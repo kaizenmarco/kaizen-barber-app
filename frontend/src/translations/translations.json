@@ -1,0 +1,50 @@
+{
+  "pt-BR": {
+    "login.titulo": "Gerenciamento de Barbearia",
+    "login.email": "Email",
+    "login.senha": "Senha",
+    "botao.entrar": "Entrar",
+    "botao.sair": "Sair",
+    "nav.dashboard": "Dashboard",
+    "nav.agendamentos": "Agendamentos",
+    "nav.clientes": "Clientes",
+    "nav.profissionais": "Profissionais",
+    "dashboard.titulo": "Bem-vindo ao Dashboard",
+    "dashboard.bem_vindo": "Gerencie sua barbearia em um único lugar",
+    "dashboard.receita_hoje": "Receita Hoje",
+    "dashboard.agendamentos_hoje": "Agendamentos Hoje",
+    "dashboard.profissionais_online": "Profissionais Online"
+  },
+  "ja": {
+    "login.titulo": "理髪店管理システム",
+    "login.email": "メールアドレス",
+    "login.senha": "パスワード",
+    "botao.entrar": "ログイン",
+    "botao.sair": "ログアウト",
+    "nav.dashboard": "ダッシュボード",
+    "nav.agendamentos": "予約",
+    "nav.clientes": "顧客",
+    "nav.profissionais": "スタイリスト",
+    "dashboard.titulo": "ダッシュボードへようこそ",
+    "dashboard.bem_vindo": "一つの場所で理髪店を管理します",
+    "dashboard.receita_hoje": "今日の売上",
+    "dashboard.agendamentos_hoje": "今日の予約",
+    "dashboard.profissionais_online": "オンラインスタイリスト"
+  },
+  "en": {
+    "login.titulo": "Barber Shop Management",
+    "login.email": "Email",
+    "login.senha": "Password",
+    "botao.entrar": "Login",
+    "botao.sair": "Logout",
+    "nav.dashboard": "Dashboard",
+    "nav.agendamentos": "Bookings",
+    "nav.clientes": "Clients",
+    "nav.profissionais": "Stylists",
+    "dashboard.titulo": "Welcome to Dashboard",
+    "dashboard.bem_vindo": "Manage your barber shop in one place",
+    "dashboard.receita_hoje": "Revenue Today",
+    "dashboard.agendamentos_hoje": "Bookings Today",
+    "dashboard.profissionais_online": "Stylists Online"
+  }
+}
