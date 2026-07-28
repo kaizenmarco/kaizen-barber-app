@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 
 function Profissionais({ t }) {
   const [profissionais, setProfissionais] = useState([
-    { id: 1, nome: 'Marco Kaizen', especialidades: 'Cortes, Barba', comissao: '40%', horario_inicio: '09:00', horario_fim: '20:30' },
-    { id: 2, nome: 'Gabriel Little Kaizen', especialidades: 'Cortes, Barba, Permanente', comissao: '40%', horario_inicio: '08:00', horario_fim: '19:00' },
-    { id: 3, nome: 'Neia', especialidades: 'Corte Feminino, Coloração, Alisamento', comissao: '40%', horario_inicio: '09:00', horario_fim: '20:30' },
+    { id: 1, nome: 'Marco Kaizen', especialidades: 'Cortes, Barba', comissao: '40%', horario_inicio: '09:00', horario_fim: '20:30', foto: '/images/marco.png' },
+    { id: 2, nome: 'Gabriel Little Kaizen', especialidades: 'Cortes, Permanente', comissao: '40%', horario_inicio: '08:00', horario_fim: '19:00', foto: '/images/gabriel.jpg' },
+    { id: 3, nome: 'Neia', especialidades: 'Corte Feminino, Coloração, Alisamento', comissao: '40%', horario_inicio: '09:00', horario_fim: '20:30', foto: '/images/neia.jpeg' },
   ]);
 
   const [novoProfissional, setNovoProfissional] = useState({
@@ -25,7 +25,8 @@ function Profissionais({ t }) {
     if (novoProfissional.nome && novoProfissional.especialidades) {
       setProfissionais([...profissionais, {
         id: profissionais.length + 1,
-        ...novoProfissional
+        ...novoProfissional,
+        foto: '/images/placeholder.png'
       }]);
       setNovoProfissional({ nome: '', especialidades: '', comissao: '40%', horario_inicio: '', horario_fim: '' });
     }
@@ -84,37 +85,20 @@ function Profissionais({ t }) {
         </form>
       </section>
 
-      <section className="list-section">
-        <h3>Lista de Profissionais</h3>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Especialidades</th>
-              <th>Comissão</th>
-              <th>Horário</th>
-              <th>Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {profissionais.map((profissional) => (
-              <tr key={profissional.id}>
-                <td>{profissional.nome}</td>
-                <td>{profissional.especialidades}</td>
-                <td>{profissional.comissao}</td>
-                <td>{profissional.horario_inicio} - {profissional.horario_fim}</td>
-                <td>
-                  <button 
-                    className="btn-delete"
-                    onClick={() => setProfissionais(profissionais.filter(p => p.id !== profissional.id))}
-                  >
-                    Deletar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <section className="profissionais-grid">
+        {profissionais.map((profissional) => (
+          <div key={profissional.id} className="profissional-card">
+            <img src={profissional.foto} alt={profissional.nome} className="profissional-foto" />
+            <div className="profissional-info">
+              <h3>{profissional.nome}</h3>
+              <p className="especialidades">{profissional.especialidades}</p>
+              <div className="detalhes">
+                <p><strong>Comissão:</strong> {profissional.comissao}</p>
+                <p><strong>Horário:</strong> {profissional.horario_inicio} - {profissional.horario_fim}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </section>
     </div>
   );

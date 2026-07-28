@@ -35,7 +35,12 @@ function App() {
 
   if (!usuario) {
     return (
-      <div className="login-container">
+      <div className="login-container" style={{
+        backgroundImage: 'linear-gradient(rgba(26, 26, 26, 0.85), rgba(26, 26, 26, 0.85)), url(/images/background.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}>
         <div className="login-box">
           <div className="language-selector">
             <button onClick={() => setIdioma('pt-BR')} className={idioma === 'pt-BR' ? 'ativo' : ''}>
@@ -49,7 +54,8 @@ function App() {
             </button>
           </div>
 
-          <h1>🏳️ Kaizen Barber Shop</h1>
+          <img src="/images/logo.png" alt="Kaizen Barber Shop" className="login-logo" />
+          <h1>Kaizen Barber Shop</h1>
           <p className="subtitle">{t('login.titulo')}</p>
 
           <form onSubmit={handleLogin}>
@@ -81,7 +87,10 @@ function App() {
   return (
     <div className="dashboard-container">
       <header className="header">
-        <h1>🏳️ Kaizen Barber Shop</h1>
+        <div className="header-left">
+          <img src="/images/logo.png" alt="Kaizen" className="header-logo" />
+          <h1>Kaizen Barber Shop</h1>
+        </div>
         <div className="header-controls">
           <select value={idioma} onChange={(e) => setIdioma(e.target.value)} className="idioma-select">
             <option value="pt-BR">🇧🇷 Português</option>
