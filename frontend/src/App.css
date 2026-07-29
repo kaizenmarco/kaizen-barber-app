@@ -49,6 +49,8 @@ body {
   width: 100%;
   max-width: 400px;
   box-shadow: 0 10px 40px rgba(212, 175, 55, 0.2);
+  position: relative;
+  z-index: 2;
 }
 
 .login-logo {
@@ -521,7 +523,6 @@ body {
   font-weight: bold;
 }
 
-/* Profissionais Cards */
 .profissionais-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -584,6 +585,817 @@ body {
   color: var(--accent-gold);
 }
 
+/* PÁGINA CLIENTE PÚBLICO */
+
+.cliente-publico-container {
+  min-height: 100vh;
+  background-color: var(--primary-dark);
+  display: flex;
+  flex-direction: column;
+}
+
+.cliente-header {
+  background: linear-gradient(135deg, var(--secondary-dark) 0%, #1a1a1a 100%);
+  border-bottom: 3px solid var(--accent-gold);
+  padding: 30px 40px;
+  box-shadow: 0 5px 15px rgba(212, 175, 55, 0.2);
+}
+
+.cliente-header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.cliente-logo {
+  max-width: 60px;
+  height: auto;
+}
+
+.cliente-header-info h1 {
+  color: var(--accent-gold);
+  font-size: 32px;
+  margin: 0;
+  margin-bottom: 5px;
+}
+
+.cliente-header-info p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.cliente-abas {
+  background-color: var(--secondary-dark);
+  border-bottom: 2px solid var(--accent-gold);
+  display: flex;
+  gap: 10px;
+  padding: 0 40px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.aba-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  padding: 15px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.aba-btn:hover {
+  color: var(--accent-gold);
+}
+
+.aba-btn.ativa {
+  color: var(--accent-gold);
+  border-bottom-color: var(--accent-gold);
+}
+
+.cliente-conteudo {
+  flex: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 40px;
+}
+
+.aba-section {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.aba-section h2 {
+  color: var(--accent-gold);
+  font-size: 28px;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+/* SERVIÇOS */
+
+.servicos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 25px;
+}
+
+.servico-card-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.servico-card-uniforme:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+  border-color: #f4a460;
+}
+
+.servico-imagem {
+  width: 100%;
+  height: 180px;
+  background-color: var(--primary-dark);
+  overflow: hidden;
+}
+
+.servico-imagem img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.servico-info-uniforme {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.servico-info-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.servico-desc {
+  color: var(--text-light);
+  font-size: 13px;
+  margin-bottom: 10px;
+  flex-grow: 1;
+}
+
+.servico-duracao {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.servico-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border-color);
+  padding-top: 15px;
+}
+
+.servico-preco {
+  color: var(--accent-gold);
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.btn-agendar-uniforme {
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  border: none;
+  padding: 8px 15px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.btn-agendar-uniforme:hover {
+  background-color: #f4a460;
+}
+
+/* DETALHES/HORÁRIOS */
+
+.servico-selecionado-info {
+  background-color: rgba(212, 175, 55, 0.1);
+  border-left: 4px solid var(--accent-gold);
+  border-radius: 8px;
+  padding: 15px 20px;
+  margin-bottom: 25px;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.horarios-grid-uniforme {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.horario-card-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.horario-card-uniforme h4 {
+  color: var(--accent-gold);
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.horario-time {
+  color: var(--text-light);
+  font-weight: bold;
+}
+
+.horario-card-uniforme.fechado {
+  opacity: 0.6;
+  border-color: var(--text-muted);
+}
+
+.horario-card-uniforme.aberto:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(212, 175, 55, 0.2);
+}
+
+/* HORÁRIOS PROFISSIONAIS UNIFORME */
+
+.horarios-profissionais-section {
+  width: 100%;
+}
+
+.btn-voltar {
+  background-color: transparent;
+  color: var(--accent-gold);
+  border: 2px solid var(--accent-gold);
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 25px;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.btn-voltar:hover {
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+}
+
+.horarios-profissionais-section h3 {
+  color: var(--accent-gold);
+  font-size: 22px;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.profissionais-horarios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 25px;
+}
+
+.prof-horarios-card-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 25px;
+  text-align: center;
+}
+
+.prof-horarios-card-uniforme:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+  border-color: #f4a460;
+}
+
+.prof-horarios-img-uniforme {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  background-color: var(--primary-dark);
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.prof-horarios-info {
+  width: 100%;
+}
+
+.prof-horarios-info h4 {
+  color: var(--accent-gold);
+  font-size: 18px;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.horarios-opcoes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.hora-btn {
+  background-color: var(--primary-dark);
+  color: var(--accent-gold);
+  border: 2px solid var(--accent-gold);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+
+.hora-btn:hover {
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.sem-disponibilidade {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 30px;
+  grid-column: 1 / -1;
+}
+
+/* ENDEREÇO */
+
+.endereco-content-uniforme {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 30px;
+}
+
+.endereco-info-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 22px;
+  margin-bottom: 15px;
+}
+
+.endereco-info-uniforme p {
+  color: var(--text-light);
+  line-height: 1.8;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.endereco-info-uniforme strong {
+  color: var(--accent-gold);
+}
+
+.btn-mapa-uniforme {
+  display: inline-block;
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  padding: 12px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.btn-mapa-uniforme:hover {
+  background-color: #f4a460;
+  transform: translateY(-2px);
+}
+
+.endereco-fotos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.foto-placeholder {
+  background-color: var(--primary-dark);
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.foto-placeholder p {
+  color: var(--text-light);
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.foto-placeholder .pequeno {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+/* PAGAMENTO */
+
+.pagamento-grid-uniforme {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 25px;
+}
+
+.pagamento-card-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 280px;
+}
+
+.pagamento-card-uniforme:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+}
+
+.pagamento-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.pagamento-card-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.pagamento-card-uniforme p {
+  color: var(--text-light);
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.pagamento-qrcode-placeholder {
+  background-color: var(--primary-dark);
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 30px;
+  margin-bottom: 15px;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagamento-qrcode-placeholder p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.pagamento-nota {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.btn-pagamento {
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  border: none;
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.btn-pagamento:hover {
+  background-color: #f4a460;
+}
+
+/* REDES SOCIAIS */
+
+.redes-grid-uniforme {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 25px;
+}
+
+.rede-card-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 250px;
+}
+
+.rede-card-uniforme:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+  border-color: #f4a460;
+}
+
+.rede-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.rede-card-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.rede-card-uniforme p {
+  color: var(--text-light);
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+.rede-card-uniforme button {
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.rede-card-uniforme button:hover {
+  background-color: #f4a460;
+}
+
+/* PROFISSIONAIS */
+
+.profissionais-lista-uniforme {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 25px;
+}
+
+.prof-card-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  gap: 20px;
+}
+
+.prof-card-uniforme:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+  border-color: #f4a460;
+}
+
+.prof-img-uniforme {
+  width: 150px;
+  height: 200px;
+  object-fit: contain;
+  background-color: var(--primary-dark);
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+.prof-info-uniforme {
+  padding: 20px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.prof-info-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+.prof-especialidade {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.prof-qualificacoes, .prof-servicos {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.prof-qualificacoes strong, .prof-servicos strong {
+  color: var(--accent-gold);
+  display: block;
+  margin-bottom: 5px;
+}
+
+.prof-qualificacoes p, .prof-servicos p {
+  color: var(--text-light);
+  margin: 3px 0;
+  line-height: 1.4;
+}
+
+/* FIDELIDADE */
+
+.fidelidade-card-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+}
+
+.fidelidade-card-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 22px;
+  margin-bottom: 25px;
+}
+
+.fidelidade-beneficios {
+  background-color: rgba(212, 175, 55, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.fidelidade-beneficios p {
+  color: var(--text-light);
+  font-size: 15px;
+  margin: 10px 0;
+  line-height: 1.6;
+}
+
+.btn-fidelidade-uniforme {
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  border: none;
+  padding: 15px 30px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.3s ease;
+}
+
+.btn-fidelidade-uniforme:hover {
+  background-color: #f4a460;
+  transform: translateY(-2px);
+}
+
+/* AVALIAÇÕES */
+
+.avaliacoes-novo-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 30px;
+  margin-bottom: 30px;
+}
+
+.avaliacoes-novo-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.avaliacao-bonus {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 25px;
+  font-style: italic;
+}
+
+.avaliacoes-novo-uniforme form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.avaliacoes-novo-uniforme input,
+.avaliacoes-novo-uniforme select,
+.avaliacoes-novo-uniforme textarea {
+  padding: 12px;
+  background-color: var(--primary-dark);
+  color: var(--text-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.avaliacoes-novo-uniforme textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.btn-enviar-avaliacao-uniforme {
+  background-color: var(--accent-gold);
+  color: var(--primary-dark);
+  border: none;
+  padding: 15px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.3s ease;
+}
+
+.btn-enviar-avaliacao-uniforme:hover {
+  background-color: #f4a460;
+  transform: translateY(-2px);
+}
+
+.avaliacoes-lista-uniforme {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 30px;
+}
+
+.avaliacoes-lista-uniforme h3 {
+  color: var(--accent-gold);
+  font-size: 18px;
+  margin-bottom: 25px;
+}
+
+.avaliacao-card-uniforme {
+  background-color: var(--primary-dark);
+  border-left: 4px solid var(--accent-gold);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 15px;
+}
+
+.avaliacao-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.avaliacao-top h4 {
+  color: var(--accent-gold);
+  font-size: 16px;
+}
+
+.estrelas-uniforme {
+  font-size: 14px;
+}
+
+.avaliacao-texto-uniforme {
+  color: var(--text-light);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.avaliacao-data-uniforme {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* FOOTER */
+
+.cliente-footer {
+  background-color: var(--secondary-dark);
+  border-top: 2px solid var(--accent-gold);
+  padding: 20px 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: auto;
+}
+
 @media (max-width: 768px) {
   .caixa-status {
     grid-template-columns: 1fr;
@@ -604,5 +1416,57 @@ body {
 
   .profissionais-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cliente-header-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .cliente-conteudo {
+    padding: 20px;
+  }
+
+  .cliente-abas {
+    padding: 0 20px;
+  }
+
+  .servicos-grid, .pagamento-grid-uniforme, .redes-grid-uniforme, .profissionais-lista-uniforme {
+    grid-template-columns: 1fr;
+  }
+
+  .endereco-content-uniforme {
+    grid-template-columns: 1fr;
+  }
+
+  .endereco-fotos {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .prof-card-uniforme {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .prof-img-uniforme {
+    width: 100%;
+    height: 150px;
+  }
+
+  .horarios-grid-uniforme {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .profissionais-horarios-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .horarios-opcoes {
+    grid-template-columns: 1fr;
+  }
+
+  .avaliacao-top {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

@@ -8,6 +8,7 @@ import Caixa from './pages/Caixa';
 import Comandas from './pages/Comandas';
 import Fidelidade from './pages/Fidelidade';
 import OrdemChegada from './pages/OrdemChegada';
+import ClientePublico from './pages/ClientePublico';
 
 function App() {
   const [usuario, setUsuario] = useState(null);
@@ -15,6 +16,7 @@ function App() {
   const [senha, setSenha] = useState('');
   const [idioma, setIdioma] = useState('pt-BR');
   const [paginaAtual, setPaginaAtual] = useState('dashboard');
+  const [mostraLogin, setMostraLogin] = useState(false);
 
   const t = (chave) => translations[idioma]?.[chave] || chave;
 
@@ -31,9 +33,11 @@ function App() {
     setEmail('');
     setSenha('');
     setPaginaAtual('dashboard');
+    setMostraLogin(false);
   };
 
-  if (!usuario) {
+  // Se não está logado e quer ver a página de login
+  if (!usuario && mostraLogin) {
     return (
       <div className="login-container" style={{
         backgroundImage: 'linear-gradient(rgba(26, 26, 26, 0.85), rgba(26, 26, 26, 0.85)), url(/images/background.png)',
@@ -79,11 +83,48 @@ function App() {
           <p className="demo-hint">
             Demo: marco@kaizen.com.br / 123
           </p>
+
+          <p style={{ textAlign: 'center', marginTop: '20px' }}>
+            <button onClick={() => setMostraLogin(false)} style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--accent-gold)',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              fontSize: '14px'
+            }}>
+              ← Voltar ao início
+            </button>
+          </p>
         </div>
       </div>
     );
   }
 
+  // Se não está logado, mostra a página pública
+  if (!usuario) {
+    return (
+      <>
+        <ClientePublico />
+        <div style={{ textAlign: 'center', padding: '20px', background: 'var(--secondary-dark)', borderTop: '2px solid var(--accent-gold)' }}>
+          <button onClick={() => setMostraLogin(true)} style={{
+            background: 'var(--accent-gold)',
+            color: 'var(--primary-dark)',
+            border: 'none',
+            padding: '12px 30px',
+            borderRadius: '6px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}>
+            🔐 Acesso Profissional
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // Se está logado, mostra o app admin
   return (
     <div className="dashboard-container">
       <header className="header">
