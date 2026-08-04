@@ -1395,7 +1395,74 @@ body {
   font-size: 13px;
   margin-top: auto;
 }
+/* MODAL AVISO POLÍTICA */
+.aviso-politica-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
 
+.aviso-politica-content {
+  background-color: var(--secondary-dark);
+  border: 2px solid var(--accent-gold);
+  border-radius: 12px;
+  padding: 30px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.aviso-politica-content h3 {
+  color: var(--accent-gold);
+  font-size: 22px;
+  margin-bottom: 20px;
+}
+
+.aviso-politica-texto {
+  background-color: var(--primary-dark);
+  border-left: 4px solid var(--accent-gold);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.aviso-politica-texto p {
+  color: var(--text-light);
+  margin: 10px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.aviso-politica-texto ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.aviso-politica-texto li {
+  color: var(--text-light);
+  margin: 10px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.aviso-politica-content input,
+.aviso-politica-content select {
+  width: 100%;
+  padding: 10px;
+  background-color: var(--primary-dark);
+  color: var(--text-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
 @media (max-width: 768px) {
   .caixa-status {
     grid-template-columns: 1fr;

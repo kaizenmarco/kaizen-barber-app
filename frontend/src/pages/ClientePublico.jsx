@@ -1,9 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 function ClientePublico() {
   const [abaAtiva, setAbaAtiva] = useState('servicos');
-  const [diaEscolhido, setDiaEscolhido] = useState(null);
-  const [servicoSelecionado, setServicoSelecionado] = useState(null);
+  const [mesAtual, setMesAtual] = useState(new Date());
+  const [agendamentoConfirmado, setAgendamentoConfirmado] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+  const [horariosOcupados, setHorariosOcupados] = useState({});
+  const [pontosCliente, setPontosCliente] = useState(0);
+  const [usarPontos, setUsarPontos] = useState(false);
+  const [carregandoPontos, setCarregandoPontos] = useState(false);
+  const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
+  
+  const [dadosAgendamento, setDadosAgendamento] = useState({
+    nome: '',
+    email: '',
+    telefone: '',
+    profissional: '',
+    hora: '',
+    servico: '',
+    data: ''
+  });
+
   const [avaliacoes, setAvaliacoes] = useState([
     { id: 1, nome: 'João Silva', estrelas: 5, texto: 'Excelente atendimento! Marco é o melhor barbeiro!', data: '2026-07-25' },
     { id: 2, nome: 'Carlos Santos', estrelas: 5, texto: 'Ambiente perfeito e profissionais incríveis!', data: '2026-07-20' },
@@ -15,19 +33,20 @@ function ClientePublico() {
   });
 
   const servicos = [
-    { id: 1, nome: 'Corte', preco: '¥4.000', duracao: '45 min', descricao: 'Corte de cabelo masculino', imagem: '/images/placeholder.jpg', profissionaisIds: [1, 2] },
-    { id: 2, nome: 'Corte + Sobrancelhas', preco: '¥4.500', duracao: '45 min', descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/placeholder.jpg', profissionaisIds: [1, 2] },
-    { id: 3, nome: 'Corte + Barba', preco: '¥6.500', duracao: '60 min', descricao: 'Corte e modelagem profissional de barba', imagem: '/images/placeholder.jpg', profissionaisIds: [1, 2] },
-    { id: 4, nome: 'Coloração', preco: '¥15.000', duracao: '90 min', descricao: 'Coloração profissional com tratamento', imagem: '/images/placeholder.jpg', profissionaisIds: [3] },
-    { id: 5, nome: 'Alisamento', preco: '¥15.000', duracao: '90 min', descricao: 'Alisamento e tratamento capilar', imagem: '/images/placeholder.jpg', profissionaisIds: [3] },
-    { id: 6, nome: 'Corte Feminino', preco: '¥4.000', duracao: '45 min', descricao: 'Corte moderno feminino', imagem: '/images/placeholder.jpg', profissionaisIds: [3] },
-    { id: 7, nome: 'Permanente', preco: '¥6.000', duracao: '60 min', descricao: 'Permanente enrolado profissional', imagem: '/images/placeholder.jpg', profissionaisIds: [1, 2] },
-    { id: 8, nome: 'Limpeza de Pele', preco: '¥5.000', duracao: '45 min', descricao: 'Limpeza facial profunda', imagem: '/images/placeholder.jpg', profissionaisIds: [3] },
+    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', preco: 4000, duracao: '45 min', descricao: 'Corte de cabelo masculino', imagem: '/images/servico_corte.png' },
+    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', preco: 4500, duracao: '45 min', descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/servico_corte_sobrancelhas.png' },
+    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', preco: 6500, duracao: '60 min', descricao: 'Corte e modelagem profissional de barba', imagem: '/images/servico_corte_barba.png' },
+    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração', preco: 15000, duracao: '90 min', descricao: 'Coloração profissional com tratamento', imagem: '/images/servico_coloracao.png' },
+    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento', preco: 15000, duracao: '90 min', descricao: 'Alisamento e tratamento capilar', imagem: '/images/servico_alisamento.png' },
+    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino', preco: 4000, duracao: '45 min', descricao: 'Corte moderno feminino', imagem: '/images/servico_corte_feminino.png' },
+    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente', preco: 6000, duracao: '60 min', descricao: 'Permanente enrolado profissional', imagem: '/images/servico_permanente.png' },
+    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele', preco: 5000, duracao: '45 min', descricao: 'Limpeza facial profunda', imagem: '/images/servico_limpeza_pele.png' },
   ];
 
   const profissionais = [
     { 
       id: 1, 
+      uuid: '11c0c7fb-e020-4c49-ab0a-28a16109b35f',
       nome: 'Marco Kaizen', 
       especialidade: 'Especialista em Cortes e Barba',
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
@@ -37,53 +56,236 @@ function ClientePublico() {
     },
     { 
       id: 2, 
+      uuid: '66266181-d06b-4f54-bcc9-12dccc100cb4',
       nome: 'Gabriel Little Kaizen', 
       especialidade: 'Especialista em Cortes',
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
-      imagem: '/images/gabriel.jpg',
+      imagem: '/images/gabriel.png',
       horarios: { segunda: ['10:00', '11:00', '14:00', '15:00'], terca: [], quarta: ['10:00', '11:00', '14:00', '15:00'], quinta: ['10:00', '11:00', '14:00', '15:00'], sexta: ['10:00', '11:00', '14:00', '15:00'], sabado: ['10:00', '14:00'], domingo: ['11:00', '14:00'] }
     },
     { 
       id: 3, 
+      uuid: 'ad232428-9872-46db-82b3-27819ab353ff',
       nome: 'Neia', 
       especialidade: 'Especialista em Coloração e Estética',
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
-      imagem: '/images/neia.jpeg',
+      imagem: '/images/neia.png',
       horarios: { segunda: ['09:00', '11:00', '15:00', '16:00', '17:00'], terca: [], quarta: ['09:00', '11:00', '15:00', '16:00', '17:00'], quinta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sexta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sabado: ['11:00', '15:00'], domingo: ['09:00', '16:00'] }
     },
   ];
 
-  const horarios = [
-    { dia: 'Segunda', key: 'segunda', status: 'aberto' },
-    { dia: 'Terça', key: 'terca', status: 'fechado' },
-    { dia: 'Quarta', key: 'quarta', status: 'aberto' },
-    { dia: 'Quinta', key: 'quinta', status: 'aberto' },
-    { dia: 'Sexta', key: 'sexta', status: 'aberto' },
-    { dia: 'Sábado', key: 'sabado', status: 'aberto' },
-    { dia: 'Domingo', key: 'domingo', status: 'aberto' },
-  ];
+  useEffect(() => {
+    buscarHorariosOcupados();
+  }, [mesAtual]);
 
-  const formasPagamento = [
-    { id: 1, nome: 'Dinheiro', icon: '💵', descricao: 'Yen em espécie', qrcode: false },
-    { id: 2, nome: 'Cartão', icon: '💳', descricao: 'Visa, Mastercard, AmEx', qrcode: true },
-    { id: 3, nome: 'PayPay', icon: '📱', descricao: 'Aplicativo PayPay', qrcode: true },
-  ];
+  useEffect(() => {
+    if (dadosAgendamento.email && dadosAgendamento.email.includes('@')) {
+      buscarPontosCliente();
+    }
+  }, [dadosAgendamento.email]);
 
-  const redesSociais = [
-    { id: 1, nome: 'Instagram', icon: '📸', url: 'https://instagram.com/marco.kaizen', botao: 'Seguir' },
-    { id: 2, nome: 'WhatsApp', icon: '💬', url: 'https://wa.me/81809724251', botao: 'Mensagem' },
-    { id: 3, nome: 'TikTok', icon: '🎵', url: 'https://tiktok.com', botao: 'Seguir' },
-  ];
+  const buscarPontosCliente = async () => {
+    setCarregandoPontos(true);
+    try {
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('email', dadosAgendamento.email);
 
-  const handleAgendar = (servico) => {
-    setServicoSelecionado(servico);
-    setAbaAtiva('detalhes');
+      if (!clientes || clientes.length === 0) {
+        setPontosCliente(0);
+        setCarregandoPontos(false);
+        return;
+      }
+
+      const cliente = clientes[0];
+
+      const { data: agendamentos, error } = await supabase
+        .from('agendamentos')
+        .select('id')
+        .eq('cliente_id', cliente.id)
+        .eq('status', 'REALIZADO');
+
+      if (error) throw error;
+
+      const pontos = (agendamentos?.length || 0) * 2;
+      setPontosCliente(pontos);
+    } catch (error) {
+      console.error('Erro ao buscar pontos:', error);
+      setPontosCliente(0);
+    } finally {
+      setCarregandoPontos(false);
+    }
   };
 
-  const handleAgendarHorario = (profissional, hora) => {
-    alert(`✅ Redirecionando para agendar ${servicoSelecionado?.nome} com ${profissional} às ${hora}`);
+  const buscarHorariosOcupados = async () => {
+    try {
+      const ano = mesAtual.getFullYear();
+      const mes = mesAtual.getMonth();
+      
+      const primeiroDia = new Date(ano, mes, 1);
+      const ultimoDia = new Date(ano, mes + 1, 0);
+      
+      const dataInicio = primeiroDia.toISOString().split('T')[0];
+      const dataFim = ultimoDia.toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('agendamentos')
+        .select('profissional_id, data_hora, status')
+        .gte('data_hora', `${dataInicio}T00:00:00`)
+        .lte('data_hora', `${dataFim}T23:59:59`)
+        .in('status', ['CONFIRMADO', 'REALIZADO']);
+
+      if (error) throw error;
+
+      const ocupados = {};
+      data.forEach(agendamento => {
+        const profUUID = agendamento.profissional_id;
+        const dataHora = agendamento.data_hora;
+
+        if (!ocupados[profUUID]) {
+          ocupados[profUUID] = [];
+        }
+        ocupados[profUUID].push(dataHora);
+      });
+
+      setHorariosOcupados(ocupados);
+    } catch (error) {
+      console.error('Erro ao buscar horários:', error);
+    }
+  };
+
+  const getDiaSemana = (data) => {
+    const dias = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    return dias[data.getDay()];
+  };
+
+  const getHorariosProfissional = (prof, data) => {
+    const diaSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'][data.getDay()];
+    const horariosBase = prof.horarios[diaSemana] || [];
+    const horariosOcupadosDeste = horariosOcupados[prof.uuid] || [];
+    
+    return horariosBase.filter(h => {
+      const dataHoraCompleta = `${data.toISOString().split('T')[0]}T${h}:00`;
+      return !horariosOcupadosDeste.some(o => o.startsWith(dataHoraCompleta.substring(0, 16)));
+    });
+  };
+
+  const calcularPrecoFinal = () => {
+    if (!dadosAgendamento.servico) return 0;
+    const servico = servicos.find(s => s.nome === dadosAgendamento.servico);
+    if (!servico) return 0;
+    let preco = servico.preco;
+    if (usarPontos && pontosCliente >= 10) {
+      preco -= 500;
+    }
+    return Math.max(0, preco);
+  };
+
+  const handleSelecionarDiaHorario = (data, prof, hora) => {
+    setDiaHorarioSelecionado({ data, prof, hora });
+    setDadosAgendamento({
+      ...dadosAgendamento,
+      data: data.toISOString().split('T')[0],
+      profissional: prof.nome,
+      hora: hora
+    });
+  };
+
+  const handleConfirmarAgendamento = async () => {
+    if (!dadosAgendamento.nome || !dadosAgendamento.email) {
+      alert('⚠️ Preencha seu nome e email!');
+      return;
+    }
+
+    if (!dadosAgendamento.servico) {
+      alert('⚠️ Selecione um serviço!');
+      return;
+    }
+
+    if (usarPontos && pontosCliente < 10) {
+      alert('⚠️ Você não tem pontos suficientes para resgatar desconto!');
+      return;
+    }
+
+    setCarregando(true);
+
+    try {
+      let clienteId = null;
+      
+      const { data: clientesExistentes } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('email', dadosAgendamento.email);
+
+      if (clientesExistentes && clientesExistentes.length > 0) {
+        clienteId = clientesExistentes[0].id;
+      } else {
+        const { data: novoCliente, error: erroClienteInsert } = await supabase
+          .from('clientes')
+          .insert([
+            {
+              nome: dadosAgendamento.nome,
+              email: dadosAgendamento.email,
+              telefone: dadosAgendamento.telefone || null
+            }
+          ])
+          .select('id')
+          .single();
+
+        if (erroClienteInsert) throw erroClienteInsert;
+        clienteId = novoCliente.id;
+      }
+
+      const profissionalUUID = diaHorarioSelecionado.prof.uuid;
+      const servicoSelecionado = servicos.find(s => s.nome === dadosAgendamento.servico);
+      const servicoUUID = servicoSelecionado.uuid;
+      const precoFinal = calcularPrecoFinal();
+
+      const { error } = await supabase
+        .from('agendamentos')
+        .insert([
+          {
+            cliente_id: clienteId,
+            profissional_id: profissionalUUID,
+            servico_id: servicoUUID,
+            data_hora: `${dadosAgendamento.data}T${dadosAgendamento.hora}:00`,
+            status: 'CONFIRMADO',
+            preco_final: precoFinal,
+            observacoes: usarPontos ? 'Desconto de pontos de fidelidade aplicado (-¥500)' : null
+          }
+        ]);
+
+      if (error) throw error;
+
+      setAgendamentoConfirmado({
+        numero: Math.floor(Math.random() * 100000),
+        profissional: dadosAgendamento.profissional,
+        servico: dadosAgendamento.servico,
+        data: new Date(dadosAgendamento.data).toLocaleDateString('pt-BR'),
+        hora: dadosAgendamento.hora,
+        precoOriginal: servicoSelecionado.preco,
+        precoFinal: precoFinal,
+        desconto: usarPontos ? 500 : 0
+      });
+
+      setDadosAgendamento({ nome: '', email: '', telefone: '', profissional: '', hora: '', servico: '', data: '' });
+      setUsarPontos(false);
+      setPontosCliente(0);
+      setDiaHorarioSelecionado(null);
+
+      setTimeout(() => {
+        setAgendamentoConfirmado(null);
+        setAbaAtiva('servicos');
+      }, 5000);
+
+    } catch (error) {
+      alert('❌ Erro ao agendar: ' + error.message);
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const handleAdicionarAvaliacao = (e) => {
@@ -96,83 +298,77 @@ function ClientePublico() {
         data: hoje
       }]);
       setNovaAvaliacao({ nome: '', estrelas: 5, texto: '' });
-      alert('✅ Avaliação enviada! Use o código AVALIACAOKAIZEN para ganhar 20% OFF');
+      alert('✅ Avaliação enviada!');
     }
   };
 
   const renderizarEstrelas = (num) => {
-    return '⭐'.repeat(num);
+    return '★'.repeat(num);
   };
 
-  const obterHorariosDisponiveis = (dia) => {
-    if (dia === 'terca' || !dia) {
-      return {};
-    }
+  const gerarCalendario = () => {
+    const ano = mesAtual.getFullYear();
+    const mes = mesAtual.getMonth();
     
-    const horariosDisponiveis = {};
-    
-    // Se tem um serviço com profissionais específicos, filtra apenas esses
-    if (servicoSelecionado && servicoSelecionado.profissionaisIds) {
-      profissionais.forEach(prof => {
-        if (servicoSelecionado.profissionaisIds.includes(prof.id)) {
-          const horarios = prof.horarios[dia] || [];
-          if (horarios.length > 0) {
-            horariosDisponiveis[prof.id] = {
-              nome: prof.nome,
-              imagem: prof.imagem,
-              horarios: horarios
-            };
-          }
-        }
-      });
-    } else {
-      // Se não tem profissionais específicos, mostra todos
-      profissionais.forEach(prof => {
-        const horarios = prof.horarios[dia] || [];
-        if (horarios.length > 0) {
-          horariosDisponiveis[prof.id] = {
-            nome: prof.nome,
-            imagem: prof.imagem,
-            horarios: horarios
-          };
-        }
-      });
-    }
-    
-    return horariosDisponiveis;
+    const primeiroDia = new Date(ano, mes, 1);
+    const ultimoDia = new Date(ano, mes + 1, 0);
+    const diasMes = ultimoDia.getDate();
+    const diaInicio = primeiroDia.getDay();
+
+    const dias = [];
+    for (let i = 0; i < diaInicio; i++) dias.push(null);
+    for (let i = 1; i <= diasMes; i++) dias.push(new Date(ano, mes, i));
+    return dias;
   };
+
+  if (agendamentoConfirmado) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#1a1a1a' }}>
+        <div style={{ background: '#2d2d2d', border: '2px solid #d4af37', borderRadius: '12px', padding: '40px', textAlign: 'center', maxWidth: '500px' }}>
+          <h2 style={{ color: '#d4af37', fontSize: '28px', marginBottom: '20px' }}>✅ AGENDAMENTO CONFIRMADO!</h2>
+          <div style={{ color: '#e8e8e8', fontSize: '16px', lineHeight: '1.8', marginBottom: '30px' }}>
+            <p><strong>Número:</strong> #{agendamentoConfirmado.numero}</p>
+            <p><strong>Profissional:</strong> {agendamentoConfirmado.profissional}</p>
+            <p><strong>Serviço:</strong> {agendamentoConfirmado.servico}</p>
+            <p><strong>Data:</strong> {agendamentoConfirmado.data}</p>
+            <p><strong>Hora:</strong> {agendamentoConfirmado.hora}</p>
+            <p><strong>Preço:</strong> ¥{agendamentoConfirmado.precoFinal.toLocaleString('ja-JP')}</p>
+          </div>
+          <p style={{ color: '#d4af37', fontSize: '14px', fontWeight: 'bold' }}>⏱️ Redirecionando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="cliente-publico-container">
-      {/* Header */}
-      <header className="cliente-header">
-        <div className="cliente-header-content">
-          <img src="/images/logo.png" alt="Kaizen" className="cliente-logo" />
-          <div className="cliente-header-info">
-            <h1>Kaizen Barber Shop</h1>
-            <p>Premium Barbershop - Anjo, Aichi</p>
-          </div>
-        </div>
+    <div style={{ background: '#1a1a1a', color: '#e8e8e8', minHeight: '100vh' }}>
+      <header style={{ borderBottom: '3px solid #d4af37', padding: '20px', textAlign: 'center' }}>
+        <img src="/images/logo.png" alt="Kaizen" style={{ width: '60px', height: '60px', marginBottom: '10px' }} />
+        <h1 style={{ color: '#d4af37', fontSize: '32px', margin: '0' }}>Kaizen Barber Shop</h1>
+        <p style={{ color: '#999', margin: '0' }}>Premium Barbershop - Anjo, Aichi</p>
       </header>
 
-      {/* Abas Horizontais */}
-      <nav className="cliente-abas">
+      <nav style={{ display: 'flex', gap: '10px', padding: '20px', borderBottom: '1px solid #404040', overflowX: 'auto' }}>
         {[
-          { id: 'servicos', label: '💈 Serviços', icon: '💈' },
-          { id: 'detalhes', label: 'ℹ️ Detalhes', icon: 'ℹ️' },
-          { id: 'endereco', label: '📍 Endereço', icon: '📍' },
-          { id: 'pagamento', label: '💳 Pagamento', icon: '💳' },
-          { id: 'redes', label: '📱 Redes', icon: '📱' },
-          { id: 'profissionais', label: '👥 Profissionais', icon: '👥' },
-          { id: 'fidelidade', label: '🎁 Fidelidade', icon: '🎁' },
-          { id: 'avaliacoes', label: '⭐ Avaliações', icon: '⭐' },
+          { id: 'servicos', label: '💈 Serviços' },
+          { id: 'agendar', label: '📅 Agendar' },
+          { id: 'endereco', label: '📍 Endereço' },
+          { id: 'profissionais', label: '👥 Profissionais' },
+          { id: 'fidelidade', label: '🎁 Fidelidade' },
+          { id: 'avaliacoes', label: '★ Avaliações' },
         ].map((aba) => (
           <button 
             key={aba.id}
-            className={`aba-btn ${abaAtiva === aba.id ? 'ativa' : ''}`}
-            onClick={() => {
-              setAbaAtiva(aba.id);
-              setDiaEscolhido(null);
+            onClick={() => setAbaAtiva(aba.id)}
+            style={{
+              padding: '10px 15px',
+              background: abaAtiva === aba.id ? '#d4af37' : 'transparent',
+              color: abaAtiva === aba.id ? '#1a1a1a' : '#d4af37',
+              border: '1px solid #d4af37',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap'
             }}
           >
             {aba.label}
@@ -180,31 +376,21 @@ function ClientePublico() {
         ))}
       </nav>
 
-      {/* Conteúdo das Abas */}
-      <main className="cliente-conteudo">
+      <main style={{ padding: '30px', maxWidth: '1200px', margin: '0 auto' }}>
         
-        {/* SERVIÇOS */}
         {abaAtiva === 'servicos' && (
-          <section className="aba-section">
-            <h2>💈 Nossos Serviços</h2>
-            <div className="servicos-grid">
+          <section>
+            <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>💈 Nossos Serviços</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {servicos.map((servico) => (
-                <div key={servico.id} className="servico-card-uniforme">
-                  <div className="servico-imagem">
-                    <img src={servico.imagem} alt={servico.nome} />
-                  </div>
-                  <div className="servico-info-uniforme">
-                    <h3>{servico.nome}</h3>
-                    <p className="servico-desc">{servico.descricao}</p>
-                    <p className="servico-duracao">⏱️ {servico.duracao}</p>
-                    <div className="servico-footer">
-                      <span className="servico-preco">{servico.preco}</span>
-                      <button 
-                        className="btn-agendar-uniforme"
-                        onClick={() => handleAgendar(servico)}
-                      >
-                        Agendar
-                      </button>
+                <div key={servico.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
+                  <img src={servico.imagem} alt={servico.nome} style={{ width: '100%', height: '250px', objectFit: 'cover' }} />
+                  <div style={{ padding: '15px' }}>
+                    <h3 style={{ color: '#d4af37', marginTop: '0' }}>{servico.nome}</h3>
+                    <p style={{ color: '#999', fontSize: '14px', margin: '5px 0' }}>{servico.descricao}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
+                      <span style={{ color: '#d4af37', fontWeight: 'bold' }}>¥{servico.preco.toLocaleString('ja-JP')}</span>
+                      <button onClick={() => setAbaAtiva('agendar')} style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '8px 12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Agendar</button>
                     </div>
                   </div>
                 </div>
@@ -213,183 +399,113 @@ function ClientePublico() {
           </section>
         )}
 
-        {/* DETALHES */}
-        {abaAtiva === 'detalhes' && (
-          <section className="aba-section">
-            <h2>ℹ️ Horários de Atendimento</h2>
-            {servicoSelecionado && (
-              <div className="servico-selecionado-info">
-                <p>Serviço selecionado: <strong>{servicoSelecionado.nome}</strong> ({servicoSelecionado.preco})</p>
+        {abaAtiva === 'agendar' && (
+          <section style={{
+            backgroundImage: 'url(/images/interior.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)'
+          }}>
+            <div style={{
+              background: 'rgba(26, 26, 26, 0.35)',
+              padding: '30px'
+            }}>
+              <h2 style={{ color: '#d4af37', marginBottom: '20px' }}>📅 Calendário de Agendamentos</h2>
+              
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                <button onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1))} style={{ padding: '8px 16px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>← Anterior</button>
+                <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '200px', textAlign: 'center', fontSize: '18px' }}>
+                  {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                </span>
+                <button onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1))} style={{ padding: '8px 16px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Próximo →</button>
               </div>
-            )}
-            {!diaEscolhido ? (
-              <div className="horarios-grid-uniforme">
-                {horarios.map((h) => (
-                  <button
-                    key={h.key}
-                    className={`horario-card-uniforme ${h.status}`}
-                    onClick={() => h.status === 'aberto' && setDiaEscolhido(h.key)}
-                    style={{ cursor: h.status === 'aberto' ? 'pointer' : 'not-allowed' }}
-                  >
-                    <h4>{h.dia}</h4>
-                    <p className="horario-time">
-                      {h.status === 'aberto' ? '🟢 Clique para ver profissionais' : '🔴 Fechado'}
-                    </p>
-                  </button>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', marginBottom: '30px' }}>
+                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(dia => (
+                  <div key={dia} style={{ textAlign: 'center', color: '#d4af37', fontWeight: 'bold', padding: '10px' }}>{dia}</div>
                 ))}
-              </div>
-            ) : (
-              <div className="horarios-profissionais-section">
-                <button 
-                  className="btn-voltar"
-                  onClick={() => setDiaEscolhido(null)}
-                >
-                  ← Voltar aos dias
-                </button>
-                <h3>Profissionais Disponíveis - {horarios.find(h => h.key === diaEscolhido)?.dia}</h3>
-                <div className="profissionais-horarios-grid">
-                  {Object.entries(obterHorariosDisponiveis(diaEscolhido)).length > 0 ? (
-                    Object.entries(obterHorariosDisponiveis(diaEscolhido)).map(([profId, profData]) => (
-                      <div key={profId} className="prof-horarios-card-uniforme">
-                        <img src={profData.imagem} alt={profData.nome} className="prof-horarios-img-uniforme" />
-                        <div className="prof-horarios-info">
-                          <h4>{profData.nome}</h4>
-                          <div className="horarios-opcoes">
-                            {profData.horarios.map((hora) => (
-                              <button 
-                                key={hora} 
-                                className="hora-btn"
-                                onClick={() => handleAgendarHorario(profData.nome, hora)}
-                              >
-                                {hora}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                
+                {gerarCalendario().map((data, idx) => {
+                  if (!data) return <div key={`vazio-${idx}`}></div>;
+
+                  const hoje = new Date();
+                  const ehPassado = data < hoje && data.getDate() !== hoje.getDate();
+                  
+                  return (
+                    <div key={data.toISOString()} style={{ border: '2px solid #d4af37', padding: '10px', borderRadius: '6px', background: 'rgba(45, 45, 45, 0.8)', minHeight: '140px', opacity: ehPassado ? 0.5 : 1 }}>
+                      <div style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '8px' }}>{data.getDate()}</div>
+                      <div style={{ fontSize: '10px' }}>
+                        {!ehPassado && profissionais.map(prof => {
+                          const horarios = getHorariosProfissional(prof, data);
+                          return horarios.length > 0 ? (
+                            <div key={prof.id} style={{ marginBottom: '5px' }}>
+                              <div style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '9px' }}>{prof.nome}:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                                {horarios.map(h => (
+                                  <button key={h} onClick={() => handleSelecionarDiaHorario(data, prof, h)} style={{ background: '#4ade80', color: '#1a1a1a', border: 'none', borderRadius: '3px', padding: '2px 4px', fontSize: '8px', fontWeight: 'bold', cursor: 'pointer' }}>{h}</button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null;
+                        })}
                       </div>
-                    ))
-                  ) : (
-                    <p className="sem-disponibilidade">Sem profissionais disponíveis neste dia</p>
-                  )}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+
+              {diaHorarioSelecionado && (
+                <div style={{ background: 'rgba(45, 45, 45, 0.95)', border: '2px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
+                  <h3 style={{ color: '#d4af37' }}>📅 Resumo</h3>
+                  <p><strong>Data:</strong> {diaHorarioSelecionado.data.toLocaleDateString('pt-BR')}</p>
+                  <p><strong>Hora:</strong> {diaHorarioSelecionado.hora}</p>
+                  <p><strong>Profissional:</strong> {diaHorarioSelecionado.prof.nome}</p>
+
+                  <input type="text" placeholder="Nome" value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+                  <input type="email" placeholder="Email" value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+                  <input type="tel" placeholder="Telefone" value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+                  <select value={dadosAgendamento.servico} onChange={(e) => setDadosAgendamento({...dadosAgendamento, servico: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}>
+                    <option value="">Selecione serviço</option>
+                    {servicos.map(s => (<option key={s.id} value={s.nome}>{s.nome}</option>))}
+                  </select>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => setDiaHorarioSelecionado(null)} style={{ background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
+                    <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ flex: 1, background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px', borderRadius: '4px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer' }}>{carregando ? '⏳' : '✅ Confirmar'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
         )}
 
-        {/* ENDEREÇO */}
         {abaAtiva === 'endereco' && (
-          <section className="aba-section">
-            <h2>📍 Nossa Localização</h2>
-            <div className="endereco-content-uniforme">
-              <div className="endereco-info-uniforme">
-                <h3>Kaizen Barber Shop</h3>
-                <p><strong>Endereço Completo:</strong><br />
-                Aichi-Ken Anjo-Shi<br />
-                Hamatomi-Cho 4-17<br />
-                San City Oomy 302</p>
-                <p><strong>Referência:</strong><br />
-                Do outro lado da rua em relação ao McDonald's do Korona World</p>
-                <a href="https://www.google.com/maps/search/Anjo+Aichi+Hamatomi+Cho+4-17/@35.01,-136.91,15z" target="_blank" rel="noopener noreferrer" className="btn-mapa-uniforme">
-                  🗺️ Ver no Google Maps
-                </a>
-              </div>
-              <div className="endereco-fotos">
-                <div className="foto-placeholder">
-                  <p>Fachada da Barbearia</p>
-                  <p className="pequeno">(Foto em breve)</p>
-                </div>
-                <div className="foto-placeholder">
-                  <p>Interior da Barbearia</p>
-                  <p className="pequeno">(Foto em breve)</p>
-                </div>
-                <div className="foto-placeholder">
-                  <p>Ambiente</p>
-                  <p className="pequeno">(Foto em breve)</p>
-                </div>
-                <div className="foto-placeholder">
-                  <p>Detalhes</p>
-                  <p className="pequeno">(Foto em breve)</p>
-                </div>
+          <section>
+            <h2 style={{ color: '#d4af37' }}>📍 Localização</h2>
+            <div style={{ maxWidth: '600px' }}>
+              <h3>Kaizen Barber Shop</h3>
+              <p>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                <img src="/images/fachada.png" alt="Fachada" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/interior.png" alt="Interior" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
               </div>
             </div>
           </section>
         )}
 
-        {/* FORMAS DE PAGAMENTO */}
-        {abaAtiva === 'pagamento' && (
-          <section className="aba-section">
-            <h2>💳 Formas de Pagamento</h2>
-            <div className="pagamento-grid-uniforme">
-              {formasPagamento.map((pag) => (
-                <div key={pag.id} className="pagamento-card-uniforme">
-                  <div className="pagamento-icon">{pag.icon}</div>
-                  <h3>{pag.nome}</h3>
-                  <p>{pag.descricao}</p>
-                  {pag.qrcode && (
-                    <div className="pagamento-qrcode-placeholder">
-                      <p>QR Code</p>
-                    </div>
-                  )}
-                  {!pag.qrcode ? (
-                    <p className="pagamento-nota">Aceito na barbearia</p>
-                  ) : (
-                    <button className="btn-pagamento">Usar</button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* REDES SOCIAIS */}
-        {abaAtiva === 'redes' && (
-          <section className="aba-section">
-            <h2>📱 Redes Sociais</h2>
-            <div className="redes-grid-uniforme">
-              {redesSociais.map((rede) => (
-                <a 
-                  key={rede.id}
-                  href={rede.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="rede-card-uniforme"
-                >
-                  <div className="rede-icon">{rede.icon}</div>
-                  <h3>{rede.nome}</h3>
-                  <p>
-                    {rede.nome === 'WhatsApp' ? '+81 80-9724-2512' : 
-                     rede.nome === 'Instagram' ? '@marco.kaizen' :
-                     rede.nome === 'TikTok' ? 'Em breve' : ''}
-                  </p>
-                  <button>{rede.botao}</button>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* PROFISSIONAIS */}
         {abaAtiva === 'profissionais' && (
-          <section className="aba-section">
-            <h2>👥 Nossos Profissionais</h2>
-            <div className="profissionais-lista-uniforme">
+          <section>
+            <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>👥 Profissionais</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {profissionais.map((prof) => (
-                <div key={prof.id} className="prof-card-uniforme">
-                  <img src={prof.imagem} alt={prof.nome} className="prof-img-uniforme" />
-                  <div className="prof-info-uniforme">
-                    <h3>{prof.nome}</h3>
-                    <p className="prof-especialidade">{prof.especialidade}</p>
-                    <div className="prof-qualificacoes">
-                      <strong>Qualificações:</strong>
-                      {prof.qualificacoes.map((qual, idx) => (
-                        <p key={idx}>✓ {qual}</p>
-                      ))}
-                    </div>
-                    <div className="prof-servicos">
-                      <strong>Serviços:</strong>
-                      <p>{prof.servicos.join(', ')}</p>
-                    </div>
+                <div key={prof.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
+                  <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', height: '250px', objectFit: 'cover' }} />
+                  <div style={{ padding: '15px' }}>
+                    <h3 style={{ color: '#d4af37' }}>{prof.nome}</h3>
+                    <p style={{ color: '#999', fontSize: '14px' }}>{prof.especialidade}</p>
                   </div>
                 </div>
               ))}
@@ -397,78 +513,40 @@ function ClientePublico() {
           </section>
         )}
 
-        {/* FIDELIDADE */}
         {abaAtiva === 'fidelidade' && (
-          <section className="aba-section">
-            <h2>🎁 Programa de Fidelidade</h2>
-            <div className="fidelidade-card-uniforme">
-              <h3>Ganhe pontos a cada visita!</h3>
-              <div className="fidelidade-beneficios">
-                <p>✅ <strong>2 pontos</strong> por cada serviço realizado</p>
-                <p>✅ <strong>10 pontos</strong> = <strong>¥500</strong> de desconto</p>
-                <p>✅ Válido por <strong>3 meses</strong></p>
-                <p>✅ <strong>Intransferível</strong> (pessoal)</p>
-              </div>
-              <button className="btn-fidelidade-uniforme">Participar do Programa</button>
+          <section>
+            <h2 style={{ color: '#d4af37' }}>🎁 Fidelidade</h2>
+            <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px' }}>
+              <p>✅ 2 pontos por serviço realizado</p>
+              <p>✅ 10 pontos = ¥500 de desconto</p>
+              <p style={{ color: '#d4af37', fontWeight: 'bold' }}>Você já é membro! 🎉</p>
             </div>
           </section>
         )}
 
-        {/* AVALIAÇÕES */}
         {abaAtiva === 'avaliacoes' && (
-          <section className="aba-section">
-            <h2>⭐ Avaliações</h2>
-            
-            <div className="avaliacoes-novo-uniforme">
-              <h3>📝 Deixe sua avaliação!</h3>
-              <p className="avaliacao-bonus">✨ Ganhe 20% de desconto ao avaliar serviços, profissionais e ambiente</p>
+          <section>
+            <h2 style={{ color: '#d4af37' }}>★ Avaliações</h2>
+            <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '30px', maxWidth: '600px' }}>
+              <h3 style={{ color: '#d4af37' }}>Deixe sua avaliação!</h3>
               <form onSubmit={handleAdicionarAvaliacao}>
-                <input
-                  type="text"
-                  placeholder="Seu nome"
-                  value={novaAvaliacao.nome}
-                  onChange={(e) => setNovaAvaliacao({...novaAvaliacao, nome: e.target.value})}
-                  required
-                />
-                <select
-                  value={novaAvaliacao.estrelas}
-                  onChange={(e) => setNovaAvaliacao({...novaAvaliacao, estrelas: parseInt(e.target.value)})}
-                >
-                  <option value="1">⭐ 1 estrela</option>
-                  <option value="2">⭐⭐ 2 estrelas</option>
-                  <option value="3">⭐⭐⭐ 3 estrelas</option>
-                  <option value="4">⭐⭐⭐⭐ 4 estrelas</option>
-                  <option value="5">⭐⭐⭐⭐⭐ 5 estrelas</option>
-                </select>
-                <textarea
-                  placeholder="Sua avaliação (serviço, profissional, ambiente)"
-                  value={novaAvaliacao.texto}
-                  onChange={(e) => setNovaAvaliacao({...novaAvaliacao, texto: e.target.value})}
-                  required
-                ></textarea>
-                <button type="submit" className="btn-enviar-avaliacao-uniforme">Enviar Avaliação - Ganhar 20% OFF</button>
+                <input type="text" placeholder="Seu nome" value={novaAvaliacao.nome} onChange={(e) => setNovaAvaliacao({...novaAvaliacao, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
+                <textarea placeholder="Sua avaliação" value={novaAvaliacao.texto} onChange={(e) => setNovaAvaliacao({...novaAvaliacao, texto: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', minHeight: '80px' }} required />
+                <button type="submit" style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>Enviar</button>
               </form>
             </div>
-
-            <div className="avaliacoes-lista-uniforme">
-              <h3>Avaliações Recentes</h3>
-              {avaliacoes.map((avaliacao) => (
-                <div key={avaliacao.id} className="avaliacao-card-uniforme">
-                  <div className="avaliacao-top">
-                    <h4>{avaliacao.nome}</h4>
-                    <span className="estrelas-uniforme">{renderizarEstrelas(avaliacao.estrelas)}</span>
-                  </div>
-                  <p className="avaliacao-texto-uniforme">{avaliacao.texto}</p>
-                  <p className="avaliacao-data-uniforme">{avaliacao.data}</p>
-                </div>
-              ))}
-            </div>
+            {avaliacoes.map((av) => (
+              <div key={av.id} style={{ border: '1px solid #404040', borderRadius: '6px', padding: '15px', marginBottom: '15px', background: '#2d2d2d' }}>
+                <h4 style={{ color: '#e8e8e8', margin: '0' }}>{av.nome}</h4>
+                <span style={{ color: '#d4af37' }}>{renderizarEstrelas(av.estrelas)}</span>
+                <p style={{ color: '#e8e8e8' }}>{av.texto}</p>
+              </div>
+            ))}
           </section>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="cliente-footer">
+      <footer style={{ borderTop: '1px solid #404040', padding: '20px', textAlign: 'center', color: '#999' }}>
         <p>&copy; 2026 Kaizen Barber Shop. Todos os direitos reservados.</p>
       </footer>
     </div>
