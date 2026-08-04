@@ -1,0 +1,6 @@
+{
+  "name": "kaizen-barber-app",
+  "scripts": {
+    "build": "cd frontend && npm run build"
+  }
+}
