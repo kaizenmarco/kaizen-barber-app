@@ -3,8 +3,7 @@ import { supabase } from '../supabaseClient';
 
 function Comandas({ t }) {
   const hoje = new Date();
-  const dataHoje = hoje.toISOString().split('T')[0];
-  
+
   const [comandaAberta, setComandaAberta] = useState(false);
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -102,24 +101,18 @@ function Comandas({ t }) {
     }
 
     try {
-      let clienteId = null;
       const { data: clienteExistente } = await supabase
         .from('clientes')
         .select('id')
         .eq('nome', novoItem.cliente)
         .single();
 
-      if (clienteExistente) {
-        clienteId = clienteExistente.id;
-      } else {
-        const { data: novoCliente, error: erroCliente } = await supabase
+      if (!clienteExistente) {
+        const { error: erroCliente } = await supabase
           .from('clientes')
-          .insert([{ nome: novoItem.cliente }])
-          .select('id')
-          .single();
+          .insert([{ nome: novoItem.cliente }]);
 
         if (erroCliente) throw erroCliente;
-        clienteId = novoCliente.id;
       }
 
       const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });

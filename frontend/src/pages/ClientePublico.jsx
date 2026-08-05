@@ -9,7 +9,7 @@ function ClientePublico() {
   const [horariosOcupados, setHorariosOcupados] = useState({});
   const [pontosCliente, setPontosCliente] = useState(0);
   const [usarPontos, setUsarPontos] = useState(false);
-  const [carregandoPontos, setCarregandoPontos] = useState(false);
+  const [, setCarregandoPontos] = useState(false);
   const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
   
   const [dadosAgendamento, setDadosAgendamento] = useState({
@@ -78,12 +78,14 @@ function ClientePublico() {
 
   useEffect(() => {
     buscarHorariosOcupados();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesAtual]);
 
   useEffect(() => {
     if (dadosAgendamento.email && dadosAgendamento.email.includes('@')) {
       buscarPontosCliente();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dadosAgendamento.email]);
 
   const buscarPontosCliente = async () => {
@@ -155,11 +157,6 @@ function ClientePublico() {
     } catch (error) {
       console.error('Erro ao buscar horários:', error);
     }
-  };
-
-  const getDiaSemana = (data) => {
-    const dias = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    return dias[data.getDay()];
   };
 
   const getHorariosProfissional = (prof, data) => {
