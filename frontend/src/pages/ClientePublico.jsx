@@ -9,9 +9,14 @@ function ClientePublico() {
   const [horariosOcupados, setHorariosOcupados] = useState({});
   const [pontosCliente, setPontosCliente] = useState(0);
   const [usarPontos, setUsarPontos] = useState(false);
-  const [, setCarregandoPontos] = useState(false);
+  const [carregandoPontos, setCarregandoPontos] = useState(false);
+  const [atendimentosRealizados, setAtendimentosRealizados] = useState(0);
+  const [pontosJaResgatados, setPontosJaResgatados] = useState(0);
   const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
   const resumoRef = useRef(null);
+
+  const [emailConsultaPontos, setEmailConsultaPontos] = useState('');
+  const [consultaPontosFeita, setConsultaPontosFeita] = useState(false);
   
   const [dadosAgendamento, setDadosAgendamento] = useState({
     nome: '',
@@ -95,32 +100,50 @@ function ClientePublico() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dadosAgendamento.email]);
 
-  const buscarPontosCliente = async () => {
+  const buscarPontosCliente = async (emailParam) => {
+    const email = emailParam || dadosAgendamento.email;
+    if (!email) return;
     setCarregandoPontos(true);
     try {
       const { data: clientes } = await supabase
         .from('clientes')
         .select('id')
-        .eq('email', dadosAgendamento.email);
+        .eq('email', email);
 
       if (!clientes || clientes.length === 0) {
         setPontosCliente(0);
+        setAtendimentosRealizados(0);
+        setPontosJaResgatados(0);
         setCarregandoPontos(false);
         return;
       }
 
       const cliente = clientes[0];
 
-      const { data: agendamentos, error } = await supabase
+      const { data: realizados, error: erroRealizados } = await supabase
         .from('agendamentos')
         .select('id')
         .eq('cliente_id', cliente.id)
         .eq('status', 'REALIZADO');
 
-      if (error) throw error;
+      if (erroRealizados) throw erroRealizados;
 
-      const pontos = (agendamentos?.length || 0) * 2;
-      setPontosCliente(pontos);
+      // Conta quantos agendamentos já usaram desconto de pontos, para saber quanto ja foi resgatado
+      const { data: resgates, error: erroResgates } = await supabase
+        .from('agendamentos')
+        .select('id')
+        .eq('cliente_id', cliente.id)
+        .ilike('observacoes', '%Desconto de pontos%');
+
+      if (erroResgates) throw erroResgates;
+
+      const totalGanho = (realizados?.length || 0) * 2;
+      const totalResgatado = (resgates?.length || 0) * 10;
+      const saldo = Math.max(0, totalGanho - totalResgatado);
+
+      setAtendimentosRealizados(realizados?.length || 0);
+      setPontosJaResgatados(totalResgatado);
+      setPontosCliente(saldo);
     } catch (error) {
       console.error('Erro ao buscar pontos:', error);
       setPontosCliente(0);
@@ -339,7 +362,11 @@ function ClientePublico() {
             <p><strong>Data:</strong> {agendamentoConfirmado.data}</p>
             <p><strong>Hora:</strong> {agendamentoConfirmado.hora}</p>
             <p><strong>Preço:</strong> ¥{agendamentoConfirmado.precoFinal.toLocaleString('ja-JP')}</p>
+            {agendamentoConfirmado.desconto > 0 && (
+              <p style={{ color: '#4ade80' }}>🎁 Desconto de fidelidade aplicado: -¥{agendamentoConfirmado.desconto.toLocaleString('ja-JP')}</p>
+            )}
           </div>
+          <p style={{ color: '#e8e8e8', fontSize: '13px', marginBottom: '10px' }}>⭐ Você ganhará +2 pontos de fidelidade assim que este atendimento for realizado.</p>
           <p style={{ color: '#d4af37', fontSize: '14px', fontWeight: 'bold' }}>⏱️ Redirecionando...</p>
         </div>
       </div>
@@ -478,6 +505,26 @@ function ClientePublico() {
                     {servicos.map(s => (<option key={s.id} value={s.nome}>{s.nome}</option>))}
                   </select>
 
+                  {dadosAgendamento.email && dadosAgendamento.email.includes('@') && (
+                    <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '4px', padding: '12px', marginBottom: '15px', fontSize: '13px' }}>
+                      {carregandoPontos ? (
+                        <p style={{ margin: 0, color: '#999' }}>⏳ Consultando seus pontos de fidelidade...</p>
+                      ) : (
+                        <>
+                          <p style={{ margin: '0 0 8px 0', color: '#d4af37' }}>🎁 Você tem <strong>{pontosCliente} pontos</strong> de fidelidade disponíveis.</p>
+                          {pontosCliente >= 10 ? (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#e8e8e8' }}>
+                              <input type="checkbox" checked={usarPontos} onChange={(e) => setUsarPontos(e.target.checked)} />
+                              Usar 10 pontos agora para ganhar ¥500 de desconto neste agendamento
+                            </label>
+                          ) : (
+                            <p style={{ margin: 0, color: '#999' }}>Faltam {10 - pontosCliente} pontos ({Math.ceil((10 - pontosCliente) / 2)} atendimento{Math.ceil((10 - pontosCliente) / 2) > 1 ? 's' : ''}) para o próximo desconto de ¥500.</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={() => setDiaHorarioSelecionado(null)} style={{ background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
                     <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ flex: 1, background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px', borderRadius: '4px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer' }}>{carregando ? '⏳' : '✅ Confirmar'}</button>
@@ -524,10 +571,42 @@ function ClientePublico() {
         {abaAtiva === 'fidelidade' && (
           <section>
             <h2 style={{ color: '#d4af37' }}>🎁 Fidelidade</h2>
+            <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '20px' }}>
+              <p>✅ 2 pontos por atendimento realizado</p>
+              <p>✅ 10 pontos = ¥500 de desconto no próximo agendamento</p>
+            </div>
+
             <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px' }}>
-              <p>✅ 2 pontos por serviço realizado</p>
-              <p>✅ 10 pontos = ¥500 de desconto</p>
-              <p style={{ color: '#d4af37', fontWeight: 'bold' }}>Você já é membro! 🎉</p>
+              <h3 style={{ color: '#d4af37', marginTop: 0 }}>Consultar meu saldo</h3>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <input
+                  type="email"
+                  placeholder="Seu email cadastrado"
+                  value={emailConsultaPontos}
+                  onChange={(e) => setEmailConsultaPontos(e.target.value)}
+                  style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
+                />
+                <button
+                  onClick={async () => { await buscarPontosCliente(emailConsultaPontos); setConsultaPontosFeita(true); }}
+                  disabled={!emailConsultaPontos.includes('@') || carregandoPontos}
+                  style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: carregandoPontos ? 'wait' : 'pointer' }}
+                >
+                  {carregandoPontos ? '⏳' : 'Consultar'}
+                </button>
+              </div>
+
+              {consultaPontosFeita && !carregandoPontos && (
+                <div style={{ marginTop: '20px', color: '#e8e8e8', lineHeight: '1.8' }}>
+                  <p>Atendimentos realizados: <strong style={{ color: '#d4af37' }}>{atendimentosRealizados}</strong></p>
+                  <p>Pontos já resgatados: <strong style={{ color: '#60a5fa' }}>{pontosJaResgatados}</strong></p>
+                  <p style={{ fontSize: '18px' }}>Saldo disponível: <strong style={{ color: '#4ade80' }}>{pontosCliente} pontos</strong></p>
+                  {pontosCliente >= 10 ? (
+                    <p style={{ color: '#4ade80', fontWeight: 'bold' }}>🎉 Você já pode resgatar ¥500 de desconto no seu próximo agendamento! É só marcar a opção na hora de confirmar o horário.</p>
+                  ) : (
+                    <p style={{ color: '#999' }}>Faltam {10 - pontosCliente} pontos para o próximo desconto de ¥500.</p>
+                  )}
+                </div>
+              )}
             </div>
           </section>
         )}
