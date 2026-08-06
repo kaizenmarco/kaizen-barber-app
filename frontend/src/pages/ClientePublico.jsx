@@ -381,7 +381,7 @@ function ClientePublico() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {servicos.map((servico) => (
                 <div key={servico.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
-                  <img src={servico.imagem} alt={servico.nome} style={{ width: '100%', height: '250px', objectFit: 'cover' }} />
+                  <img src={servico.imagem} alt={servico.nome} style={{ width: '100%', aspectRatio: '4 / 5', objectFit: 'cover', objectPosition: 'center top' }} />
                   <div style={{ padding: '15px' }}>
                     <h3 style={{ color: '#d4af37', marginTop: '0' }}>{servico.nome}</h3>
                     <p style={{ color: '#999', fontSize: '14px', margin: '5px 0' }}>{servico.descricao}</p>
