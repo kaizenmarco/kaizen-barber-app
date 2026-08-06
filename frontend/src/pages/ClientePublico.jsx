@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 function ClientePublico() {
@@ -11,6 +11,7 @@ function ClientePublico() {
   const [usarPontos, setUsarPontos] = useState(false);
   const [, setCarregandoPontos] = useState(false);
   const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
+  const resumoRef = useRef(null);
   
   const [dadosAgendamento, setDadosAgendamento] = useState({
     nome: '',
@@ -80,6 +81,12 @@ function ClientePublico() {
     buscarHorariosOcupados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesAtual]);
+
+  useEffect(() => {
+    if (diaHorarioSelecionado && resumoRef.current) {
+      resumoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [diaHorarioSelecionado]);
 
   useEffect(() => {
     if (dadosAgendamento.email && dadosAgendamento.email.includes('@')) {
@@ -257,6 +264,8 @@ function ClientePublico() {
 
       if (error) throw error;
 
+      await buscarHorariosOcupados();
+
       setAgendamentoConfirmado({
         numero: Math.floor(Math.random() * 100000),
         profissional: dadosAgendamento.profissional,
@@ -432,17 +441,17 @@ function ClientePublico() {
                   const ehPassado = data < hoje && data.getDate() !== hoje.getDate();
                   
                   return (
-                    <div key={data.toISOString()} style={{ border: '2px solid #d4af37', padding: '10px', borderRadius: '6px', background: 'rgba(45, 45, 45, 0.8)', minHeight: '140px', opacity: ehPassado ? 0.5 : 1 }}>
+                    <div key={data.toISOString()} style={{ border: '2px solid #d4af37', padding: '10px', borderRadius: '6px', background: 'rgba(45, 45, 45, 0.8)', minHeight: '170px', opacity: ehPassado ? 0.5 : 1 }}>
                       <div style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '8px' }}>{data.getDate()}</div>
-                      <div style={{ fontSize: '10px' }}>
+                      <div style={{ fontSize: '11px' }}>
                         {!ehPassado && profissionais.map(prof => {
                           const horarios = getHorariosProfissional(prof, data);
                           return horarios.length > 0 ? (
-                            <div key={prof.id} style={{ marginBottom: '5px' }}>
-                              <div style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '9px' }}>{prof.nome}:</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                            <div key={prof.id} style={{ marginBottom: '8px' }}>
+                              <div style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '10px', marginBottom: '3px' }}>{prof.nome}:</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                                 {horarios.map(h => (
-                                  <button key={h} onClick={() => handleSelecionarDiaHorario(data, prof, h)} style={{ background: '#4ade80', color: '#1a1a1a', border: 'none', borderRadius: '3px', padding: '2px 4px', fontSize: '8px', fontWeight: 'bold', cursor: 'pointer' }}>{h}</button>
+                                  <button key={h} onClick={() => handleSelecionarDiaHorario(data, prof, h)} style={{ background: '#4ade80', color: '#1a1a1a', border: 'none', borderRadius: '5px', padding: '6px 9px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', minWidth: '44px', minHeight: '32px' }}>{h}</button>
                                 ))}
                               </div>
                             </div>
@@ -455,7 +464,7 @@ function ClientePublico() {
               </div>
 
               {diaHorarioSelecionado && (
-                <div style={{ background: 'rgba(45, 45, 45, 0.95)', border: '2px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
+                <div ref={resumoRef} style={{ background: 'rgba(45, 45, 45, 0.95)', border: '2px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
                   <h3 style={{ color: '#d4af37' }}>📅 Resumo</h3>
                   <p><strong>Data:</strong> {diaHorarioSelecionado.data.toLocaleDateString('pt-BR')}</p>
                   <p><strong>Hora:</strong> {diaHorarioSelecionado.hora}</p>
@@ -488,6 +497,8 @@ function ClientePublico() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                 <img src="/images/fachada.png" alt="Fachada" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
                 <img src="/images/interior.png" alt="Interior" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/detalhes.png" alt="Detalhes" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/ambiente.png" alt="Ambiente" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
               </div>
             </div>
           </section>
