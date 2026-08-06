@@ -39,15 +39,18 @@ function ClientePublico() {
   });
 
   const servicos = [
-    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', preco: 4000, duracao: '45 min', descricao: 'Corte de cabelo masculino', imagem: '/images/servico_corte.png' },
-    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', preco: 4500, duracao: '45 min', descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/servico_corte_sobrancelhas.png' },
-    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', preco: 6500, duracao: '60 min', descricao: 'Corte e modelagem profissional de barba', imagem: '/images/servico_corte_barba.png' },
-    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração', preco: 15000, duracao: '90 min', descricao: 'Coloração profissional com tratamento', imagem: '/images/servico_coloracao.png' },
-    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento', preco: 15000, duracao: '90 min', descricao: 'Alisamento e tratamento capilar', imagem: '/images/servico_alisamento.png' },
-    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino', preco: 4000, duracao: '45 min', descricao: 'Corte moderno feminino', imagem: '/images/servico_corte_feminino.png' },
-    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente', preco: 6000, duracao: '60 min', descricao: 'Permanente enrolado profissional', imagem: '/images/servico_permanente.png' },
-    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele', preco: 5000, duracao: '45 min', descricao: 'Limpeza facial profunda', imagem: '/images/servico_limpeza_pele.png' },
+    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', preco: 4000, duracao: '40 min', duracaoMinutos: 40, descricao: 'Corte de cabelo masculino', imagem: '/images/servico_corte.png' },
+    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', preco: 4500, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/servico_corte_sobrancelhas.png' },
+    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', preco: 6500, duracao: '60 min', duracaoMinutos: 60, descricao: 'Corte e modelagem profissional de barba', imagem: '/images/servico_corte_barba.png' },
+    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Coloração profissional com tratamento', imagem: '/images/servico_coloracao.png' },
+    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Alisamento e tratamento capilar', imagem: '/images/servico_alisamento.png' },
+    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino', preco: 4000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte moderno feminino', imagem: '/images/servico_corte_feminino.png' },
+    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente', preco: 6000, duracao: '150 min', duracaoMinutos: 150, descricao: 'Permanente enrolado profissional', imagem: '/images/servico_permanente.png' },
+    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele', preco: 5000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Limpeza facial profunda', imagem: '/images/servico_limpeza_pele.png' },
   ];
+
+  const servicoSelecionadoInfo = servicos.find(s => s.nome === dadosAgendamento.servico);
+  const duracaoSelecionada = servicoSelecionadoInfo ? servicoSelecionadoInfo.duracaoMinutos : 60;
 
   const profissionais = [
     { 
@@ -165,7 +168,7 @@ function ClientePublico() {
 
       const { data, error } = await supabase
         .from('agendamentos')
-        .select('profissional_id, data_hora, status')
+        .select('profissional_id, data_hora, servico_id, status')
         .gte('data_hora', `${dataInicio}T00:00:00`)
         .lte('data_hora', `${dataFim}T23:59:59`)
         .in('status', ['CONFIRMADO', 'REALIZADO']);
@@ -175,12 +178,16 @@ function ClientePublico() {
       const ocupados = {};
       data.forEach(agendamento => {
         const profUUID = agendamento.profissional_id;
-        const dataHora = agendamento.data_hora;
+        const [dataStr, horaCompleta] = agendamento.data_hora.split('T');
+        const [hh, mm] = horaCompleta.split(':').map(Number);
+        const inicioMin = hh * 60 + mm;
+        const servicoInfo = servicos.find(s => s.uuid === agendamento.servico_id);
+        const duracaoMin = servicoInfo ? servicoInfo.duracaoMinutos : 60;
 
         if (!ocupados[profUUID]) {
           ocupados[profUUID] = [];
         }
-        ocupados[profUUID].push(dataHora);
+        ocupados[profUUID].push({ data: dataStr, inicioMin, fimMin: inicioMin + duracaoMin });
       });
 
       setHorariosOcupados(ocupados);
@@ -189,14 +196,50 @@ function ClientePublico() {
     }
   };
 
-  const getHorariosProfissional = (prof, data) => {
+  const paraMinutos = (hhmm) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const getBlocosDeTrabalho = (horariosBase) => {
+    const minutos = horariosBase.map(paraMinutos).sort((a, b) => a - b);
+    const blocos = [];
+    let blocoAtual = [];
+    minutos.forEach((m, idx) => {
+      if (idx === 0 || m - minutos[idx - 1] === 60) {
+        blocoAtual.push(m);
+      } else {
+        blocos.push(blocoAtual);
+        blocoAtual = [m];
+      }
+    });
+    if (blocoAtual.length) blocos.push(blocoAtual);
+    return blocos;
+  };
+
+  const getHorariosProfissional = (prof, data, duracaoMinutos) => {
     const diaSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'][data.getDay()];
     const horariosBase = prof.horarios[diaSemana] || [];
-    const horariosOcupadosDeste = horariosOcupados[prof.uuid] || [];
-    
+    if (horariosBase.length === 0) return [];
+
+    const duracao = duracaoMinutos || 60;
+    const blocos = getBlocosDeTrabalho(horariosBase);
+    const dataStr = data.toISOString().split('T')[0];
+    const intervalosOcupados = (horariosOcupados[prof.uuid] || []).filter(o => o.data === dataStr);
+
     return horariosBase.filter(h => {
-      const dataHoraCompleta = `${data.toISOString().split('T')[0]}T${h}:00`;
-      return !horariosOcupadosDeste.some(o => o.startsWith(dataHoraCompleta.substring(0, 16)));
+      const inicioMin = paraMinutos(h);
+      const fimMin = inicioMin + duracao;
+
+      // precisa caber inteiro dentro do mesmo bloco de trabalho (sem invadir o almoço ou passar do fechamento)
+      const bloco = blocos.find(b => b.includes(inicioMin));
+      if (!bloco) return false;
+      const fimDoBloco = Math.max(...bloco) + 60;
+      if (fimMin > fimDoBloco) return false;
+
+      // não pode colidir com nenhum agendamento já existente deste profissional
+      const colide = intervalosOcupados.some(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
+      return !colide;
     });
   };
 
@@ -447,7 +490,23 @@ function ClientePublico() {
               padding: '30px'
             }}>
               <h2 style={{ color: '#d4af37', marginBottom: '20px' }}>📅 Calendário de Agendamentos</h2>
-              
+
+              <div style={{ maxWidth: '500px', margin: '0 auto 25px' }}>
+                <label style={{ color: '#d4af37', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>1. Escolha o serviço desejado:</label>
+                <select
+                  value={dadosAgendamento.servico}
+                  onChange={(e) => { setDadosAgendamento({ ...dadosAgendamento, servico: e.target.value }); setDiaHorarioSelecionado(null); }}
+                  style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
+                >
+                  <option value="">Selecione um serviço</option>
+                  {servicos.map(s => (<option key={s.id} value={s.nome}>{s.nome} ({s.duracao})</option>))}
+                </select>
+              </div>
+
+              {!dadosAgendamento.servico ? (
+                <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>👆 Escolha um serviço acima para ver os horários disponíveis.</p>
+              ) : (
+              <>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
                 <button onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1))} style={{ padding: '8px 16px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>← Anterior</button>
                 <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '200px', textAlign: 'center', fontSize: '18px' }}>
@@ -472,7 +531,7 @@ function ClientePublico() {
                       <div style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '8px' }}>{data.getDate()}</div>
                       <div style={{ fontSize: '11px' }}>
                         {!ehPassado && profissionais.map(prof => {
-                          const horarios = getHorariosProfissional(prof, data);
+                          const horarios = getHorariosProfissional(prof, data, duracaoSelecionada);
                           return horarios.length > 0 ? (
                             <div key={prof.id} style={{ marginBottom: '8px' }}>
                               <div style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '10px', marginBottom: '3px' }}>{prof.nome}:</div>
@@ -496,14 +555,11 @@ function ClientePublico() {
                   <p><strong>Data:</strong> {diaHorarioSelecionado.data.toLocaleDateString('pt-BR')}</p>
                   <p><strong>Hora:</strong> {diaHorarioSelecionado.hora}</p>
                   <p><strong>Profissional:</strong> {diaHorarioSelecionado.prof.nome}</p>
+                  <p><strong>Serviço:</strong> {dadosAgendamento.servico} {servicoSelecionadoInfo ? `(${servicoSelecionadoInfo.duracao})` : ''}</p>
 
                   <input type="text" placeholder="Nome" value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
                   <input type="email" placeholder="Email" value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-                  <input type="tel" placeholder="Telefone" value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-                  <select value={dadosAgendamento.servico} onChange={(e) => setDadosAgendamento({...dadosAgendamento, servico: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}>
-                    <option value="">Selecione serviço</option>
-                    {servicos.map(s => (<option key={s.id} value={s.nome}>{s.nome}</option>))}
-                  </select>
+                  <input type="tel" placeholder="Telefone" value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
 
                   {dadosAgendamento.email && dadosAgendamento.email.includes('@') && (
                     <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '4px', padding: '12px', marginBottom: '15px', fontSize: '13px' }}>
@@ -530,6 +586,8 @@ function ClientePublico() {
                     <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ flex: 1, background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px', borderRadius: '4px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer' }}>{carregando ? '⏳' : '✅ Confirmar'}</button>
                   </div>
                 </div>
+              )}
+              </>
               )}
             </div>
           </section>
