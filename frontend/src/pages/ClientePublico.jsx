@@ -52,6 +52,7 @@ function ClientePublico() {
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
       servicos: ['Cortes', 'Barba', 'Coloração'],
       imagem: '/images/marco.png',
+      posicaoFoto: 'center 22%',
       horarios: { segunda: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], terca: [], quarta: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], quinta: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], sexta: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], sabado: ['09:00', '10:00', '14:00', '15:00'], domingo: ['10:00', '11:00', '15:00', '16:00'] }
     },
     { 
@@ -62,6 +63,7 @@ function ClientePublico() {
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
       imagem: '/images/gabriel.png',
+      posicaoFoto: 'center 10%',
       horarios: { segunda: ['10:00', '11:00', '14:00', '15:00'], terca: [], quarta: ['10:00', '11:00', '14:00', '15:00'], quinta: ['10:00', '11:00', '14:00', '15:00'], sexta: ['10:00', '11:00', '14:00', '15:00'], sabado: ['10:00', '14:00'], domingo: ['11:00', '14:00'] }
     },
     { 
@@ -72,6 +74,7 @@ function ClientePublico() {
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
       imagem: '/images/neia.png',
+      posicaoFoto: 'center 15%',
       horarios: { segunda: ['09:00', '11:00', '15:00', '16:00', '17:00'], terca: [], quarta: ['09:00', '11:00', '15:00', '16:00', '17:00'], quinta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sexta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sabado: ['11:00', '15:00'], domingo: ['09:00', '16:00'] }
     },
   ];
@@ -499,7 +502,7 @@ function ClientePublico() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {profissionais.map((prof) => (
                 <div key={prof.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
-                  <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', height: '250px', objectFit: 'cover', objectPosition: 'top' }} />
+                  <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', height: '250px', objectFit: 'cover', objectPosition: prof.posicaoFoto || 'center 20%' }} />
                   <div style={{ padding: '15px' }}>
                     <h3 style={{ color: '#d4af37' }}>{prof.nome}</h3>
                     <p style={{ color: '#999', fontSize: '14px' }}>{prof.especialidade}</p>
