@@ -39,18 +39,15 @@ function ClientePublico() {
   });
 
   const servicos = [
-    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', preco: 4000, duracao: '40 min', duracaoMinutos: 40, descricao: 'Corte de cabelo masculino', imagem: '/images/servico_corte.png' },
-    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', preco: 4500, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/servico_corte_sobrancelhas.png' },
-    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', preco: 6500, duracao: '60 min', duracaoMinutos: 60, descricao: 'Corte e modelagem profissional de barba', imagem: '/images/servico_corte_barba.png' },
-    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Coloração profissional com tratamento', imagem: '/images/servico_coloracao.png' },
-    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Alisamento e tratamento capilar', imagem: '/images/servico_alisamento.png' },
-    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino', preco: 4000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte moderno feminino', imagem: '/images/servico_corte_feminino.png' },
-    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente', preco: 6000, duracao: '150 min', duracaoMinutos: 150, descricao: 'Permanente enrolado profissional', imagem: '/images/servico_permanente.png' },
-    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele', preco: 5000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Limpeza facial profunda', imagem: '/images/servico_limpeza_pele.png' },
+    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', preco: 4000, duracao: '40 min', duracaoMinutos: 40, descricao: 'Corte de cabelo masculino', imagem: '/images/servico_corte.png', profissionaisIds: [1, 2] },
+    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', preco: 4500, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/servico_corte_sobrancelhas.png', profissionaisIds: [1, 2] },
+    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', preco: 6500, duracao: '60 min', duracaoMinutos: 60, descricao: 'Corte e modelagem profissional de barba', imagem: '/images/servico_corte_barba.png', profissionaisIds: [1] },
+    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Coloração profissional com tratamento', imagem: '/images/servico_coloracao.png', profissionaisIds: [1, 3] },
+    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Alisamento e tratamento capilar', imagem: '/images/servico_alisamento.png', profissionaisIds: [3] },
+    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino', preco: 4000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte moderno feminino', imagem: '/images/servico_corte_feminino.png', profissionaisIds: [1, 2] },
+    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente', preco: 6000, duracao: '150 min', duracaoMinutos: 150, descricao: 'Permanente enrolado profissional', imagem: '/images/servico_permanente.png', profissionaisIds: [2] },
+    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele', preco: 5000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Limpeza facial profunda', imagem: '/images/servico_limpeza_pele.png', profissionaisIds: [3] },
   ];
-
-  const servicoSelecionadoInfo = servicos.find(s => s.nome === dadosAgendamento.servico);
-  const duracaoSelecionada = servicoSelecionadoInfo ? servicoSelecionadoInfo.duracaoMinutos : 60;
 
   const profissionais = [
     { 
@@ -84,6 +81,12 @@ function ClientePublico() {
       horarios: { segunda: ['09:00', '11:00', '15:00', '16:00', '17:00'], terca: [], quarta: ['09:00', '11:00', '15:00', '16:00', '17:00'], quinta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sexta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sabado: ['11:00', '15:00'], domingo: ['09:00', '16:00'] }
     },
   ];
+
+  const servicoSelecionadoInfo = servicos.find(s => s.nome === dadosAgendamento.servico);
+  const duracaoSelecionada = servicoSelecionadoInfo ? servicoSelecionadoInfo.duracaoMinutos : 60;
+  const profissionaisAptos = servicoSelecionadoInfo
+    ? profissionais.filter(p => servicoSelecionadoInfo.profissionaisIds.includes(p.id))
+    : profissionais;
 
   useEffect(() => {
     buscarHorariosOcupados();
@@ -466,7 +469,7 @@ function ClientePublico() {
                     <p style={{ color: '#999', fontSize: '14px', margin: '5px 0' }}>{servico.descricao}</p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
                       <span style={{ color: '#d4af37', fontWeight: 'bold' }}>¥{servico.preco.toLocaleString('ja-JP')}</span>
-                      <button onClick={() => setAbaAtiva('agendar')} style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '8px 12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Agendar</button>
+                      <button onClick={() => { setDadosAgendamento({ ...dadosAgendamento, servico: servico.nome }); setDiaHorarioSelecionado(null); setAbaAtiva('agendar'); }} style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '8px 12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Agendar</button>
                     </div>
                   </div>
                 </div>
@@ -530,7 +533,7 @@ function ClientePublico() {
                     <div key={data.toISOString()} style={{ border: '2px solid #d4af37', padding: '10px', borderRadius: '6px', background: 'rgba(45, 45, 45, 0.8)', minHeight: '170px', opacity: ehPassado ? 0.5 : 1 }}>
                       <div style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '8px' }}>{data.getDate()}</div>
                       <div style={{ fontSize: '11px' }}>
-                        {!ehPassado && profissionais.map(prof => {
+                        {!ehPassado && profissionaisAptos.map(prof => {
                           const horarios = getHorariosProfissional(prof, data, duracaoSelecionada);
                           return horarios.length > 0 ? (
                             <div key={prof.id} style={{ marginBottom: '8px' }}>
