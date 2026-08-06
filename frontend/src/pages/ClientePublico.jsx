@@ -499,7 +499,7 @@ function ClientePublico() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {profissionais.map((prof) => (
                 <div key={prof.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
-                  <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', height: '250px', objectFit: 'cover' }} />
+                  <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', height: '250px', objectFit: 'cover', objectPosition: 'top' }} />
                   <div style={{ padding: '15px' }}>
                     <h3 style={{ color: '#d4af37' }}>{prof.nome}</h3>
                     <p style={{ color: '#999', fontSize: '14px' }}>{prof.especialidade}</p>
