@@ -132,14 +132,14 @@ function ClientePublico() {
   });
 
   const servicos = [
-    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', preco: 4000, duracao: '40 min', duracaoMinutos: 40, descricao: 'Corte de cabelo masculino', imagem: '/images/servico_corte.png', profissionaisIds: [1, 2] },
-    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', preco: 4500, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/servico_corte_sobrancelhas.png', profissionaisIds: [1, 2] },
-    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', preco: 6500, duracao: '60 min', duracaoMinutos: 60, descricao: 'Corte e modelagem profissional de barba', imagem: '/images/servico_corte_barba.png', profissionaisIds: [1, 2] },
-    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Coloração profissional com tratamento', imagem: '/images/servico_coloracao.png', profissionaisIds: [1, 3] },
-    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Alisamento e tratamento capilar', imagem: '/images/servico_alisamento.png', profissionaisIds: [3] },
-    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino', preco: 4000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte moderno feminino', imagem: '/images/servico_corte_feminino.png', profissionaisIds: [3] },
-    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente', preco: 6000, duracao: '150 min', duracaoMinutos: 150, descricao: 'Permanente enrolado profissional', imagem: '/images/servico_permanente.png', profissionaisIds: [2, 3] },
-    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele', preco: 5000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Limpeza facial profunda', imagem: '/images/servico_limpeza_pele.png', profissionaisIds: [3] },
+    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', preco: 4000, duracao: '40 min', duracaoMinutos: 40, descricao: 'Corte de cabelo masculino', imagem: '/images/servico_corte.jpg', profissionaisIds: [1, 2] },
+    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', preco: 4500, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte completo com design de sobrancelhas', imagem: '/images/servico_corte_sobrancelhas.jpg', profissionaisIds: [1, 2] },
+    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', preco: 6500, duracao: '60 min', duracaoMinutos: 60, descricao: 'Corte e modelagem profissional de barba', imagem: '/images/servico_corte_barba.jpg', profissionaisIds: [1, 2] },
+    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Coloração profissional com tratamento', imagem: '/images/servico_coloracao.jpg', profissionaisIds: [1, 3] },
+    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento', preco: 15000, duracao: '180 min', duracaoMinutos: 180, descricao: 'Alisamento e tratamento capilar', imagem: '/images/servico_alisamento.jpg', profissionaisIds: [3] },
+    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino', preco: 4000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte moderno feminino', imagem: '/images/servico_corte_feminino.jpg', profissionaisIds: [3] },
+    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente', preco: 6000, duracao: '150 min', duracaoMinutos: 150, descricao: 'Permanente enrolado profissional', imagem: '/images/servico_permanente.jpg', profissionaisIds: [2, 3] },
+    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele', preco: 5000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Limpeza facial profunda', imagem: '/images/servico_limpeza_pele.jpg', profissionaisIds: [3] },
   ];
 
   const profissionais = [
@@ -150,7 +150,7 @@ function ClientePublico() {
       especialidade: 'Especialista em Cortes e Barba',
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
       servicos: ['Cortes', 'Barba', 'Coloração'],
-      imagem: '/images/marco.png',
+      imagem: '/images/marco.jpg',
     },
     {
       id: 2,
@@ -159,7 +159,7 @@ function ClientePublico() {
       especialidade: 'Especialista em Cortes',
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
-      imagem: '/images/gabriel.png',
+      imagem: '/images/gabriel.jpg',
     },
     {
       id: 3,
@@ -168,7 +168,7 @@ function ClientePublico() {
       especialidade: 'Especialista em Coloração e Estética',
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
-      imagem: '/images/neia.png',
+      imagem: '/images/neia.jpg',
     },
   ];
 
@@ -636,7 +636,7 @@ function ClientePublico() {
   return (
     <div style={{ background: '#1a1a1a', color: '#e8e8e8', minHeight: '100vh' }}>
       <header style={{ borderBottom: '3px solid #d4af37', padding: '20px', textAlign: 'center' }}>
-        <img src="/images/logo.png" alt="Kaizen" style={{ width: '60px', height: '60px', marginBottom: '10px' }} />
+        <img src="/images/logo.jpg" alt="Kaizen" style={{ width: '60px', height: '60px', marginBottom: '10px' }} />
         <h1 style={{ color: '#d4af37', fontSize: '32px', margin: '0' }}>Kaizen Barber Shop</h1>
         <p style={{ color: '#999', margin: '0' }}>Premium Barbershop - Anjo, Aichi</p>
       </header>
@@ -747,7 +747,7 @@ function ClientePublico() {
 
         {abaAtiva === 'agendar' && (
           <section style={{
-            backgroundImage: 'url(/images/interior.png)',
+            backgroundImage: 'url(/images/interior.jpg)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundAttachment: 'fixed',
@@ -934,10 +934,10 @@ function ClientePublico() {
               <h3>Kaizen Barber Shop</h3>
               <p>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                <img src="/images/fachada.png" alt="Fachada" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                <img src="/images/interior.png" alt="Interior" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                <img src="/images/detalhes.png" alt="Detalhes" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                <img src="/images/ambiente.png" alt="Ambiente" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/fachada.jpg" alt="Fachada" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/interior.jpg" alt="Interior" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/detalhes.jpg" alt="Detalhes" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/ambiente.jpg" alt="Ambiente" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
               </div>
             </div>
           </section>

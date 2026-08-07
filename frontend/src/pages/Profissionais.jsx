@@ -21,9 +21,9 @@ const ORDEM_DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', '
 
 function Profissionais({ t }) {
   const [profissionais, setProfissionais] = useState([
-    { id: 1, nome: 'Marco Kaizen', especialidades: 'Cortes, Barba', comissao: '40%', foto: '/images/marco.png' },
+    { id: 1, nome: 'Marco Kaizen', especialidades: 'Cortes, Barba', comissao: '40%', foto: '/images/marco.jpg' },
     { id: 2, nome: 'Gabriel Little Kaizen', especialidades: 'Cortes, Permanente', comissao: '40%', foto: '/images/gabriel.jpg' },
-    { id: 3, nome: 'Neia', especialidades: 'Corte Feminino, Coloração, Alisamento', comissao: '40%', foto: '/images/neia.jpeg' },
+    { id: 3, nome: 'Neia', especialidades: 'Corte Feminino, Coloração, Alisamento', comissao: '40%', foto: '/images/neia.jpg' },
   ]);
 
   const [novoProfissional, setNovoProfissional] = useState({
@@ -56,7 +56,7 @@ function Profissionais({ t }) {
       setProfissionais([...profissionais, {
         id: profissionais.length + 1,
         ...novoProfissional,
-        foto: '/images/placeholder.png'
+        foto: '/images/logo.jpg'
       }]);
       setNovoProfissional({ nome: '', especialidades: '', comissao: '40%' });
     }
