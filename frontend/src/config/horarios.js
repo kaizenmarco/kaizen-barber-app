@@ -21,9 +21,6 @@ export const HORARIO_SALAO = {
 // Intervalo de almoço, válido em todos os dias de funcionamento.
 export const HORARIO_ALMOCO = { inicio: '12:45', fim: '13:45' };
 
-// Intervalo (em minutos) entre os horários oferecidos aos clientes.
-export const INTERVALO_SLOTS_MINUTOS = 60;
-
 // ----------------------------------------------------------------------------
 // Horário estendido — usado em períodos como feriados prolongados no Japão
 // (Golden Week, Obon, Ano Novo etc.), quando os profissionais trabalham a
@@ -147,9 +144,13 @@ export const getSlotsDisponiveisNoDia = (data, duracaoMinutos = 60, horarioEsten
     [Math.max(almocoFim, aberturaMin), fechamentoMin],
   ].filter(([inicio, fim]) => fim > inicio);
 
+  // O passo entre um horário e o próximo é a própria duração do serviço,
+  // não um intervalo fixo — assim os horários oferecidos ficam "encostados"
+  // um no outro (ex: corte de 40min -> 09:00, 09:40, 10:20...; coloração de
+  // 180min -> só os horários em que um bloco inteiro de 3h cabe).
   const slots = [];
   blocos.forEach(([inicioBloco, fimBloco]) => {
-    for (let m = inicioBloco; m + duracaoMinutos <= fimBloco; m += INTERVALO_SLOTS_MINUTOS) {
+    for (let m = inicioBloco; m + duracaoMinutos <= fimBloco; m += duracaoMinutos) {
       slots.push(paraHHMM(m));
     }
   });
