@@ -1,10 +1,88 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getSlotsDisponiveisNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
+import {
+  getSlotsDisponiveisNoDia,
+  paraMinutos,
+  buscarHorarioEstendido,
+  HORARIO_ESTENDIDO_PADRAO,
+  HORARIO_SALAO,
+  HORARIO_ALMOCO,
+  getDiaSemana,
+} from '../config/horarios';
+
+const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
+const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
+const DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+const DIAS_CARROSSEL = 30; // quantos dias à frente mostrar no seletor de data
+const OPCOES_LEMBRETE = [15, 20, 30, 60];
+
+const formatarPreco = (valor) => `¥${valor.toLocaleString('ja-JP')}`;
+
+const somarMinutos = (horaStr, minutos) => {
+  const total = paraMinutos(horaStr) + minutos;
+  const h = String(Math.floor(total / 60)).padStart(2, '0');
+  const m = String(total % 60).padStart(2, '0');
+  return `${h}:${m}`;
+};
+
+// Gera um arquivo .ics (padrão universal de calendário) com um lembrete
+// (VALARM) embutido, para o cliente importar no calendário do celular.
+const gerarConteudoICS = ({ servico, profissional, dataStr, horaInicio, horaFim, lembreteMinutos }) => {
+  const dtStart = `${dataStr.replace(/-/g, '')}T${horaInicio.replace(':', '')}00`;
+  const dtEnd = `${dataStr.replace(/-/g, '')}T${horaFim.replace(':', '')}00`;
+  const agora = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const uid = `${dataStr}-${horaInicio}-${Math.random().toString(36).slice(2)}@kaizenbarber`;
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Kaizen Barber Shop//Agendamento//PT',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${agora}`,
+    `DTSTART;TZID=Asia/Tokyo:${dtStart}`,
+    `DTEND;TZID=Asia/Tokyo:${dtEnd}`,
+    `SUMMARY:${servico} - ${NOME_ESTABELECIMENTO}`,
+    `DESCRIPTION:Profissional: ${profissional}`,
+    `LOCATION:${ENDERECO_ESTABELECIMENTO}`,
+    'BEGIN:VALARM',
+    `TRIGGER:-PT${lembreteMinutos}M`,
+    'ACTION:DISPLAY',
+    `DESCRIPTION:Lembrete: seu horário na ${NOME_ESTABELECIMENTO} é em ${lembreteMinutos} minutos`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+};
+
+const baixarArquivoICS = (conteudo, nomeArquivo) => {
+  const blob = new Blob([conteudo], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const linkGoogleCalendar = ({ servico, profissional, dataStr, horaInicio, horaFim }) => {
+  const inicio = `${dataStr.replace(/-/g, '')}T${horaInicio.replace(':', '')}00`;
+  const fim = `${dataStr.replace(/-/g, '')}T${horaFim.replace(':', '')}00`;
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `${servico} - ${NOME_ESTABELECIMENTO}`,
+    dates: `${inicio}/${fim}`,
+    details: `Profissional: ${profissional}`,
+    location: ENDERECO_ESTABELECIMENTO,
+    ctz: 'Asia/Tokyo',
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+};
 
 function ClientePublico() {
   const [abaAtiva, setAbaAtiva] = useState('servicos');
-  const [mesAtual, setMesAtual] = useState(new Date());
   const [agendamentoConfirmado, setAgendamentoConfirmado] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [horariosOcupados, setHorariosOcupados] = useState({});
@@ -15,11 +93,24 @@ function ClientePublico() {
   const [atendimentosRealizados, setAtendimentosRealizados] = useState(0);
   const [pontosJaResgatados, setPontosJaResgatados] = useState(0);
   const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
-  const resumoRef = useRef(null);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [observacoesCliente, setObservacoesCliente] = useState('');
+
+  const [dataSelecionada, setDataSelecionada] = useState(new Date());
+  const [profissionalSelecionadoId, setProfissionalSelecionadoId] = useState(null);
+  const [descricaoExpandida, setDescricaoExpandida] = useState({});
+
+  const [listaEsperaAberta, setListaEsperaAberta] = useState(false);
+  const [listaEsperaDados, setListaEsperaDados] = useState({ nome: '', email: '', telefone: '' });
+  const [listaEsperaEnviada, setListaEsperaEnviada] = useState(false);
+  const [enviandoListaEspera, setEnviandoListaEspera] = useState(false);
+
+  const [lembreteMinutos, setLembreteMinutos] = useState(30);
+  const [presencaConfirmada, setPresencaConfirmada] = useState(false);
 
   const [emailConsultaPontos, setEmailConsultaPontos] = useState('');
   const [consultaPontosFeita, setConsultaPontosFeita] = useState(false);
-  
+
   const [dadosAgendamento, setDadosAgendamento] = useState({
     nome: '',
     email: '',
@@ -52,28 +143,28 @@ function ClientePublico() {
   ];
 
   const profissionais = [
-    { 
-      id: 1, 
+    {
+      id: 1,
       uuid: '11c0c7fb-e020-4c49-ab0a-28a16109b35f',
-      nome: 'Marco Kaizen', 
+      nome: 'Marco Kaizen',
       especialidade: 'Especialista em Cortes e Barba',
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
       servicos: ['Cortes', 'Barba', 'Coloração'],
       imagem: '/images/marco.png',
     },
-    { 
-      id: 2, 
+    {
+      id: 2,
       uuid: '66266181-d06b-4f54-bcc9-12dccc100cb4',
-      nome: 'Gabriel Little Kaizen', 
+      nome: 'Gabriel Little Kaizen',
       especialidade: 'Especialista em Cortes',
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
       imagem: '/images/gabriel.png',
     },
-    { 
-      id: 3, 
+    {
+      id: 3,
       uuid: 'ad232428-9872-46db-82b3-27819ab353ff',
-      nome: 'Neia', 
+      nome: 'Neia',
       especialidade: 'Especialista em Coloração e Estética',
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
@@ -86,21 +177,16 @@ function ClientePublico() {
   const profissionaisAptos = servicoSelecionadoInfo
     ? profissionais.filter(p => servicoSelecionadoInfo.profissionaisIds.includes(p.id))
     : profissionais;
+  const profissionalSelecionado = profissionaisAptos.find(p => p.id === profissionalSelecionadoId) || profissionaisAptos[0] || null;
 
   useEffect(() => {
     buscarHorariosOcupados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mesAtual]);
+  }, []);
 
   useEffect(() => {
     buscarHorarioEstendido().then(setHorarioEstendido);
   }, []);
-
-  useEffect(() => {
-    if (diaHorarioSelecionado && resumoRef.current) {
-      resumoRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [diaHorarioSelecionado]);
 
   useEffect(() => {
     if (dadosAgendamento.email && dadosAgendamento.email.includes('@')) {
@@ -108,6 +194,15 @@ function ClientePublico() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dadosAgendamento.email]);
+
+  // Sempre que o serviço muda, garante que o profissional selecionado
+  // continua sendo um dos aptos para aquele serviço.
+  useEffect(() => {
+    if (profissionaisAptos.length > 0 && !profissionaisAptos.some(p => p.id === profissionalSelecionadoId)) {
+      setProfissionalSelecionadoId(profissionaisAptos[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dadosAgendamento.servico]);
 
   const buscarPontosCliente = async (emailParam) => {
     const email = emailParam || dadosAgendamento.email;
@@ -163,14 +258,15 @@ function ClientePublico() {
 
   const buscarHorariosOcupados = async () => {
     try {
-      const ano = mesAtual.getFullYear();
-      const mes = mesAtual.getMonth();
-      
-      const primeiroDia = new Date(ano, mes, 1);
-      const ultimoDia = new Date(ano, mes + 1, 0);
-      
-      const dataInicio = primeiroDia.toISOString().split('T')[0];
-      const dataFim = ultimoDia.toISOString().split('T')[0];
+      // cobre toda a janela do carrossel de datas (hoje + DIAS_CARROSSEL dias),
+      // não só o mês corrente, para não deixar passar conflitos perto da virada do mês.
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const fimJanela = new Date(hoje);
+      fimJanela.setDate(hoje.getDate() + DIAS_CARROSSEL);
+
+      const dataInicio = hoje.toISOString().split('T')[0];
+      const dataFim = fimJanela.toISOString().split('T')[0];
 
       const { data, error } = await supabase
         .from('agendamentos')
@@ -206,6 +302,7 @@ function ClientePublico() {
   // do horário do salão (config/horarios.js) e remove os que colidem com
   // agendamentos já existentes daquele profissional.
   const getHorariosProfissional = (prof, data, duracaoMinutos) => {
+    if (!prof) return [];
     const duracao = duracaoMinutos || 60;
     const slotsBase = getSlotsDisponiveisNoDia(data, duracao, horarioEstendido);
     if (slotsBase.length === 0) return [];
@@ -234,14 +331,23 @@ function ClientePublico() {
     return Math.max(0, preco);
   };
 
-  const handleSelecionarDiaHorario = (data, prof, hora) => {
-    setDiaHorarioSelecionado({ data, prof, hora });
+  const abrirAgendamentoParaServico = (servico) => {
+    setDadosAgendamento({ ...dadosAgendamento, servico: servico.nome });
+    setDiaHorarioSelecionado(null);
+    setDataSelecionada(new Date());
+    setAbaAtiva('agendar');
+  };
+
+  const handleSelecionarHorario = (hora) => {
+    if (!profissionalSelecionado) return;
+    setDiaHorarioSelecionado({ data: dataSelecionada, prof: profissionalSelecionado, hora });
     setDadosAgendamento({
       ...dadosAgendamento,
-      data: data.toISOString().split('T')[0],
-      profissional: prof.nome,
-      hora: hora
+      data: dataSelecionada.toISOString().split('T')[0],
+      profissional: profissionalSelecionado.nome,
+      hora
     });
+    setModalAberto(true);
   };
 
   const handleConfirmarAgendamento = async () => {
@@ -264,7 +370,7 @@ function ClientePublico() {
 
     try {
       let clienteId = null;
-      
+
       const { data: clientesExistentes } = await supabase
         .from('clientes')
         .select('id')
@@ -294,7 +400,12 @@ function ClientePublico() {
       const servicoUUID = servicoSelecionado.uuid;
       const precoFinal = calcularPrecoFinal();
 
-      const { error } = await supabase
+      const notas = [
+        usarPontos ? 'Desconto de pontos de fidelidade aplicado (-¥500)' : null,
+        observacoesCliente ? `Observação do cliente: ${observacoesCliente}` : null,
+      ].filter(Boolean).join(' | ') || null;
+
+      const { data: novoAgendamento, error } = await supabase
         .from('agendamentos')
         .insert([
           {
@@ -304,39 +415,94 @@ function ClientePublico() {
             data_hora: `${dadosAgendamento.data}T${dadosAgendamento.hora}:00`,
             status: 'CONFIRMADO',
             preco_final: precoFinal,
-            observacoes: usarPontos ? 'Desconto de pontos de fidelidade aplicado (-¥500)' : null
+            observacoes: notas
           }
-        ]);
+        ])
+        .select('id')
+        .single();
 
       if (error) throw error;
 
       await buscarHorariosOcupados();
 
       setAgendamentoConfirmado({
+        id: novoAgendamento?.id,
         numero: Math.floor(Math.random() * 100000),
         profissional: dadosAgendamento.profissional,
         servico: dadosAgendamento.servico,
+        dataStr: dadosAgendamento.data,
         data: new Date(dadosAgendamento.data).toLocaleDateString('pt-BR'),
         hora: dadosAgendamento.hora,
+        horaFim: somarMinutos(dadosAgendamento.hora, duracaoSelecionada),
+        duracaoMinutos: duracaoSelecionada,
         precoOriginal: servicoSelecionado.preco,
         precoFinal: precoFinal,
         desconto: usarPontos ? 500 : 0
       });
 
+      setPresencaConfirmada(false);
+      setModalAberto(false);
       setDadosAgendamento({ nome: '', email: '', telefone: '', profissional: '', hora: '', servico: '', data: '' });
       setUsarPontos(false);
+      setObservacoesCliente('');
       setPontosCliente(0);
       setDiaHorarioSelecionado(null);
-
-      setTimeout(() => {
-        setAgendamentoConfirmado(null);
-        setAbaAtiva('servicos');
-      }, 5000);
 
     } catch (error) {
       alert('❌ Erro ao agendar: ' + error.message);
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const handleConfirmarPresenca = async () => {
+    if (!agendamentoConfirmado?.id) {
+      setPresencaConfirmada(true);
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({ presenca_confirmada: true })
+        .eq('id', agendamentoConfirmado.id);
+      if (error) throw error;
+      setPresencaConfirmada(true);
+    } catch (error) {
+      alert('❌ Não foi possível confirmar a presença agora: ' + error.message);
+    }
+  };
+
+  const handleAdicionarAoCalendario = () => {
+    const conteudo = gerarConteudoICS({
+      servico: agendamentoConfirmado.servico,
+      profissional: agendamentoConfirmado.profissional,
+      dataStr: agendamentoConfirmado.dataStr,
+      horaInicio: agendamentoConfirmado.hora,
+      horaFim: agendamentoConfirmado.horaFim,
+      lembreteMinutos,
+    });
+    baixarArquivoICS(conteudo, `agendamento-kaizen-${agendamentoConfirmado.dataStr}.ics`);
+  };
+
+  const handleEnviarListaEspera = async (e) => {
+    e.preventDefault();
+    if (!listaEsperaDados.nome || !listaEsperaDados.email) return;
+    setEnviandoListaEspera(true);
+    try {
+      const { error } = await supabase.from('lista_espera').insert([{
+        nome: listaEsperaDados.nome,
+        email: listaEsperaDados.email,
+        telefone: listaEsperaDados.telefone || null,
+        servico: dadosAgendamento.servico || null,
+        profissional: profissionalSelecionado?.nome || null,
+        data_desejada: dataSelecionada.toISOString().split('T')[0],
+      }]);
+      if (error) throw error;
+      setListaEsperaEnviada(true);
+    } catch (error) {
+      alert('❌ Não foi possível registrar na lista de espera agora: ' + error.message);
+    } finally {
+      setEnviandoListaEspera(false);
     }
   };
 
@@ -358,39 +524,110 @@ function ClientePublico() {
     return '★'.repeat(num);
   };
 
-  const gerarCalendario = () => {
-    const ano = mesAtual.getFullYear();
-    const mes = mesAtual.getMonth();
-    
-    const primeiroDia = new Date(ano, mes, 1);
-    const ultimoDia = new Date(ano, mes + 1, 0);
-    const diasMes = ultimoDia.getDate();
-    const diaInicio = primeiroDia.getDay();
-
+  // Próximos DIAS_CARROSSEL dias a partir de hoje, para o carrossel de datas.
+  const gerarDiasCarrossel = () => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
     const dias = [];
-    for (let i = 0; i < diaInicio; i++) dias.push(null);
-    for (let i = 1; i <= diasMes; i++) dias.push(new Date(ano, mes, i));
+    for (let i = 0; i < DIAS_CARROSSEL; i++) {
+      const d = new Date(hoje);
+      d.setDate(hoje.getDate() + i);
+      dias.push(d);
+    }
     return dias;
   };
 
   if (agendamentoConfirmado) {
+    const horariosDisponiveisLembrete = OPCOES_LEMBRETE;
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#1a1a1a' }}>
-        <div style={{ background: '#2d2d2d', border: '2px solid #d4af37', borderRadius: '12px', padding: '40px', textAlign: 'center', maxWidth: '500px' }}>
-          <h2 style={{ color: '#d4af37', fontSize: '28px', marginBottom: '20px' }}>✅ AGENDAMENTO CONFIRMADO!</h2>
-          <div style={{ color: '#e8e8e8', fontSize: '16px', lineHeight: '1.8', marginBottom: '30px' }}>
-            <p><strong>Número:</strong> #{agendamentoConfirmado.numero}</p>
-            <p><strong>Profissional:</strong> {agendamentoConfirmado.profissional}</p>
-            <p><strong>Serviço:</strong> {agendamentoConfirmado.servico}</p>
-            <p><strong>Data:</strong> {agendamentoConfirmado.data}</p>
-            <p><strong>Hora:</strong> {agendamentoConfirmado.hora}</p>
-            <p><strong>Preço:</strong> ¥{agendamentoConfirmado.precoFinal.toLocaleString('ja-JP')}</p>
-            {agendamentoConfirmado.desconto > 0 && (
-              <p style={{ color: '#4ade80' }}>🎁 Desconto de fidelidade aplicado: -¥{agendamentoConfirmado.desconto.toLocaleString('ja-JP')}</p>
-            )}
+      <div style={{ background: '#1a1a1a', minHeight: '100vh', paddingBottom: '40px' }}>
+        <div style={{ background: '#166534', padding: '18px 20px', textAlign: 'center' }}>
+          <p style={{ color: '#fff', fontWeight: 'bold', fontSize: '17px', margin: 0 }}>✅ Horário agendado com sucesso!</p>
+        </div>
+
+        <div style={{ maxWidth: '480px', margin: '30px auto', padding: '0 20px' }}>
+          <div style={{ background: '#2d2d2d', border: '2px solid #d4af37', borderRadius: '12px', padding: '25px', marginBottom: '20px' }}>
+            <p style={{ color: '#999', fontSize: '12px', margin: '0 0 4px 0' }}>#{agendamentoConfirmado.numero} · {NOME_ESTABELECIMENTO}</p>
+            <h2 style={{ color: '#d4af37', margin: '0 0 15px 0' }}>{agendamentoConfirmado.servico}</h2>
+            <div style={{ color: '#e8e8e8', fontSize: '15px', lineHeight: '1.9' }}>
+              <p style={{ margin: 0 }}>💈 Profissional: <strong>{agendamentoConfirmado.profissional}</strong></p>
+              <p style={{ margin: 0 }}>📅 Data: <strong>{agendamentoConfirmado.data}</strong></p>
+              <p style={{ margin: 0 }}>🕐 Horário: <strong>{agendamentoConfirmado.hora} - {agendamentoConfirmado.horaFim} ({agendamentoConfirmado.duracaoMinutos} min)</strong></p>
+              <p style={{ margin: 0 }}>
+                💰 Valor: <strong>{formatarPreco(agendamentoConfirmado.precoFinal)}</strong>
+                {agendamentoConfirmado.desconto > 0 && (
+                  <span style={{ color: '#4ade80' }}> (desconto de {formatarPreco(agendamentoConfirmado.desconto)} aplicado)</span>
+                )}
+              </p>
+            </div>
+            <p style={{ color: '#999', fontSize: '13px', marginTop: '15px' }}>⭐ Você ganhará +2 pontos de fidelidade assim que este atendimento for realizado.</p>
           </div>
-          <p style={{ color: '#e8e8e8', fontSize: '13px', marginBottom: '10px' }}>⭐ Você ganhará +2 pontos de fidelidade assim que este atendimento for realizado.</p>
-          <p style={{ color: '#d4af37', fontSize: '14px', fontWeight: 'bold' }}>⏱️ Redirecionando...</p>
+
+          <div style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
+            <h3 style={{ color: '#d4af37', marginTop: 0, fontSize: '16px' }}>⏰ Criar lembrete</h3>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              {horariosDisponiveisLembrete.map(min => (
+                <button
+                  key={min}
+                  onClick={() => setLembreteMinutos(min)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid #d4af37',
+                    background: lembreteMinutos === min ? '#d4af37' : 'transparent',
+                    color: lembreteMinutos === min ? '#1a1a1a' : '#d4af37',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '13px'
+                  }}
+                >
+                  {min} min antes
+                </button>
+              ))}
+            </div>
+            <button onClick={handleAdicionarAoCalendario} style={{ width: '100%', padding: '12px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
+              📲 Adicionar lembrete ao calendário do celular
+            </button>
+            <a
+              href={linkGoogleCalendar({
+                servico: agendamentoConfirmado.servico,
+                profissional: agendamentoConfirmado.profissional,
+                dataStr: agendamentoConfirmado.dataStr,
+                horaInicio: agendamentoConfirmado.hora,
+                horaFim: agendamentoConfirmado.horaFim,
+              })}
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: 'block', textAlign: 'center', color: '#999', fontSize: '13px', textDecoration: 'underline' }}
+            >
+              ou adicionar ao Google Agenda
+            </a>
+          </div>
+
+          <button
+            onClick={handleConfirmarPresenca}
+            disabled={presencaConfirmada}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: presencaConfirmada ? '#166534' : 'transparent',
+              color: presencaConfirmada ? '#fff' : '#4ade80',
+              border: '1px solid #4ade80',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              cursor: presencaConfirmada ? 'default' : 'pointer',
+              marginBottom: '20px'
+            }}
+          >
+            {presencaConfirmada ? '✓ Presença confirmada' : 'Confirmar presença'}
+          </button>
+
+          <button
+            onClick={() => { setAgendamentoConfirmado(null); setAbaAtiva('servicos'); }}
+            style={{ width: '100%', padding: '12px', background: 'transparent', color: '#999', border: '1px solid #404040', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            Voltar para o site
+          </button>
         </div>
       </div>
     );
@@ -413,7 +650,7 @@ function ClientePublico() {
           { id: 'fidelidade', label: '🎁 Fidelidade' },
           { id: 'avaliacoes', label: '★ Avaliações' },
         ].map((aba) => (
-          <button 
+          <button
             key={aba.id}
             onClick={() => setAbaAtiva(aba.id)}
             style={{
@@ -433,24 +670,77 @@ function ClientePublico() {
       </nav>
 
       <main style={{ padding: '30px', maxWidth: '1200px', margin: '0 auto' }}>
-        
+
         {abaAtiva === 'servicos' && (
           <section>
             <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>💈 Nossos Serviços</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-              {servicos.map((servico) => (
-                <div key={servico.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
-                  <img src={servico.imagem} alt={servico.nome} style={{ width: '100%', aspectRatio: '4 / 5', objectFit: 'cover', objectPosition: 'center top' }} />
-                  <div style={{ padding: '15px' }}>
-                    <h3 style={{ color: '#d4af37', marginTop: '0' }}>{servico.nome}</h3>
-                    <p style={{ color: '#999', fontSize: '14px', margin: '5px 0' }}>{servico.descricao}</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px' }}>
-                      <span style={{ color: '#d4af37', fontWeight: 'bold' }}>¥{servico.preco.toLocaleString('ja-JP')}</span>
-                      <button onClick={() => { setDadosAgendamento({ ...dadosAgendamento, servico: servico.nome }); setDiaHorarioSelecionado(null); setAbaAtiva('agendar'); }} style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '8px 12px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Agendar</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {servicos.map((servico, idx) => {
+                const descricaoLonga = servico.descricao.length > 60;
+                const expandida = !!descricaoExpandida[servico.id];
+                const descricaoExibida = !descricaoLonga || expandida
+                  ? servico.descricao
+                  : `${servico.descricao.slice(0, 60)}...`;
+
+                return (
+                  <div
+                    key={servico.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      border: '1px solid #d4af37',
+                      borderRadius: '10px',
+                      background: '#2d2d2d',
+                      padding: '14px',
+                      flexWrap: 'wrap'
+                    }}
+                  >
+                    <img
+                      src={servico.imagem}
+                      alt={servico.nome}
+                      style={{ width: '92px', height: '92px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
+                    />
+
+                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                      <h3 style={{ color: '#d4af37', margin: '0 0 4px 0', fontSize: '16px', letterSpacing: '0.3px' }}>
+                        {idx + 1}. {servico.nome.toUpperCase()}
+                      </h3>
+                      <p style={{ color: '#999', fontSize: '13px', margin: '0 0 6px 0' }}>
+                        {descricaoExibida}
+                        {descricaoLonga && (
+                          <button
+                            onClick={() => setDescricaoExpandida({ ...descricaoExpandida, [servico.id]: !expandida })}
+                            style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', fontSize: '13px', padding: 0, marginLeft: '4px', textDecoration: 'underline' }}
+                          >
+                            {expandida ? 'Ver menos' : 'Ver mais'}
+                          </button>
+                        )}
+                      </p>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>{formatarPreco(servico.preco)}</span>
+                        <span style={{ color: '#999', fontSize: '13px' }}>⏱️ {servico.duracao}</span>
+                      </div>
                     </div>
+
+                    <button
+                      onClick={() => abrirAgendamentoParaServico(servico)}
+                      style={{
+                        background: '#2563eb',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '12px 22px',
+                        borderRadius: '6px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                    >
+                      Agendar
+                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -466,13 +756,13 @@ function ClientePublico() {
             boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)'
           }}>
             <div style={{
-              background: 'rgba(26, 26, 26, 0.35)',
+              background: 'rgba(26, 26, 26, 0.55)',
               padding: '30px'
             }}>
-              <h2 style={{ color: '#d4af37', marginBottom: '20px' }}>📅 Calendário de Agendamentos</h2>
+              <h2 style={{ color: '#d4af37', marginBottom: '20px' }}>📅 Agendar horário</h2>
 
               <div style={{ maxWidth: '500px', margin: '0 auto 25px' }}>
-                <label style={{ color: '#d4af37', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>1. Escolha o serviço desejado:</label>
+                <label style={{ color: '#d4af37', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>Serviço:</label>
                 <select
                   value={dadosAgendamento.servico}
                   onChange={(e) => { setDadosAgendamento({ ...dadosAgendamento, servico: e.target.value }); setDiaHorarioSelecionado(null); }}
@@ -486,88 +776,152 @@ function ClientePublico() {
               {!dadosAgendamento.servico ? (
                 <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>👆 Escolha um serviço acima para ver os horários disponíveis.</p>
               ) : (
-              <>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
-                <button onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1))} style={{ padding: '8px 16px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>← Anterior</button>
-                <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '200px', textAlign: 'center', fontSize: '18px' }}>
-                  {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                </span>
-                <button onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1))} style={{ padding: '8px 16px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Próximo →</button>
-              </div>
+                <div style={{ maxWidth: '560px', margin: '0 auto' }}>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '10px', marginBottom: '30px' }}>
-                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(dia => (
-                  <div key={dia} style={{ textAlign: 'center', color: '#d4af37', fontWeight: 'bold', padding: '10px' }}>{dia}</div>
-                ))}
-                
-                {gerarCalendario().map((data, idx) => {
-                  if (!data) return <div key={`vazio-${idx}`}></div>;
-
-                  const hoje = new Date();
-                  const ehPassado = data < hoje && data.getDate() !== hoje.getDate();
-                  
-                  return (
-                    <div key={data.toISOString()} style={{ border: '2px solid #d4af37', padding: '10px', borderRadius: '6px', background: 'rgba(45, 45, 45, 0.8)', minHeight: '170px', opacity: ehPassado ? 0.5 : 1 }}>
-                      <div style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '8px' }}>{data.getDate()}</div>
-                      <div style={{ fontSize: '11px' }}>
-                        {!ehPassado && profissionaisAptos.map(prof => {
-                          const horarios = getHorariosProfissional(prof, data, duracaoSelecionada);
-                          return horarios.length > 0 ? (
-                            <div key={prof.id} style={{ marginBottom: '8px' }}>
-                              <div style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '10px', marginBottom: '3px' }}>{prof.nome}:</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                {horarios.map(h => (
-                                  <button key={h} onClick={() => handleSelecionarDiaHorario(data, prof, h)} style={{ background: '#4ade80', color: '#1a1a1a', border: 'none', borderRadius: '5px', padding: '6px 9px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', minWidth: '44px', minHeight: '32px' }}>{h}</button>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null;
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {diaHorarioSelecionado && (
-                <div ref={resumoRef} style={{ background: 'rgba(45, 45, 45, 0.95)', border: '2px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
-                  <h3 style={{ color: '#d4af37' }}>📅 Resumo</h3>
-                  <p><strong>Data:</strong> {diaHorarioSelecionado.data.toLocaleDateString('pt-BR')}</p>
-                  <p><strong>Hora:</strong> {diaHorarioSelecionado.hora}</p>
-                  <p><strong>Profissional:</strong> {diaHorarioSelecionado.prof.nome}</p>
-                  <p><strong>Serviço:</strong> {dadosAgendamento.servico} {servicoSelecionadoInfo ? `(${servicoSelecionadoInfo.duracao})` : ''}</p>
-
-                  <input type="text" placeholder="Nome" value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-                  <input type="email" placeholder="Email" value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-                  <input type="tel" placeholder="Telefone" value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-
-                  {dadosAgendamento.email && dadosAgendamento.email.includes('@') && (
-                    <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '4px', padding: '12px', marginBottom: '15px', fontSize: '13px' }}>
-                      {carregandoPontos ? (
-                        <p style={{ margin: 0, color: '#999' }}>⏳ Consultando seus pontos de fidelidade...</p>
-                      ) : (
-                        <>
-                          <p style={{ margin: '0 0 8px 0', color: '#d4af37' }}>🎁 Você tem <strong>{pontosCliente} pontos</strong> de fidelidade disponíveis.</p>
-                          {pontosCliente >= 10 ? (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#e8e8e8' }}>
-                              <input type="checkbox" checked={usarPontos} onChange={(e) => setUsarPontos(e.target.checked)} />
-                              Usar 10 pontos agora para ganhar ¥500 de desconto neste agendamento
-                            </label>
-                          ) : (
-                            <p style={{ margin: 0, color: '#999' }}>Faltam {10 - pontosCliente} pontos ({Math.ceil((10 - pontosCliente) / 2)} atendimento{Math.ceil((10 - pontosCliente) / 2) > 1 ? 's' : ''}) para o próximo desconto de ¥500.</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => setDiaHorarioSelecionado(null)} style={{ background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-                    <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ flex: 1, background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px', borderRadius: '4px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer' }}>{carregando ? '⏳' : '✅ Confirmar'}</button>
+                  {/* Seletor de data em carrossel horizontal */}
+                  <p style={{ color: '#d4af37', fontWeight: 'bold', textAlign: 'center', marginBottom: '10px' }}>
+                    {dataSelecionada.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                  </p>
+                  <div
+                    className="kaizen-datas-scroll"
+                    style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '20px' }}
+                  >
+                    {gerarDiasCarrossel().map((data) => {
+                      const diaSemana = getDiaSemana(data);
+                      const fechado = !HORARIO_SALAO[diaSemana]?.aberto;
+                      const selecionado = data.toDateString() === dataSelecionada.toDateString();
+                      return (
+                        <button
+                          key={data.toISOString()}
+                          disabled={fechado}
+                          onClick={() => { setDataSelecionada(data); setListaEsperaAberta(false); setListaEsperaEnviada(false); }}
+                          style={{
+                            flex: '0 0 auto',
+                            width: '58px',
+                            padding: '10px 4px',
+                            borderRadius: '10px',
+                            border: selecionado ? '2px solid #d4af37' : '1px solid #404040',
+                            background: selecionado ? '#d4af37' : '#2d2d2d',
+                            color: fechado ? '#666' : (selecionado ? '#1a1a1a' : '#e8e8e8'),
+                            cursor: fechado ? 'not-allowed' : 'pointer',
+                            opacity: fechado ? 0.5 : 1,
+                            textAlign: 'center'
+                          }}
+                          title={fechado ? 'Fechado' : undefined}
+                        >
+                          <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{DIAS_SEMANA_ABREV[data.getDay()]}</div>
+                          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{data.getDate()}</div>
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  {/* Seletor de profissional */}
+                  <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>Profissional:</p>
+                  <div style={{ display: 'flex', gap: '18px', marginBottom: '25px', flexWrap: 'wrap' }}>
+                    {profissionaisAptos.map((prof) => {
+                      const selecionado = profissionalSelecionado?.id === prof.id;
+                      return (
+                        <button
+                          key={prof.id}
+                          onClick={() => { setProfissionalSelecionadoId(prof.id); setListaEsperaAberta(false); setListaEsperaEnviada(false); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center', padding: 0 }}
+                        >
+                          <img
+                            src={prof.imagem}
+                            alt={prof.nome}
+                            style={{
+                              width: '64px',
+                              height: '64px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: selecionado ? '3px solid #d4af37' : '3px solid transparent',
+                              display: 'block',
+                              margin: '0 auto 6px'
+                            }}
+                          />
+                          <span style={{ fontSize: '12px', color: selecionado ? '#d4af37' : '#e8e8e8', fontWeight: selecionado ? 'bold' : 'normal' }}>
+                            {prof.nome}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Grade de horários, dividida em Manhã / Tarde */}
+                  {(() => {
+                    const horarios = getHorariosProfissional(profissionalSelecionado, dataSelecionada, duracaoSelecionada);
+                    const limiteManha = paraMinutos(HORARIO_ALMOCO.inicio);
+                    const manha = horarios.filter(h => paraMinutos(h) < limiteManha);
+                    const tarde = horarios.filter(h => paraMinutos(h) >= limiteManha);
+
+                    if (horarios.length === 0) {
+                      return (
+                        <div style={{ background: 'rgba(45, 45, 45, 0.9)', border: '1px solid #404040', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
+                          <p style={{ color: '#e8e8e8', marginBottom: '15px' }}>😕 Nenhum horário disponível com {profissionalSelecionado?.nome || 'este profissional'} neste dia.</p>
+                          {!listaEsperaAberta && !listaEsperaEnviada && (
+                            <button
+                              onClick={() => setListaEsperaAberta(true)}
+                              style={{ background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                              Lista de espera
+                            </button>
+                          )}
+                          {listaEsperaEnviada && (
+                            <p style={{ color: '#4ade80', fontWeight: 'bold', margin: 0 }}>✅ Anotado! Avisaremos assim que abrir um horário.</p>
+                          )}
+                          {listaEsperaAberta && !listaEsperaEnviada && (
+                            <form onSubmit={handleEnviarListaEspera} style={{ marginTop: '15px', textAlign: 'left' }}>
+                              <input type="text" placeholder="Nome" value={listaEsperaDados.nome} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, nome: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
+                              <input type="email" placeholder="Email" value={listaEsperaDados.email} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, email: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
+                              <input type="tel" placeholder="Telefone (opcional)" value={listaEsperaDados.telefone} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, telefone: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+                              <button type="submit" disabled={enviandoListaEspera} style={{ width: '100%', padding: '10px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                {enviandoListaEspera ? '⏳ Enviando...' : 'Entrar na lista de espera'}
+                              </button>
+                            </form>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {manha.length > 0 && (
+                          <div style={{ marginBottom: '20px' }}>
+                            <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>☀️ Manhã ({manha.length})</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                              {manha.map(h => (
+                                <button
+                                  key={h}
+                                  onClick={() => handleSelecionarHorario(h)}
+                                  style={{ background: '#4ade80', color: '#1a1a1a', border: 'none', borderRadius: '999px', padding: '9px 18px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}
+                                >
+                                  {h}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {tarde.length > 0 && (
+                          <div>
+                            <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>🌆 Tarde ({tarde.length})</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                              {tarde.map(h => (
+                                <button
+                                  key={h}
+                                  onClick={() => handleSelecionarHorario(h)}
+                                  style={{ background: '#4ade80', color: '#1a1a1a', border: 'none', borderRadius: '999px', padding: '9px 18px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}
+                                >
+                                  {h}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
-              )}
-              </>
               )}
             </div>
           </section>
@@ -674,6 +1028,96 @@ function ClientePublico() {
       <footer style={{ borderTop: '1px solid #404040', padding: '20px', textAlign: 'center', color: '#999' }}>
         <p>&copy; 2026 Kaizen Barber Shop. Todos os direitos reservados.</p>
       </footer>
+
+      {/* Tela 3: modal de confirmação (bottom sheet) */}
+      {modalAberto && diaHorarioSelecionado && (
+        <div
+          className="kaizen-modal-overlay"
+          onClick={() => setModalAberto(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+        >
+          <div
+            className="kaizen-modal-sheet"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#2d2d2d',
+              borderTop: '2px solid #d4af37',
+              borderRadius: '16px 16px 0 0',
+              padding: '20px',
+              width: '100%',
+              maxWidth: '560px',
+              maxHeight: '88vh',
+              overflowY: 'auto'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+              <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: '#555' }} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+              <img src={diaHorarioSelecionado.prof.imagem} alt={diaHorarioSelecionado.prof.nome} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+              <div>
+                <p style={{ margin: 0, color: '#999', fontSize: '12px' }}>{NOME_ESTABELECIMENTO}</p>
+                <p style={{ margin: 0, color: '#d4af37', fontWeight: 'bold' }}>{diaHorarioSelecionado.prof.nome}</p>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(212, 175, 55, 0.08)', border: '1px solid #404040', borderRadius: '8px', padding: '14px', marginBottom: '15px' }}>
+              <p style={{ margin: '0 0 6px 0', color: '#e8e8e8', fontWeight: 'bold' }}>{dadosAgendamento.servico}</p>
+              <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '13px' }}>
+                📅 {diaHorarioSelecionado.data.toLocaleDateString('pt-BR')} · 🕐 {diaHorarioSelecionado.hora} - {somarMinutos(diaHorarioSelecionado.hora, duracaoSelecionada)} ({duracaoSelecionada} min)
+              </p>
+              <p style={{ margin: 0 }}>
+                {usarPontos && pontosCliente >= 10 ? (
+                  <>
+                    <span style={{ textDecoration: 'line-through', color: '#999', marginRight: '8px' }}>{formatarPreco(servicoSelecionadoInfo?.preco || 0)}</span>
+                    <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
+                  </>
+                ) : (
+                  <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
+                )}
+              </p>
+            </div>
+
+            <input type="text" placeholder="Nome" value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <input type="email" placeholder="Email" value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <input type="tel" placeholder="Telefone" value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <textarea
+              placeholder="Alguma observação? (Ex: Não precisa lavar, etc...)"
+              value={observacoesCliente}
+              onChange={(e) => setObservacoesCliente(e.target.value)}
+              style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', minHeight: '60px' }}
+            />
+
+            {dadosAgendamento.email && dadosAgendamento.email.includes('@') && (
+              <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '4px', padding: '12px', marginBottom: '15px', fontSize: '13px' }}>
+                {carregandoPontos ? (
+                  <p style={{ margin: 0, color: '#999' }}>⏳ Consultando seus pontos de fidelidade...</p>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 8px 0', color: '#d4af37' }}>🎁 Você tem <strong>{pontosCliente} pontos</strong> de fidelidade disponíveis.</p>
+                    {pontosCliente >= 10 ? (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#e8e8e8' }}>
+                        <input type="checkbox" checked={usarPontos} onChange={(e) => setUsarPontos(e.target.checked)} />
+                        Usar 10 pontos agora para ganhar ¥500 de desconto neste agendamento
+                      </label>
+                    ) : (
+                      <p style={{ margin: 0, color: '#999' }}>Faltam {10 - pontosCliente} pontos ({Math.ceil((10 - pontosCliente) / 2)} atendimento{Math.ceil((10 - pontosCliente) / 2) > 1 ? 's' : ''}) para o próximo desconto de ¥500.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ width: '100%', background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '14px', borderRadius: '6px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer', fontSize: '15px' }}>
+              {carregando ? '⏳ Agendando serviço...' : '✅ Confirmar agendamento'}
+            </button>
+            <button onClick={() => setModalAberto(false)} style={{ width: '100%', background: 'transparent', color: '#999', border: 'none', padding: '10px', marginTop: '6px', cursor: 'pointer' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1537,3 +1537,31 @@ body {
     align-items: flex-start;
   }
 }
+
+@keyframes kaizenSubirModal {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes kaizenFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.kaizen-modal-overlay {
+  animation: kaizenFadeIn 0.2s ease-out;
+}
+
+.kaizen-modal-sheet {
+  animation: kaizenSubirModal 0.25s ease-out;
+}
+
+.kaizen-data-pill::-webkit-scrollbar,
+.kaizen-datas-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.kaizen-datas-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent-gold);
+  border-radius: 3px;
+}
