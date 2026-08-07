@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { getSlotsDisponiveisNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
 
 function ClientePublico() {
   const [abaAtiva, setAbaAtiva] = useState('servicos');
@@ -7,6 +8,7 @@ function ClientePublico() {
   const [agendamentoConfirmado, setAgendamentoConfirmado] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [horariosOcupados, setHorariosOcupados] = useState({});
+  const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [pontosCliente, setPontosCliente] = useState(0);
   const [usarPontos, setUsarPontos] = useState(false);
   const [carregandoPontos, setCarregandoPontos] = useState(false);
@@ -58,7 +60,6 @@ function ClientePublico() {
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
       servicos: ['Cortes', 'Barba', 'Coloração'],
       imagem: '/images/marco.png',
-      horarios: { segunda: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], terca: [], quarta: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], quinta: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], sexta: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'], sabado: ['09:00', '10:00', '14:00', '15:00'], domingo: ['10:00', '11:00', '15:00', '16:00'] }
     },
     { 
       id: 2, 
@@ -68,7 +69,6 @@ function ClientePublico() {
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
       imagem: '/images/gabriel.png',
-      horarios: { segunda: ['10:00', '11:00', '14:00', '15:00'], terca: [], quarta: ['10:00', '11:00', '14:00', '15:00'], quinta: ['10:00', '11:00', '14:00', '15:00'], sexta: ['10:00', '11:00', '14:00', '15:00'], sabado: ['10:00', '14:00'], domingo: ['11:00', '14:00'] }
     },
     { 
       id: 3, 
@@ -78,7 +78,6 @@ function ClientePublico() {
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
       imagem: '/images/neia.png',
-      horarios: { segunda: ['09:00', '11:00', '15:00', '16:00', '17:00'], terca: [], quarta: ['09:00', '11:00', '15:00', '16:00', '17:00'], quinta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sexta: ['09:00', '11:00', '15:00', '16:00', '17:00'], sabado: ['11:00', '15:00'], domingo: ['09:00', '16:00'] }
     },
   ];
 
@@ -92,6 +91,10 @@ function ClientePublico() {
     buscarHorariosOcupados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesAtual]);
+
+  useEffect(() => {
+    buscarHorarioEstendido().then(setHorarioEstendido);
+  }, []);
 
   useEffect(() => {
     if (diaHorarioSelecionado && resumoRef.current) {
@@ -199,46 +202,20 @@ function ClientePublico() {
     }
   };
 
-  const paraMinutos = (hhmm) => {
-    const [h, m] = hhmm.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  const getBlocosDeTrabalho = (horariosBase) => {
-    const minutos = horariosBase.map(paraMinutos).sort((a, b) => a - b);
-    const blocos = [];
-    let blocoAtual = [];
-    minutos.forEach((m, idx) => {
-      if (idx === 0 || m - minutos[idx - 1] === 60) {
-        blocoAtual.push(m);
-      } else {
-        blocos.push(blocoAtual);
-        blocoAtual = [m];
-      }
-    });
-    if (blocoAtual.length) blocos.push(blocoAtual);
-    return blocos;
-  };
-
+  // Horários disponíveis para um profissional em uma data: parte dos slots
+  // do horário do salão (config/horarios.js) e remove os que colidem com
+  // agendamentos já existentes daquele profissional.
   const getHorariosProfissional = (prof, data, duracaoMinutos) => {
-    const diaSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'][data.getDay()];
-    const horariosBase = prof.horarios[diaSemana] || [];
-    if (horariosBase.length === 0) return [];
-
     const duracao = duracaoMinutos || 60;
-    const blocos = getBlocosDeTrabalho(horariosBase);
+    const slotsBase = getSlotsDisponiveisNoDia(data, duracao, horarioEstendido);
+    if (slotsBase.length === 0) return [];
+
     const dataStr = data.toISOString().split('T')[0];
     const intervalosOcupados = (horariosOcupados[prof.uuid] || []).filter(o => o.data === dataStr);
 
-    return horariosBase.filter(h => {
+    return slotsBase.filter(h => {
       const inicioMin = paraMinutos(h);
       const fimMin = inicioMin + duracao;
-
-      // precisa caber inteiro dentro do mesmo bloco de trabalho (sem invadir o almoço ou passar do fechamento)
-      const bloco = blocos.find(b => b.includes(inicioMin));
-      if (!bloco) return false;
-      const fimDoBloco = Math.max(...bloco) + 60;
-      if (fimMin > fimDoBloco) return false;
 
       // não pode colidir com nenhum agendamento já existente deste profissional
       const colide = intervalosOcupados.some(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
