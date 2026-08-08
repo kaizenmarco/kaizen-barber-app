@@ -13,7 +13,7 @@ import {
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
 const DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-const DIAS_CARROSSEL = 30; // quantos dias à frente mostrar no seletor de data
+const DIAS_CARROSSEL = 90; // até quantos dias à frente o cliente pode agendar (~3 meses, cobre os períodos de feriados prolongados no Japão)
 const OPCOES_LEMBRETE = [15, 20, 30, 60];
 
 const formatarPreco = (valor) => `¥${valor.toLocaleString('ja-JP')}`;
@@ -97,6 +97,12 @@ function ClientePublico() {
   const [observacoesCliente, setObservacoesCliente] = useState('');
 
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
+  const [mesCalendario, setMesCalendario] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
   const [profissionalSelecionadoId, setProfissionalSelecionadoId] = useState(null);
   const [descricaoExpandida, setDescricaoExpandida] = useState({});
 
@@ -179,6 +185,16 @@ function ClientePublico() {
     : profissionais;
   const profissionalSelecionado = profissionaisAptos.find(p => p.id === profissionalSelecionadoId) || profissionaisAptos[0] || null;
 
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const limiteDataMax = new Date(hoje);
+  limiteDataMax.setDate(hoje.getDate() + DIAS_CARROSSEL - 1);
+  const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const podeVoltarMes = mesCalendario.getFullYear() > inicioMesAtual.getFullYear() ||
+    (mesCalendario.getFullYear() === inicioMesAtual.getFullYear() && mesCalendario.getMonth() > inicioMesAtual.getMonth());
+  const proximoMesRef = new Date(mesCalendario.getFullYear(), mesCalendario.getMonth() + 1, 1);
+  const podeAvancarMes = proximoMesRef <= limiteDataMax;
+
   useEffect(() => {
     buscarHorariosOcupados();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,6 +219,16 @@ function ClientePublico() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dadosAgendamento.servico]);
+
+  // Mantém o calendário sempre mostrando o mês da data selecionada (ex:
+  // quando o serviço muda e a data volta para hoje, ou quando o cliente
+  // escolhe uma data em outro mês).
+  useEffect(() => {
+    const novoMes = new Date(dataSelecionada.getFullYear(), dataSelecionada.getMonth(), 1);
+    setMesCalendario(prev => (
+      prev.getFullYear() === novoMes.getFullYear() && prev.getMonth() === novoMes.getMonth()
+    ) ? prev : novoMes);
+  }, [dataSelecionada]);
 
   const buscarPontosCliente = async (emailParam) => {
     const email = emailParam || dadosAgendamento.email;
@@ -258,7 +284,7 @@ function ClientePublico() {
 
   const buscarHorariosOcupados = async () => {
     try {
-      // cobre toda a janela do carrossel de datas (hoje + DIAS_CARROSSEL dias),
+      // cobre toda a janela de agendamento do calendário (hoje + DIAS_CARROSSEL dias),
       // não só o mês corrente, para não deixar passar conflitos perto da virada do mês.
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
@@ -524,17 +550,28 @@ function ClientePublico() {
     return '★'.repeat(num);
   };
 
-  // Próximos DIAS_CARROSSEL dias a partir de hoje, para o carrossel de datas.
-  const gerarDiasCarrossel = () => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+  // Monta a grade do mês (semanas de domingo a sábado) para o calendário
+  // visual, com células vazias (null) preenchendo os dias fora do mês.
+  const gerarGradeMes = (mesRef) => {
+    const ano = mesRef.getFullYear();
+    const mes = mesRef.getMonth();
+    const primeiroDia = new Date(ano, mes, 1);
+    const ultimoDia = new Date(ano, mes + 1, 0);
     const dias = [];
-    for (let i = 0; i < DIAS_CARROSSEL; i++) {
-      const d = new Date(hoje);
-      d.setDate(hoje.getDate() + i);
-      dias.push(d);
-    }
+    for (let i = 0; i < primeiroDia.getDay(); i++) dias.push(null);
+    for (let d = 1; d <= ultimoDia.getDate(); d++) dias.push(new Date(ano, mes, d));
+    while (dias.length % 7 !== 0) dias.push(null);
     return dias;
+  };
+
+  const irMesAnterior = () => {
+    if (!podeVoltarMes) return;
+    setMesCalendario(new Date(mesCalendario.getFullYear(), mesCalendario.getMonth() - 1, 1));
+  };
+
+  const irProximoMes = () => {
+    if (!podeAvancarMes) return;
+    setMesCalendario(new Date(mesCalendario.getFullYear(), mesCalendario.getMonth() + 1, 1));
   };
 
   if (agendamentoConfirmado) {
@@ -778,39 +815,87 @@ function ClientePublico() {
               ) : (
                 <div style={{ maxWidth: '560px', margin: '0 auto' }}>
 
-                  {/* Seletor de data em carrossel horizontal */}
-                  <p style={{ color: '#d4af37', fontWeight: 'bold', textAlign: 'center', marginBottom: '10px' }}>
-                    {dataSelecionada.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                  </p>
-                  <div
-                    className="kaizen-datas-scroll"
-                    style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '20px' }}
-                  >
-                    {gerarDiasCarrossel().map((data) => {
+                  {/* Calendário do mês: navegação por mês (até 3 meses de
+                      antecedência) com visualização completa dos dias da
+                      semana e números, para o cliente decidir com calma. */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                    <button
+                      onClick={irMesAnterior}
+                      disabled={!podeVoltarMes}
+                      aria-label="Mês anterior"
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '50%',
+                        border: '1px solid #d4af37',
+                        background: 'transparent',
+                        color: podeVoltarMes ? '#d4af37' : '#555',
+                        fontSize: '18px',
+                        cursor: podeVoltarMes ? 'pointer' : 'not-allowed',
+                        opacity: podeVoltarMes ? 1 : 0.4
+                      }}
+                    >
+                      ‹
+                    </button>
+                    <p style={{ color: '#d4af37', fontWeight: 'bold', margin: 0, fontSize: '17px', textTransform: 'capitalize' }}>
+                      {mesCalendario.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                    </p>
+                    <button
+                      onClick={irProximoMes}
+                      disabled={!podeAvancarMes}
+                      aria-label="Próximo mês"
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '50%',
+                        border: '1px solid #d4af37',
+                        background: 'transparent',
+                        color: podeAvancarMes ? '#d4af37' : '#555',
+                        fontSize: '18px',
+                        cursor: podeAvancarMes ? 'pointer' : 'not-allowed',
+                        opacity: podeAvancarMes ? 1 : 0.4
+                      }}
+                    >
+                      ›
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '6px' }}>
+                    {DIAS_SEMANA_ABREV.map(dia => (
+                      <div key={dia} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', color: '#999' }}>
+                        {dia}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', marginBottom: '20px' }}>
+                    {gerarGradeMes(mesCalendario).map((data, idx) => {
+                      if (!data) return <div key={`vazio-${idx}`} />;
                       const diaSemana = getDiaSemana(data);
                       const fechado = !HORARIO_SALAO[diaSemana]?.aberto;
+                      const foraDoIntervalo = data < hoje || data > limiteDataMax;
+                      const desabilitado = fechado || foraDoIntervalo;
                       const selecionado = data.toDateString() === dataSelecionada.toDateString();
                       return (
                         <button
                           key={data.toISOString()}
-                          disabled={fechado}
+                          disabled={desabilitado}
                           onClick={() => { setDataSelecionada(data); setListaEsperaAberta(false); setListaEsperaEnviada(false); }}
+                          title={fechado ? 'Fechado' : (foraDoIntervalo ? 'Fora do período de agendamento' : undefined)}
                           style={{
-                            flex: '0 0 auto',
-                            width: '58px',
-                            padding: '10px 4px',
-                            borderRadius: '10px',
+                            aspectRatio: '1',
+                            width: '100%',
+                            borderRadius: '8px',
                             border: selecionado ? '2px solid #d4af37' : '1px solid #404040',
-                            background: selecionado ? '#d4af37' : '#2d2d2d',
-                            color: fechado ? '#666' : (selecionado ? '#1a1a1a' : '#e8e8e8'),
-                            cursor: fechado ? 'not-allowed' : 'pointer',
-                            opacity: fechado ? 0.5 : 1,
-                            textAlign: 'center'
+                            background: selecionado ? '#d4af37' : 'rgba(45, 45, 45, 0.85)',
+                            color: desabilitado ? '#666' : (selecionado ? '#1a1a1a' : '#e8e8e8'),
+                            cursor: desabilitado ? 'not-allowed' : 'pointer',
+                            opacity: desabilitado ? 0.45 : 1,
+                            fontWeight: selecionado ? 'bold' : 'normal',
+                            fontSize: '14px'
                           }}
-                          title={fechado ? 'Fechado' : undefined}
                         >
-                          <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{DIAS_SEMANA_ABREV[data.getDay()]}</div>
-                          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{data.getDate()}</div>
+                          {data.getDate()}
                         </button>
                       );
                     })}
