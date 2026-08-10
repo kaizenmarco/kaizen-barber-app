@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { getSlotsDisponiveisNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
+import { SERVICOS } from '../config/servicos';
 
 function Agendamentos({ t }) {
   const [agendamentos, setAgendamentos] = useState([]);
@@ -7,6 +9,8 @@ function Agendamentos({ t }) {
   const [abaProfissional, setAbaProfissional] = useState('11c0c7fb-e020-4c49-ab0a-28a16109b35f');
   const [mesAtual, setMesAtual] = useState(new Date());
   const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
+  const [modoEncaixe, setModoEncaixe] = useState(false);
 
   const [novoAgendamento, setNovoAgendamento] = useState({
     cliente: '',
@@ -24,21 +28,51 @@ function Agendamentos({ t }) {
     { id: 3, uuid: 'ad232428-9872-46db-82b3-27819ab353ff', nome: 'Neia' },
   ];
 
-  const servicosLista = [
-    { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte' },
-    { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas' },
-    { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba' },
-    { id: 4, uuid: '21a0d4eb-ee51-4124-a84b-34c3bdf307dc', nome: 'Coloração' },
-    { id: 5, uuid: '2f4ab333-ba87-40f5-9c3a-3dd911104130', nome: 'Alisamento' },
-    { id: 6, uuid: '3ccdf5fc-eda5-4c09-9d19-19bcb7ee044a', nome: 'Corte Feminino' },
-    { id: 7, uuid: '47d96756-2f6c-48ed-82f6-da80e0166b96', nome: 'Permanente' },
-    { id: 8, uuid: '1b3d936d-e4ff-4ab0-8bb5-78c6139230c2', nome: 'Limpeza de Pele' },
-  ];
+  // Serviços (nome, duração, preço) vêm de config/servicos.js — mesma fonte
+  // usada pelo site público, para nunca mais ficarem dessincronizados.
+  const servicosLista = SERVICOS;
+
+  useEffect(() => {
+    buscarHorarioEstendido().then(setHorarioEstendido);
+  }, []);
 
   // Buscar agendamentos
   useEffect(() => {
     buscarAgendamentos();
   }, []);
+
+  // ---- Cálculo de horários disponíveis para o formulário "Novo Agendamento" ----
+  // Usa a mesma lógica de duração por serviço do site público (config/horarios.js
+  // + config/servicos.js), e os agendamentos já carregados nesta tela para saber
+  // o que está ocupado — assim Admin e site público nunca mais mostram
+  // disponibilidades diferentes para o mesmo dia.
+  const profissionalNovoObj = profissionaisLista.find(p => p.nome === novoAgendamento.profissional);
+  const servicoNovoObj = servicosLista.find(s => s.nome === novoAgendamento.servico);
+  const duracaoNovoAgendamento = servicoNovoObj ? servicoNovoObj.duracaoMinutos : 60;
+
+  const intervalosOcupadosNoDia = (!profissionalNovoObj || !novoAgendamento.data) ? [] : agendamentos
+    .filter(a => a.profissionalId === profissionalNovoObj.uuid && a.data === novoAgendamento.data && a.status !== 'CANCELADO')
+    .map(a => {
+      const inicioMin = paraMinutos(a.hora);
+      const duracao = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+      return { inicioMin, fimMin: inicioMin + duracao, cliente: a.cliente, hora: a.hora, servico: a.servico };
+    });
+
+  const slotsDisponiveisNovoAgendamento = (!profissionalNovoObj || !servicoNovoObj || !novoAgendamento.data) ? [] : (() => {
+    const dataObj = new Date(`${novoAgendamento.data}T00:00:00`);
+    const base = getSlotsDisponiveisNoDia(dataObj, duracaoNovoAgendamento, horarioEstendido);
+    return base.filter(h => {
+      const inicioMin = paraMinutos(h);
+      const fimMin = inicioMin + duracaoNovoAgendamento;
+      return !intervalosOcupadosNoDia.some(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
+    });
+  })();
+
+  const conflitosEncaixe = (!modoEncaixe || !novoAgendamento.horario) ? [] : (() => {
+    const inicioMin = paraMinutos(novoAgendamento.horario);
+    const fimMin = inicioMin + duracaoNovoAgendamento;
+    return intervalosOcupadosNoDia.filter(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
+  })();
 
   const buscarAgendamentos = async () => {
     setCarregando(true);
@@ -53,6 +87,7 @@ function Agendamentos({ t }) {
           data_hora,
           status,
           preco_final,
+          observacoes,
           clientes(id, nome, email, telefone),
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
@@ -77,7 +112,8 @@ function Agendamentos({ t }) {
           profissional: agendamento.profissionais?.nome || 'N/A',
           profissionalId: agendamento.profissional_id,
           status: agendamento.status,
-          preco: agendamento.preco_final
+          preco: agendamento.preco_final,
+          encaixe: !!agendamento.observacoes?.startsWith('[ENCAIXE]')
         };
       });
 
@@ -96,10 +132,29 @@ function Agendamentos({ t }) {
 
   const handleAgendar = async (e) => {
     e.preventDefault();
-    
-    if (!novoAgendamento.cliente || !novoAgendamento.email || !novoAgendamento.data || !novoAgendamento.horario) {
+
+    if (!novoAgendamento.cliente || !novoAgendamento.email || !novoAgendamento.data || !novoAgendamento.horario || !novoAgendamento.servico || !novoAgendamento.profissional) {
       alert('⚠️ Preencha todos os campos obrigatórios!');
       return;
+    }
+
+    // Fora do modo Encaixe, só deixa agendar em horários que a própria tela
+    // calculou como livres (evita conflito criado por engano).
+    if (!modoEncaixe && !slotsDisponiveisNovoAgendamento.includes(novoAgendamento.horario)) {
+      alert('⚠️ Esse horário não está mais disponível. Escolha outro na lista, ou ative o modo Encaixe para forçar mesmo assim.');
+      return;
+    }
+
+    // No modo Encaixe, se colide com outro agendamento, exige confirmação
+    // explícita descrevendo o conflito — quem confirma assume a responsabilidade.
+    if (modoEncaixe && conflitosEncaixe.length > 0) {
+      const resumoConflito = conflitosEncaixe
+        .map(c => `${c.hora} - ${c.cliente} (${c.servico})`)
+        .join('\n');
+      const confirmou = window.confirm(
+        `⚠️ ENCAIXE: este horário (${novoAgendamento.horario}) invade o(s) seguinte(s) agendamento(s) de ${novoAgendamento.profissional}:\n\n${resumoConflito}\n\nAo confirmar, você assume a responsabilidade por resolver esse conflito com os clientes. Continuar?`
+      );
+      if (!confirmou) return;
     }
 
     try {
@@ -130,6 +185,10 @@ function Agendamentos({ t }) {
       const profissionalSelecionado = profissionaisLista.find(p => p.nome === novoAgendamento.profissional);
       const servicoSelecionado = servicosLista.find(s => s.nome === novoAgendamento.servico);
 
+      const observacoes = (modoEncaixe && conflitosEncaixe.length > 0)
+        ? `[ENCAIXE] Agendado manualmente pelo Admin, sobrepondo: ${conflitosEncaixe.map(c => `${c.hora} ${c.cliente}`).join(', ')}`
+        : (modoEncaixe ? '[ENCAIXE] Agendado manualmente pelo Admin fora dos horários padrão.' : null);
+
       const { error: erroAgendamento } = await supabase
         .from('agendamentos')
         .insert([{
@@ -138,13 +197,15 @@ function Agendamentos({ t }) {
           servico_id: servicoSelecionado?.uuid,
           data_hora: `${novoAgendamento.data}T${novoAgendamento.horario}:00`,
           status: 'AGENDADO',
-          preco_final: 0
+          preco_final: 0,
+          observacoes
         }]);
 
       if (erroAgendamento) throw erroAgendamento;
 
       alert('✅ Agendamento criado com sucesso!');
       setNovoAgendamento({ cliente: '', email: '', telefone: '', data: '', horario: '', servico: '', profissional: '' });
+      setModoEncaixe(false);
       buscarAgendamentos();
     } catch (error) {
       alert('❌ Erro ao criar agendamento: ' + error.message);
@@ -249,6 +310,7 @@ function Agendamentos({ t }) {
             <div key={a.id} style={{ fontSize: '11px', color: '#e8e8e8', marginTop: '5px', paddingTop: '5px', borderTop: '1px solid #404040' }}>
               <span style={{ color: getCorStatus(a.status), fontWeight: 'bold' }}>● </span>
               {a.hora} - {a.cliente}
+              {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold' }}> 🔀 encaixe</span>}
             </div>
           ))}
         </div>
@@ -286,35 +348,21 @@ function Agendamentos({ t }) {
             value={novoAgendamento.telefone}
             onChange={handleInputChange}
           />
-          <input
-            type="date"
-            name="data"
-            value={novoAgendamento.data}
-            onChange={handleInputChange}
-            required
-          />
-          <input
-            type="time"
-            name="horario"
-            value={novoAgendamento.horario}
-            onChange={handleInputChange}
-            required
-          />
           <select
             name="servico"
             value={novoAgendamento.servico}
-            onChange={handleInputChange}
+            onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, servico: e.target.value, horario: '' })); }}
             required
           >
             <option value="">Selecione um serviço</option>
             {servicosLista.map(s => (
-              <option key={s.id} value={s.nome}>{s.nome}</option>
+              <option key={s.id} value={s.nome}>{s.nome} ({s.duracao})</option>
             ))}
           </select>
           <select
             name="profissional"
             value={novoAgendamento.profissional}
-            onChange={handleInputChange}
+            onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, profissional: e.target.value, horario: '' })); }}
             required
           >
             <option value="">Selecione um profissional</option>
@@ -322,6 +370,78 @@ function Agendamentos({ t }) {
               <option key={p.id} value={p.nome}>{p.nome}</option>
             ))}
           </select>
+          <input
+            type="date"
+            name="data"
+            value={novoAgendamento.data}
+            onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
+            required
+          />
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={modoEncaixe}
+              onChange={(e) => { setModoEncaixe(e.target.checked); setNovoAgendamento(prev => ({ ...prev, horario: '' })); }}
+            />
+            <strong style={{ color: modoEncaixe ? '#f97316' : undefined }}>
+              🔀 Modo Encaixe {modoEncaixe ? '(ativado — permite sobrepor outro horário)' : ''}
+            </strong>
+          </label>
+
+          {!novoAgendamento.profissional || !novoAgendamento.servico || !novoAgendamento.data ? (
+            <p style={{ fontSize: '13px', color: '#999' }}>Selecione serviço, profissional e data para ver os horários.</p>
+          ) : modoEncaixe ? (
+            <>
+              <input
+                type="time"
+                name="horario"
+                value={novoAgendamento.horario}
+                onChange={handleInputChange}
+                required
+              />
+              {novoAgendamento.horario && conflitosEncaixe.length > 0 && (
+                <div style={{ background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px', margin: '8px 0', fontSize: '13px' }}>
+                  <strong style={{ color: '#f97316' }}>⚠️ Conflito: </strong>
+                  {conflitosEncaixe.map(c => `${c.hora} - ${c.cliente} (${c.servico})`).join('; ')}
+                </div>
+              )}
+              {intervalosOcupadosNoDia.length > 0 && (
+                <p style={{ fontSize: '12px', color: '#999', margin: '4px 0' }}>
+                  Já ocupado nesse dia: {intervalosOcupadosNoDia.map(o => o.hora).join(', ')}
+                </p>
+              )}
+            </>
+          ) : (
+            <div style={{ margin: '8px 0' }}>
+              {slotsDisponiveisNovoAgendamento.length === 0 ? (
+                <p style={{ fontSize: '13px', color: '#f87171' }}>Nenhum horário livre nesse dia para esse profissional/serviço. Ative o Modo Encaixe para forçar um horário.</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {slotsDisponiveisNovoAgendamento.map(h => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setNovoAgendamento(prev => ({ ...prev, horario: h }))}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: '999px',
+                        border: '1px solid #4ade80',
+                        background: novoAgendamento.horario === h ? '#4ade80' : 'transparent',
+                        color: novoAgendamento.horario === h ? '#1a1a1a' : '#4ade80',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <button type="submit" className="btn-primary">Agendar</button>
         </form>
       </section>
@@ -431,7 +551,10 @@ function Agendamentos({ t }) {
               <tbody>
                 {agendamentosFiltrados.map((agendamento) => (
                   <tr key={agendamento.id}>
-                    <td style={{ fontWeight: 'bold' }}>{agendamento.cliente}</td>
+                    <td style={{ fontWeight: 'bold' }}>
+                      {agendamento.cliente}
+                      {agendamento.encaixe && <span title="Criado como encaixe" style={{ color: '#f97316', marginLeft: '6px', fontSize: '11px' }}>🔀 encaixe</span>}
+                    </td>
                     <td style={{ fontSize: '12px', color: '#999' }}>{agendamento.email}</td>
                     <td>{agendamento.data}</td>
                     <td style={{ color: '#d4af37', fontWeight: 'bold' }}>{agendamento.diaSemana}</td>
