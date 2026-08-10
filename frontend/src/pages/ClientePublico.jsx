@@ -15,6 +15,21 @@ import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, L
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
 const ENDERECO_JAPONES = '〒446-0022 Aichi, Anjo, Hamatomicho, 4−17 サン シテイ オーミ 302号';
+const WHATSAPP_NUMERO = '818097242512'; // +81-80-9724-2512, só dígitos (formato exigido pelo wa.me)
+const INSTAGRAM_USUARIO = 'marco.kaizen';
+
+const botaoContatoStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  color: '#d4af37',
+  border: '1px solid #d4af37',
+  borderRadius: '4px',
+  padding: '8px 14px',
+  fontSize: '13px',
+  fontWeight: 'bold',
+  textDecoration: 'none',
+};
 const ORDEM_DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
 const DIAS_CARROSSEL = 90; // até quantos dias à frente o cliente pode agendar (~3 meses, cobre os períodos de feriados prolongados no Japão)
 const OPCOES_LEMBRETE = [15, 20, 30, 60];
@@ -1065,25 +1080,33 @@ function ClientePublico() {
                 <h3 style={{ color: '#d4af37', marginTop: 0, marginBottom: '12px' }}>Kaizen Barber Shop</h3>
                 <p style={{ margin: '0 0 12px 0', lineHeight: '1.6' }}>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
                 <p style={{ margin: '0 0 16px 0', lineHeight: '1.6', color: '#e8e8e8' }}>{ENDERECO_JAPONES}</p>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ENDERECO_JAPONES)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: '#d4af37',
-                    border: '1px solid #d4af37',
-                    borderRadius: '4px',
-                    padding: '8px 14px',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    textDecoration: 'none',
-                  }}
-                >
-                  🗺️ {t('endereco_ver_mapa')}
-                </a>
+                <p style={{ margin: '0 0 8px 0', color: '#999', fontSize: '12px' }}>{t('contato_titulo')}</p>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ENDERECO_JAPONES)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={botaoContatoStyle}
+                  >
+                    🗺️ {t('endereco_ver_mapa')}
+                  </a>
+                  <a
+                    href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ ...botaoContatoStyle, color: '#4ade80', border: '1px solid #4ade80' }}
+                  >
+                    💬 WhatsApp
+                  </a>
+                  <a
+                    href={`https://instagram.com/${INSTAGRAM_USUARIO}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ ...botaoContatoStyle, color: '#e1306c', border: '1px solid #e1306c' }}
+                  >
+                    📸 Instagram
+                  </a>
+                </div>
               </div>
 
               <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
@@ -1217,6 +1240,24 @@ function ClientePublico() {
       </main>
 
       <footer style={{ borderTop: '1px solid #404040', padding: '20px', textAlign: 'center', color: '#999' }}>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ ...botaoContatoStyle, color: '#4ade80', border: '1px solid #4ade80' }}
+          >
+            💬 WhatsApp
+          </a>
+          <a
+            href={`https://instagram.com/${INSTAGRAM_USUARIO}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ ...botaoContatoStyle, color: '#e1306c', border: '1px solid #e1306c' }}
+          >
+            📸 Instagram
+          </a>
+        </div>
         <p>&copy; 2026 Kaizen Barber Shop. {t('footer_direitos')}</p>
       </footer>
 
