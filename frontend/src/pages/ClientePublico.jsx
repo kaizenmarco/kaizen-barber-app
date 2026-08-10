@@ -9,23 +9,15 @@ import {
   HORARIO_ALMOCO,
   getDiaSemana,
 } from '../config/horarios';
-import { SERVICOS } from '../config/servicos';
+import { SERVICOS, getNomeServico, getDescricaoServico } from '../config/servicos';
+import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
-const DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 const ORDEM_DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
-const NOMES_DIAS_SEMANA = {
-  segunda: 'Segunda-feira',
-  terca: 'Terça-feira',
-  quarta: 'Quarta-feira',
-  quinta: 'Quinta-feira',
-  sexta: 'Sexta-feira',
-  sabado: 'Sábado',
-  domingo: 'Domingo',
-};
 const DIAS_CARROSSEL = 90; // até quantos dias à frente o cliente pode agendar (~3 meses, cobre os períodos de feriados prolongados no Japão)
 const OPCOES_LEMBRETE = [15, 20, 30, 60];
+const CHAVE_IDIOMA_STORAGE = 'kaizen_idioma';
 
 const formatarPreco = (valor) => `¥${valor.toLocaleString('ja-JP')}`;
 
@@ -93,6 +85,24 @@ const linkGoogleCalendar = ({ servico, profissional, dataStr, horaInicio, horaFi
 };
 
 function ClientePublico() {
+  const [idioma, setIdioma] = useState(() => {
+    try {
+      return localStorage.getItem(CHAVE_IDIOMA_STORAGE) || IDIOMA_PADRAO;
+    } catch {
+      return IDIOMA_PADRAO;
+    }
+  });
+  const t = (chave, valores) => traduzir(idioma, chave, valores);
+  const localeAtual = LOCALE_POR_IDIOMA[idioma] || LOCALE_POR_IDIOMA[IDIOMA_PADRAO];
+  const mudarIdioma = (novoIdioma) => {
+    setIdioma(novoIdioma);
+    try {
+      localStorage.setItem(CHAVE_IDIOMA_STORAGE, novoIdioma);
+    } catch {
+      // localStorage indisponível (ex: modo privado) — segue sem persistir
+    }
+  };
+
   const [abaAtiva, setAbaAtiva] = useState('servicos');
   const [agendamentoConfirmado, setAgendamentoConfirmado] = useState(null);
   const [carregando, setCarregando] = useState(false);
@@ -156,6 +166,8 @@ function ClientePublico() {
       uuid: '11c0c7fb-e020-4c49-ab0a-28a16109b35f',
       nome: 'Marco Kaizen',
       especialidade: 'Especialista em Cortes e Barba',
+      especialidadeEn: 'Cuts & Beard Specialist',
+      especialidadeJa: 'カット・ひげ専門',
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
       servicos: ['Cortes', 'Barba', 'Coloração'],
       imagem: '/images/marco.jpg',
@@ -165,6 +177,8 @@ function ClientePublico() {
       uuid: '66266181-d06b-4f54-bcc9-12dccc100cb4',
       nome: 'Gabriel Little Kaizen',
       especialidade: 'Especialista em Cortes',
+      especialidadeEn: 'Haircut Specialist',
+      especialidadeJa: 'カット専門',
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
       imagem: '/images/gabriel.jpg',
@@ -174,11 +188,18 @@ function ClientePublico() {
       uuid: 'ad232428-9872-46db-82b3-27819ab353ff',
       nome: 'Neia',
       especialidade: 'Especialista em Coloração e Estética',
+      especialidadeEn: 'Coloring & Esthetics Specialist',
+      especialidadeJa: 'カラーリング・エステ専門',
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
       imagem: '/images/neia.jpg',
     },
   ];
+  const getEspecialidadeProf = (prof) => {
+    if (idioma === 'en') return prof.especialidadeEn || prof.especialidade;
+    if (idioma === 'ja') return prof.especialidadeJa || prof.especialidade;
+    return prof.especialidade;
+  };
 
   const servicoSelecionadoInfo = servicos.find(s => s.nome === dadosAgendamento.servico);
   const duracaoSelecionada = servicoSelecionadoInfo ? servicoSelecionadoInfo.duracaoMinutos : 60;
@@ -372,17 +393,17 @@ function ClientePublico() {
 
   const handleConfirmarAgendamento = async () => {
     if (!dadosAgendamento.nome || !dadosAgendamento.email) {
-      alert('⚠️ Preencha seu nome e email!');
+      alert('⚠️ ' + t('alerta_preencha_nome_email'));
       return;
     }
 
     if (!dadosAgendamento.servico) {
-      alert('⚠️ Selecione um serviço!');
+      alert('⚠️ ' + t('alerta_selecione_servico'));
       return;
     }
 
     if (usarPontos && pontosCliente < 10) {
-      alert('⚠️ Você não tem pontos suficientes para resgatar desconto!');
+      alert('⚠️ ' + t('alerta_pontos_insuficientes'));
       return;
     }
 
@@ -450,8 +471,9 @@ function ClientePublico() {
         numero: Math.floor(Math.random() * 100000),
         profissional: dadosAgendamento.profissional,
         servico: dadosAgendamento.servico,
+        servicoExibicao: getNomeServico(servicoSelecionado, idioma),
         dataStr: dadosAgendamento.data,
-        data: new Date(dadosAgendamento.data).toLocaleDateString('pt-BR'),
+        data: new Date(dadosAgendamento.data).toLocaleDateString(localeAtual),
         hora: dadosAgendamento.hora,
         horaFim: somarMinutos(dadosAgendamento.hora, duracaoSelecionada),
         duracaoMinutos: duracaoSelecionada,
@@ -469,7 +491,7 @@ function ClientePublico() {
       setDiaHorarioSelecionado(null);
 
     } catch (error) {
-      alert('❌ Erro ao agendar: ' + error.message);
+      alert('❌ ' + t('alerta_erro_agendar') + error.message);
     } finally {
       setCarregando(false);
     }
@@ -488,13 +510,13 @@ function ClientePublico() {
       if (error) throw error;
       setPresencaConfirmada(true);
     } catch (error) {
-      alert('❌ Não foi possível confirmar a presença agora: ' + error.message);
+      alert('❌ ' + t('alerta_erro_presenca') + error.message);
     }
   };
 
   const handleAdicionarAoCalendario = () => {
     const conteudo = gerarConteudoICS({
-      servico: agendamentoConfirmado.servico,
+      servico: agendamentoConfirmado.servicoExibicao || agendamentoConfirmado.servico,
       profissional: agendamentoConfirmado.profissional,
       dataStr: agendamentoConfirmado.dataStr,
       horaInicio: agendamentoConfirmado.hora,
@@ -520,7 +542,7 @@ function ClientePublico() {
       if (error) throw error;
       setListaEsperaEnviada(true);
     } catch (error) {
-      alert('❌ Não foi possível registrar na lista de espera agora: ' + error.message);
+      alert('❌ ' + t('alerta_erro_lista_espera') + error.message);
     } finally {
       setEnviandoListaEspera(false);
     }
@@ -536,7 +558,7 @@ function ClientePublico() {
         data: hoje
       }]);
       setNovaAvaliacao({ nome: '', estrelas: 5, texto: '' });
-      alert('✅ Avaliação enviada!');
+      alert('✅ ' + t('alerta_avaliacao_enviada'));
     }
   };
 
@@ -573,29 +595,29 @@ function ClientePublico() {
     return (
       <div style={{ background: '#1a1a1a', minHeight: '100vh', paddingBottom: '40px' }}>
         <div style={{ background: '#166534', padding: '18px 20px', textAlign: 'center' }}>
-          <p style={{ color: '#fff', fontWeight: 'bold', fontSize: '17px', margin: 0 }}>✅ Horário agendado com sucesso!</p>
+          <p style={{ color: '#fff', fontWeight: 'bold', fontSize: '17px', margin: 0 }}>✅ {t('conf_titulo')}</p>
         </div>
 
         <div style={{ maxWidth: '480px', margin: '30px auto', padding: '0 20px' }}>
           <div style={{ background: '#2d2d2d', border: '2px solid #d4af37', borderRadius: '12px', padding: '25px', marginBottom: '20px' }}>
             <p style={{ color: '#999', fontSize: '12px', margin: '0 0 4px 0' }}>#{agendamentoConfirmado.numero} · {NOME_ESTABELECIMENTO}</p>
-            <h2 style={{ color: '#d4af37', margin: '0 0 15px 0' }}>{agendamentoConfirmado.servico}</h2>
+            <h2 style={{ color: '#d4af37', margin: '0 0 15px 0' }}>{agendamentoConfirmado.servicoExibicao || agendamentoConfirmado.servico}</h2>
             <div style={{ color: '#e8e8e8', fontSize: '15px', lineHeight: '1.9' }}>
-              <p style={{ margin: 0 }}>💈 Profissional: <strong>{agendamentoConfirmado.profissional}</strong></p>
-              <p style={{ margin: 0 }}>📅 Data: <strong>{agendamentoConfirmado.data}</strong></p>
-              <p style={{ margin: 0 }}>🕐 Horário: <strong>{agendamentoConfirmado.hora} - {agendamentoConfirmado.horaFim} ({agendamentoConfirmado.duracaoMinutos} min)</strong></p>
+              <p style={{ margin: 0 }}>💈 {t('conf_profissional')} <strong>{agendamentoConfirmado.profissional}</strong></p>
+              <p style={{ margin: 0 }}>📅 {t('conf_data')} <strong>{agendamentoConfirmado.data}</strong></p>
+              <p style={{ margin: 0 }}>🕐 {t('conf_horario')} <strong>{agendamentoConfirmado.hora} - {agendamentoConfirmado.horaFim} ({agendamentoConfirmado.duracaoMinutos} min)</strong></p>
               <p style={{ margin: 0 }}>
-                💰 Valor: <strong>{formatarPreco(agendamentoConfirmado.precoFinal)}</strong>
+                💰 {t('conf_valor')} <strong>{formatarPreco(agendamentoConfirmado.precoFinal)}</strong>
                 {agendamentoConfirmado.desconto > 0 && (
-                  <span style={{ color: '#4ade80' }}> (desconto de {formatarPreco(agendamentoConfirmado.desconto)} aplicado)</span>
+                  <span style={{ color: '#4ade80' }}> {t('conf_desconto_aplicado', { valor: formatarPreco(agendamentoConfirmado.desconto) })}</span>
                 )}
               </p>
             </div>
-            <p style={{ color: '#999', fontSize: '13px', marginTop: '15px' }}>⭐ Você ganhará +2 pontos de fidelidade assim que este atendimento for realizado.</p>
+            <p style={{ color: '#999', fontSize: '13px', marginTop: '15px' }}>⭐ {t('conf_pontos_fidelidade')}</p>
           </div>
 
           <div style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
-            <h3 style={{ color: '#d4af37', marginTop: 0, fontSize: '16px' }}>⏰ Criar lembrete</h3>
+            <h3 style={{ color: '#d4af37', marginTop: 0, fontSize: '16px' }}>⏰ {t('conf_criar_lembrete')}</h3>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
               {horariosDisponiveisLembrete.map(min => (
                 <button
@@ -612,16 +634,16 @@ function ClientePublico() {
                     fontSize: '13px'
                   }}
                 >
-                  {min} min antes
+                  {t('conf_min_antes', { min })}
                 </button>
               ))}
             </div>
             <button onClick={handleAdicionarAoCalendario} style={{ width: '100%', padding: '12px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' }}>
-              📲 Adicionar lembrete ao calendário do celular
+              📲 {t('conf_add_calendario')}
             </button>
             <a
               href={linkGoogleCalendar({
-                servico: agendamentoConfirmado.servico,
+                servico: agendamentoConfirmado.servicoExibicao || agendamentoConfirmado.servico,
                 profissional: agendamentoConfirmado.profissional,
                 dataStr: agendamentoConfirmado.dataStr,
                 horaInicio: agendamentoConfirmado.hora,
@@ -631,7 +653,7 @@ function ClientePublico() {
               rel="noreferrer"
               style={{ display: 'block', textAlign: 'center', color: '#999', fontSize: '13px', textDecoration: 'underline' }}
             >
-              ou adicionar ao Google Agenda
+              {t('conf_google_agenda')}
             </a>
           </div>
 
@@ -650,14 +672,14 @@ function ClientePublico() {
               marginBottom: '20px'
             }}
           >
-            {presencaConfirmada ? '✓ Presença confirmada' : 'Confirmar presença'}
+            {presencaConfirmada ? `✓ ${t('conf_presenca_confirmada')}` : t('conf_confirmar_presenca')}
           </button>
 
           <button
             onClick={() => { setAgendamentoConfirmado(null); setAbaAtiva('servicos'); }}
             style={{ width: '100%', padding: '12px', background: 'transparent', color: '#999', border: '1px solid #404040', borderRadius: '6px', cursor: 'pointer' }}
           >
-            Voltar para o site
+            {t('conf_voltar_site')}
           </button>
         </div>
       </div>
@@ -666,7 +688,27 @@ function ClientePublico() {
 
   return (
     <div style={{ background: '#1a1a1a', color: '#e8e8e8', minHeight: '100vh' }}>
-      <header style={{ borderBottom: '3px solid #d4af37' }}>
+      <header style={{ borderBottom: '3px solid #d4af37', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px', zIndex: 2 }}>
+          {IDIOMAS.map((op) => (
+            <button
+              key={op.codigo}
+              onClick={() => mudarIdioma(op.codigo)}
+              style={{
+                padding: '5px 10px',
+                borderRadius: '20px',
+                border: '1px solid #d4af37',
+                background: idioma === op.codigo ? '#d4af37' : 'rgba(26,26,26,0.75)',
+                color: idioma === op.codigo ? '#1a1a1a' : '#d4af37',
+                fontWeight: 'bold',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              {op.bandeira} {op.rotulo}
+            </button>
+          ))}
+        </div>
         <img
           src="/images/header_banner.jpg"
           alt="Kaizen Barber Shop"
@@ -674,18 +716,18 @@ function ClientePublico() {
         />
         <div style={{ padding: '20px', textAlign: 'center' }}>
           <h1 style={{ color: '#d4af37', fontSize: '32px', margin: '0' }}>Kaizen Barber Shop</h1>
-          <p style={{ color: '#999', margin: '0' }}>Premium Barbershop - Anjo, Aichi</p>
+          <p style={{ color: '#999', margin: '0' }}>{t('header_subtitulo')}</p>
         </div>
       </header>
 
       <nav style={{ display: 'flex', gap: '10px', padding: '20px', borderBottom: '1px solid #404040', overflowX: 'auto' }}>
         {[
-          { id: 'servicos', label: '💈 Serviços' },
-          { id: 'agendar', label: '📅 Agendar' },
-          { id: 'endereco', label: '📍 Endereço' },
-          { id: 'profissionais', label: '👥 Profissionais' },
-          { id: 'fidelidade', label: '🎁 Fidelidade' },
-          { id: 'avaliacoes', label: '★ Avaliações' },
+          { id: 'servicos', label: `💈 ${t('nav_servicos')}` },
+          { id: 'agendar', label: `📅 ${t('nav_agendar')}` },
+          { id: 'endereco', label: `📍 ${t('nav_endereco')}` },
+          { id: 'profissionais', label: `👥 ${t('nav_profissionais')}` },
+          { id: 'fidelidade', label: `🎁 ${t('nav_fidelidade')}` },
+          { id: 'avaliacoes', label: `★ ${t('nav_avaliacoes')}` },
         ].map((aba) => (
           <button
             key={aba.id}
@@ -710,14 +752,16 @@ function ClientePublico() {
 
         {abaAtiva === 'servicos' && (
           <section>
-            <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>💈 Nossos Serviços</h2>
+            <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>💈 {t('servicos_titulo')}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {servicos.map((servico, idx) => {
-                const descricaoLonga = servico.descricao.length > 60;
+                const nomeServico = getNomeServico(servico, idioma);
+                const descricaoServico = getDescricaoServico(servico, idioma);
+                const descricaoLonga = descricaoServico.length > 60;
                 const expandida = !!descricaoExpandida[servico.id];
                 const descricaoExibida = !descricaoLonga || expandida
-                  ? servico.descricao
-                  : `${servico.descricao.slice(0, 60)}...`;
+                  ? descricaoServico
+                  : `${descricaoServico.slice(0, 60)}...`;
 
                 return (
                   <div
@@ -741,7 +785,7 @@ function ClientePublico() {
 
                     <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                       <h3 style={{ color: '#d4af37', margin: '0 0 4px 0', fontSize: '16px', letterSpacing: '0.3px' }}>
-                        {idx + 1}. {servico.nome.toUpperCase()}
+                        {idx + 1}. {nomeServico.toUpperCase()}
                       </h3>
                       <p style={{ color: '#999', fontSize: '13px', margin: '0 0 6px 0' }}>
                         {descricaoExibida}
@@ -750,7 +794,7 @@ function ClientePublico() {
                             onClick={() => setDescricaoExpandida({ ...descricaoExpandida, [servico.id]: !expandida })}
                             style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', fontSize: '13px', padding: 0, marginLeft: '4px', textDecoration: 'underline' }}
                           >
-                            {expandida ? 'Ver menos' : 'Ver mais'}
+                            {expandida ? t('servicos_ver_menos') : t('servicos_ver_mais')}
                           </button>
                         )}
                       </p>
@@ -773,7 +817,7 @@ function ClientePublico() {
                         flexShrink: 0
                       }}
                     >
-                      Agendar
+                      {t('servicos_agendar')}
                     </button>
                   </div>
                 );
@@ -796,22 +840,22 @@ function ClientePublico() {
               background: 'rgba(26, 26, 26, 0.55)',
               padding: '30px'
             }}>
-              <h2 style={{ color: '#d4af37', marginBottom: '20px' }}>📅 Agendar horário</h2>
+              <h2 style={{ color: '#d4af37', marginBottom: '20px' }}>📅 {t('agendar_titulo')}</h2>
 
               <div style={{ maxWidth: '500px', margin: '0 auto 25px' }}>
-                <label style={{ color: '#d4af37', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>Serviço:</label>
+                <label style={{ color: '#d4af37', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>{t('agendar_servico_label')}</label>
                 <select
                   value={dadosAgendamento.servico}
                   onChange={(e) => { setDadosAgendamento({ ...dadosAgendamento, servico: e.target.value }); setDiaHorarioSelecionado(null); }}
                   style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
                 >
-                  <option value="">Selecione um serviço</option>
-                  {servicos.map(s => (<option key={s.id} value={s.nome}>{s.nome} ({s.duracao})</option>))}
+                  <option value="">{t('agendar_servico_placeholder')}</option>
+                  {servicos.map(s => (<option key={s.id} value={s.nome}>{getNomeServico(s, idioma)} ({s.duracao})</option>))}
                 </select>
               </div>
 
               {!dadosAgendamento.servico ? (
-                <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>👆 Escolha um serviço acima para ver os horários disponíveis.</p>
+                <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>👆 {t('agendar_escolha_servico')}</p>
               ) : (
                 <div style={{ maxWidth: '560px', margin: '0 auto' }}>
 
@@ -822,7 +866,7 @@ function ClientePublico() {
                     <button
                       onClick={irMesAnterior}
                       disabled={!podeVoltarMes}
-                      aria-label="Mês anterior"
+                      aria-label={t('agendar_mes_anterior')}
                       style={{
                         width: '34px',
                         height: '34px',
@@ -838,12 +882,12 @@ function ClientePublico() {
                       ‹
                     </button>
                     <p style={{ color: '#d4af37', fontWeight: 'bold', margin: 0, fontSize: '17px', textTransform: 'capitalize' }}>
-                      {mesCalendario.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                      {mesCalendario.toLocaleDateString(localeAtual, { month: 'long', year: 'numeric' })}
                     </p>
                     <button
                       onClick={irProximoMes}
                       disabled={!podeAvancarMes}
-                      aria-label="Próximo mês"
+                      aria-label={t('agendar_proximo_mes')}
                       style={{
                         width: '34px',
                         height: '34px',
@@ -861,7 +905,7 @@ function ClientePublico() {
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '6px' }}>
-                    {DIAS_SEMANA_ABREV.map(dia => (
+                    {(DIAS_ABREV_POR_IDIOMA[idioma] || DIAS_ABREV_POR_IDIOMA[IDIOMA_PADRAO]).map(dia => (
                       <div key={dia} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', color: '#999' }}>
                         {dia}
                       </div>
@@ -881,7 +925,7 @@ function ClientePublico() {
                           key={data.toISOString()}
                           disabled={desabilitado}
                           onClick={() => { setDataSelecionada(data); setListaEsperaAberta(false); setListaEsperaEnviada(false); }}
-                          title={fechado ? 'Fechado' : (foraDoIntervalo ? 'Fora do período de agendamento' : undefined)}
+                          title={fechado ? t('endereco_fechado') : (foraDoIntervalo ? t('agendar_fora_periodo') : undefined)}
                           style={{
                             aspectRatio: '1',
                             width: '100%',
@@ -902,7 +946,7 @@ function ClientePublico() {
                   </div>
 
                   {/* Seletor de profissional */}
-                  <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>Profissional:</p>
+                  <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>{t('agendar_profissional_label')}</p>
                   <div style={{ display: 'flex', gap: '18px', marginBottom: '25px', flexWrap: 'wrap' }}>
                     {profissionaisAptos.map((prof) => {
                       const selecionado = profissionalSelecionado?.id === prof.id;
@@ -943,25 +987,25 @@ function ClientePublico() {
                     if (horarios.length === 0) {
                       return (
                         <div style={{ background: 'rgba(45, 45, 45, 0.9)', border: '1px solid #404040', borderRadius: '8px', padding: '20px', textAlign: 'center' }}>
-                          <p style={{ color: '#e8e8e8', marginBottom: '15px' }}>😕 Nenhum horário disponível com {profissionalSelecionado?.nome || 'este profissional'} neste dia.</p>
+                          <p style={{ color: '#e8e8e8', marginBottom: '15px' }}>😕 {t('agendar_sem_horario', { prof: profissionalSelecionado?.nome || t('agendar_este_profissional') })}</p>
                           {!listaEsperaAberta && !listaEsperaEnviada && (
                             <button
                               onClick={() => setListaEsperaAberta(true)}
                               style={{ background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
                             >
-                              Lista de espera
+                              {t('agendar_lista_espera')}
                             </button>
                           )}
                           {listaEsperaEnviada && (
-                            <p style={{ color: '#4ade80', fontWeight: 'bold', margin: 0 }}>✅ Anotado! Avisaremos assim que abrir um horário.</p>
+                            <p style={{ color: '#4ade80', fontWeight: 'bold', margin: 0 }}>✅ {t('agendar_anotado')}</p>
                           )}
                           {listaEsperaAberta && !listaEsperaEnviada && (
                             <form onSubmit={handleEnviarListaEspera} style={{ marginTop: '15px', textAlign: 'left' }}>
-                              <input type="text" placeholder="Nome" value={listaEsperaDados.nome} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, nome: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
-                              <input type="email" placeholder="Email" value={listaEsperaDados.email} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, email: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
-                              <input type="tel" placeholder="Telefone (opcional)" value={listaEsperaDados.telefone} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, telefone: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+                              <input type="text" placeholder={t('agendar_le_nome')} value={listaEsperaDados.nome} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, nome: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
+                              <input type="email" placeholder={t('agendar_le_email')} value={listaEsperaDados.email} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, email: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
+                              <input type="tel" placeholder={t('agendar_le_telefone')} value={listaEsperaDados.telefone} onChange={(e) => setListaEsperaDados({ ...listaEsperaDados, telefone: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
                               <button type="submit" disabled={enviandoListaEspera} style={{ width: '100%', padding: '10px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
-                                {enviandoListaEspera ? '⏳ Enviando...' : 'Entrar na lista de espera'}
+                                {enviandoListaEspera ? `⏳ ${t('agendar_le_enviando')}` : t('agendar_le_enviar')}
                               </button>
                             </form>
                           )}
@@ -973,7 +1017,7 @@ function ClientePublico() {
                       <>
                         {manha.length > 0 && (
                           <div style={{ marginBottom: '20px' }}>
-                            <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>☀️ Manhã ({manha.length})</p>
+                            <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>☀️ {t('agendar_manha', { n: manha.length })}</p>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                               {manha.map(h => (
                                 <button
@@ -989,7 +1033,7 @@ function ClientePublico() {
                         )}
                         {tarde.length > 0 && (
                           <div>
-                            <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>🌆 Tarde ({tarde.length})</p>
+                            <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '10px' }}>🌆 {t('agendar_tarde', { n: tarde.length })}</p>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                               {tarde.map(h => (
                                 <button
@@ -1014,20 +1058,21 @@ function ClientePublico() {
 
         {abaAtiva === 'endereco' && (
           <section>
-            <h2 style={{ color: '#d4af37' }}>📍 Localização</h2>
+            <h2 style={{ color: '#d4af37' }}>📍 {t('endereco_titulo')}</h2>
             <div style={{ maxWidth: '600px' }}>
               <h3>Kaizen Barber Shop</h3>
               <p>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
 
               <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
                 <h3 style={{ color: '#d4af37', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  🕒 Horário de Funcionamento
+                  🕒 {t('endereco_horario_titulo')}
                 </h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     {ORDEM_DIAS_SEMANA.map((dia) => {
                       const h = HORARIO_SALAO[dia];
                       const ehHoje = dia === getDiaSemana(new Date());
+                      const nomesDias = DIAS_NOMES_POR_IDIOMA[idioma] || DIAS_NOMES_POR_IDIOMA[IDIOMA_PADRAO];
                       return (
                         <tr
                           key={dia}
@@ -1037,13 +1082,13 @@ function ClientePublico() {
                           }}
                         >
                           <td style={{ padding: '10px 8px', color: ehHoje ? '#d4af37' : '#e8e8e8', fontWeight: ehHoje ? 'bold' : 'normal' }}>
-                            {ehHoje && '▶ '}{NOMES_DIAS_SEMANA[dia]}
+                            {ehHoje && '▶ '}{nomesDias[dia]}
                           </td>
                           <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: ehHoje ? 'bold' : 'normal' }}>
                             {h.aberto ? (
                               <span style={{ color: '#4ade80' }}>{h.abertura} - {h.fechamento}</span>
                             ) : (
-                              <span style={{ color: '#f87171' }}>Fechado</span>
+                              <span style={{ color: '#f87171' }}>{t('endereco_fechado')}</span>
                             )}
                           </td>
                         </tr>
@@ -1052,15 +1097,15 @@ function ClientePublico() {
                   </tbody>
                 </table>
                 <p style={{ fontSize: '13px', color: '#999', marginTop: '14px', marginBottom: 0 }}>
-                  ☕ Intervalo de almoço: {HORARIO_ALMOCO.inicio} - {HORARIO_ALMOCO.fim} (nos dias de funcionamento)
+                  ☕ {t('endereco_almoco', { inicio: HORARIO_ALMOCO.inicio, fim: HORARIO_ALMOCO.fim })}
                 </p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                <img src="/images/fachada.jpg" alt="Fachada" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                <img src="/images/interior.jpg" alt="Interior" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                <img src="/images/detalhes.jpg" alt="Detalhes" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                <img src="/images/ambiente.jpg" alt="Ambiente" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/fachada.jpg" alt={t('endereco_fachada')} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/interior.jpg" alt={t('endereco_interior')} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/detalhes.jpg" alt={t('endereco_detalhes')} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="/images/ambiente.jpg" alt={t('endereco_ambiente')} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
               </div>
             </div>
           </section>
@@ -1068,14 +1113,14 @@ function ClientePublico() {
 
         {abaAtiva === 'profissionais' && (
           <section>
-            <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>👥 Profissionais</h2>
+            <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>👥 {t('profissionais_titulo')}</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {profissionais.map((prof) => (
                 <div key={prof.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
                   <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', aspectRatio: '2 / 3', objectFit: 'cover', objectPosition: 'center top' }} />
                   <div style={{ padding: '15px' }}>
                     <h3 style={{ color: '#d4af37' }}>{prof.nome}</h3>
-                    <p style={{ color: '#999', fontSize: '14px' }}>{prof.especialidade}</p>
+                    <p style={{ color: '#999', fontSize: '14px' }}>{getEspecialidadeProf(prof)}</p>
                   </div>
                 </div>
               ))}
@@ -1085,18 +1130,18 @@ function ClientePublico() {
 
         {abaAtiva === 'fidelidade' && (
           <section>
-            <h2 style={{ color: '#d4af37' }}>🎁 Fidelidade</h2>
+            <h2 style={{ color: '#d4af37' }}>🎁 {t('fidelidade_titulo')}</h2>
             <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '20px' }}>
-              <p>✅ 2 pontos por atendimento realizado</p>
-              <p>✅ 10 pontos = ¥500 de desconto no próximo agendamento</p>
+              <p>✅ {t('fidelidade_regra1')}</p>
+              <p>✅ {t('fidelidade_regra2')}</p>
             </div>
 
             <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px' }}>
-              <h3 style={{ color: '#d4af37', marginTop: 0 }}>Consultar meu saldo</h3>
+              <h3 style={{ color: '#d4af37', marginTop: 0 }}>{t('fidelidade_consultar_titulo')}</h3>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <input
                   type="email"
-                  placeholder="Seu email cadastrado"
+                  placeholder={t('fidelidade_email_placeholder')}
                   value={emailConsultaPontos}
                   onChange={(e) => setEmailConsultaPontos(e.target.value)}
                   style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
@@ -1106,19 +1151,19 @@ function ClientePublico() {
                   disabled={!emailConsultaPontos.includes('@') || carregandoPontos}
                   style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: carregandoPontos ? 'wait' : 'pointer' }}
                 >
-                  {carregandoPontos ? '⏳' : 'Consultar'}
+                  {carregandoPontos ? '⏳' : t('fidelidade_consultar_botao')}
                 </button>
               </div>
 
               {consultaPontosFeita && !carregandoPontos && (
                 <div style={{ marginTop: '20px', color: '#e8e8e8', lineHeight: '1.8' }}>
-                  <p>Atendimentos realizados: <strong style={{ color: '#d4af37' }}>{atendimentosRealizados}</strong></p>
-                  <p>Pontos já resgatados: <strong style={{ color: '#60a5fa' }}>{pontosJaResgatados}</strong></p>
-                  <p style={{ fontSize: '18px' }}>Saldo disponível: <strong style={{ color: '#4ade80' }}>{pontosCliente} pontos</strong></p>
+                  <p>{t('fidelidade_atendimentos')} <strong style={{ color: '#d4af37' }}>{atendimentosRealizados}</strong></p>
+                  <p>{t('fidelidade_resgatados')} <strong style={{ color: '#60a5fa' }}>{pontosJaResgatados}</strong></p>
+                  <p style={{ fontSize: '18px' }}>{t('fidelidade_saldo')} <strong style={{ color: '#4ade80' }}>{pontosCliente} {t('fidelidade_pontos')}</strong></p>
                   {pontosCliente >= 10 ? (
-                    <p style={{ color: '#4ade80', fontWeight: 'bold' }}>🎉 Você já pode resgatar ¥500 de desconto no seu próximo agendamento! É só marcar a opção na hora de confirmar o horário.</p>
+                    <p style={{ color: '#4ade80', fontWeight: 'bold' }}>🎉 {t('fidelidade_pode_resgatar')}</p>
                   ) : (
-                    <p style={{ color: '#999' }}>Faltam {10 - pontosCliente} pontos para o próximo desconto de ¥500.</p>
+                    <p style={{ color: '#999' }}>{t('fidelidade_faltam', { n: 10 - pontosCliente })}</p>
                   )}
                 </div>
               )}
@@ -1128,13 +1173,13 @@ function ClientePublico() {
 
         {abaAtiva === 'avaliacoes' && (
           <section>
-            <h2 style={{ color: '#d4af37' }}>★ Avaliações</h2>
+            <h2 style={{ color: '#d4af37' }}>★ {t('avaliacoes_titulo')}</h2>
             <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '30px', maxWidth: '600px' }}>
-              <h3 style={{ color: '#d4af37' }}>Deixe sua avaliação!</h3>
+              <h3 style={{ color: '#d4af37' }}>{t('avaliacoes_deixe')}</h3>
               <form onSubmit={handleAdicionarAvaliacao}>
-                <input type="text" placeholder="Seu nome" value={novaAvaliacao.nome} onChange={(e) => setNovaAvaliacao({...novaAvaliacao, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
-                <textarea placeholder="Sua avaliação" value={novaAvaliacao.texto} onChange={(e) => setNovaAvaliacao({...novaAvaliacao, texto: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', minHeight: '80px' }} required />
-                <button type="submit" style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>Enviar</button>
+                <input type="text" placeholder={t('avaliacoes_nome_placeholder')} value={novaAvaliacao.nome} onChange={(e) => setNovaAvaliacao({...novaAvaliacao, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} required />
+                <textarea placeholder={t('avaliacoes_texto_placeholder')} value={novaAvaliacao.texto} onChange={(e) => setNovaAvaliacao({...novaAvaliacao, texto: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', minHeight: '80px' }} required />
+                <button type="submit" style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>{t('avaliacoes_enviar')}</button>
               </form>
             </div>
             {avaliacoes.map((av) => (
@@ -1149,7 +1194,7 @@ function ClientePublico() {
       </main>
 
       <footer style={{ borderTop: '1px solid #404040', padding: '20px', textAlign: 'center', color: '#999' }}>
-        <p>&copy; 2026 Kaizen Barber Shop. Todos os direitos reservados.</p>
+        <p>&copy; 2026 Kaizen Barber Shop. {t('footer_direitos')}</p>
       </footer>
 
       {/* Tela 3: modal de confirmação (bottom sheet) */}
@@ -1186,9 +1231,9 @@ function ClientePublico() {
             </div>
 
             <div style={{ background: 'rgba(212, 175, 55, 0.08)', border: '1px solid #404040', borderRadius: '8px', padding: '14px', marginBottom: '15px' }}>
-              <p style={{ margin: '0 0 6px 0', color: '#e8e8e8', fontWeight: 'bold' }}>{dadosAgendamento.servico}</p>
+              <p style={{ margin: '0 0 6px 0', color: '#e8e8e8', fontWeight: 'bold' }}>{servicoSelecionadoInfo ? getNomeServico(servicoSelecionadoInfo, idioma) : dadosAgendamento.servico}</p>
               <p style={{ margin: '0 0 6px 0', color: '#999', fontSize: '13px' }}>
-                📅 {diaHorarioSelecionado.data.toLocaleDateString('pt-BR')} · 🕐 {diaHorarioSelecionado.hora} - {somarMinutos(diaHorarioSelecionado.hora, duracaoSelecionada)} ({duracaoSelecionada} min)
+                📅 {diaHorarioSelecionado.data.toLocaleDateString(localeAtual)} · 🕐 {diaHorarioSelecionado.hora} - {somarMinutos(diaHorarioSelecionado.hora, duracaoSelecionada)} ({duracaoSelecionada} min)
               </p>
               <p style={{ margin: 0 }}>
                 {usarPontos && pontosCliente >= 10 ? (
@@ -1202,11 +1247,11 @@ function ClientePublico() {
               </p>
             </div>
 
-            <input type="text" placeholder="Nome" value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-            <input type="email" placeholder="Email" value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-            <input type="tel" placeholder="Telefone" value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <input type="text" placeholder={t('modal_nome_placeholder')} value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <input type="email" placeholder={t('modal_email_placeholder')} value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <input type="tel" placeholder={t('modal_telefone_placeholder')} value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <textarea
-              placeholder="Alguma observação? (Ex: Não precisa lavar, etc...)"
+              placeholder={t('modal_obs_placeholder')}
               value={observacoesCliente}
               onChange={(e) => setObservacoesCliente(e.target.value)}
               style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', minHeight: '60px' }}
@@ -1215,17 +1260,17 @@ function ClientePublico() {
             {dadosAgendamento.email && dadosAgendamento.email.includes('@') && (
               <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '4px', padding: '12px', marginBottom: '15px', fontSize: '13px' }}>
                 {carregandoPontos ? (
-                  <p style={{ margin: 0, color: '#999' }}>⏳ Consultando seus pontos de fidelidade...</p>
+                  <p style={{ margin: 0, color: '#999' }}>⏳ {t('modal_consultando_pontos')}</p>
                 ) : (
                   <>
-                    <p style={{ margin: '0 0 8px 0', color: '#d4af37' }}>🎁 Você tem <strong>{pontosCliente} pontos</strong> de fidelidade disponíveis.</p>
+                    <p style={{ margin: '0 0 8px 0', color: '#d4af37' }}>🎁 {t('modal_pontos_disponiveis', { n: pontosCliente })}</p>
                     {pontosCliente >= 10 ? (
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#e8e8e8' }}>
                         <input type="checkbox" checked={usarPontos} onChange={(e) => setUsarPontos(e.target.checked)} />
-                        Usar 10 pontos agora para ganhar ¥500 de desconto neste agendamento
+                        {t('modal_usar_pontos')}
                       </label>
                     ) : (
-                      <p style={{ margin: 0, color: '#999' }}>Faltam {10 - pontosCliente} pontos ({Math.ceil((10 - pontosCliente) / 2)} atendimento{Math.ceil((10 - pontosCliente) / 2) > 1 ? 's' : ''}) para o próximo desconto de ¥500.</p>
+                      <p style={{ margin: 0, color: '#999' }}>{t('modal_faltam_pontos', { n: 10 - pontosCliente, a: Math.ceil((10 - pontosCliente) / 2) })}</p>
                     )}
                   </>
                 )}
@@ -1233,10 +1278,10 @@ function ClientePublico() {
             )}
 
             <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ width: '100%', background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '14px', borderRadius: '6px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer', fontSize: '15px' }}>
-              {carregando ? '⏳ Agendando serviço...' : '✅ Confirmar agendamento'}
+              {carregando ? `⏳ ${t('modal_agendando')}` : `✅ ${t('modal_confirmar')}`}
             </button>
             <button onClick={() => setModalAberto(false)} style={{ width: '100%', background: 'transparent', color: '#999', border: 'none', padding: '10px', marginTop: '6px', cursor: 'pointer' }}>
-              Cancelar
+              {t('modal_cancelar')}
             </button>
           </div>
         </div>
