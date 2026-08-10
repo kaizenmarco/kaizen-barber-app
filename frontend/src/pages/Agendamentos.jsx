@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getSlotsDisponiveisNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
+import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
 import { SERVICOS } from '../config/servicos';
 
 function Agendamentos({ t }) {
@@ -60,12 +60,7 @@ function Agendamentos({ t }) {
 
   const slotsDisponiveisNovoAgendamento = (!profissionalNovoObj || !servicoNovoObj || !novoAgendamento.data) ? [] : (() => {
     const dataObj = new Date(`${novoAgendamento.data}T00:00:00`);
-    const base = getSlotsDisponiveisNoDia(dataObj, duracaoNovoAgendamento, horarioEstendido);
-    return base.filter(h => {
-      const inicioMin = paraMinutos(h);
-      const fimMin = inicioMin + duracaoNovoAgendamento;
-      return !intervalosOcupadosNoDia.some(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
-    });
+    return getSlotsLivresNoDia(dataObj, duracaoNovoAgendamento, intervalosOcupadosNoDia, horarioEstendido);
   })();
 
   const conflitosEncaixe = (!modoEncaixe || !novoAgendamento.horario) ? [] : (() => {
@@ -311,6 +306,7 @@ function Agendamentos({ t }) {
               <span style={{ color: getCorStatus(a.status), fontWeight: 'bold' }}>● </span>
               {a.hora} - {a.cliente}
               {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold' }}> 🔀 encaixe</span>}
+              <div style={{ color: '#999', fontSize: '10px' }}>{a.servico}</div>
             </div>
           ))}
         </div>

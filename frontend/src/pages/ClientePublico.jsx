@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import {
-  getSlotsDisponiveisNoDia,
+  getSlotsLivresNoDia,
   paraMinutos,
   buscarHorarioEstendido,
   HORARIO_ESTENDIDO_PADRAO,
@@ -325,20 +325,9 @@ function ClientePublico() {
   const getHorariosProfissional = (prof, data, duracaoMinutos) => {
     if (!prof) return [];
     const duracao = duracaoMinutos || 60;
-    const slotsBase = getSlotsDisponiveisNoDia(data, duracao, horarioEstendido);
-    if (slotsBase.length === 0) return [];
-
     const dataStr = data.toISOString().split('T')[0];
     const intervalosOcupados = (horariosOcupados[prof.uuid] || []).filter(o => o.data === dataStr);
-
-    return slotsBase.filter(h => {
-      const inicioMin = paraMinutos(h);
-      const fimMin = inicioMin + duracao;
-
-      // não pode colidir com nenhum agendamento já existente deste profissional
-      const colide = intervalosOcupados.some(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
-      return !colide;
-    });
+    return getSlotsLivresNoDia(data, duracao, intervalosOcupados, horarioEstendido);
   };
 
   const calcularPrecoFinal = () => {

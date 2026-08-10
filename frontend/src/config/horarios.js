@@ -127,9 +127,10 @@ export const getHorarioDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRA
   return { aberto: true, abertura, fechamento: padrao.fechamento };
 };
 
-// Gera os horários de início possíveis para um dia, dado a duração do
-// serviço, respeitando abertura/fechamento e sem cruzar o almoço.
-export const getSlotsDisponiveisNoDia = (data, duracaoMinutos = 60, horarioEstendido = HORARIO_ESTENDIDO_PADRAO) => {
+// Divide um dia nos blocos de trabalho (manhã e tarde, separados pelo
+// almoço), em minutos desde 00:00. Não considera agendamentos já feitos —
+// só a grade fixa de funcionamento do salão.
+const getBlocosDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRAO) => {
   const { aberto, abertura, fechamento } = getHorarioDoDia(data, horarioEstendido);
   if (!aberto) return [];
 
@@ -138,21 +139,56 @@ export const getSlotsDisponiveisNoDia = (data, duracaoMinutos = 60, horarioEsten
   const almocoInicio = paraMinutos(HORARIO_ALMOCO.inicio);
   const almocoFim = paraMinutos(HORARIO_ALMOCO.fim);
 
-  // divide o dia em blocos de trabalho (manhã e tarde, separados pelo almoço)
-  const blocos = [
+  return [
     [aberturaMin, Math.min(almocoInicio, fechamentoMin)],
     [Math.max(almocoFim, aberturaMin), fechamentoMin],
   ].filter(([inicio, fim]) => fim > inicio);
+};
 
-  // O passo entre um horário e o próximo é a própria duração do serviço,
-  // não um intervalo fixo — assim os horários oferecidos ficam "encostados"
-  // um no outro (ex: corte de 40min -> 09:00, 09:40, 10:20...; coloração de
-  // 180min -> só os horários em que um bloco inteiro de 3h cabe).
+// Gera os horários de início possíveis para um dia, dado a duração do
+// serviço, respeitando abertura/fechamento e sem cruzar o almoço.
+// NÃO considera agendamentos já existentes — use getSlotsLivresNoDia para
+// isso. Mantida por compatibilidade / para quando não há nada ocupado ainda.
+export const getSlotsDisponiveisNoDia = (data, duracaoMinutos = 60, horarioEstendido = HORARIO_ESTENDIDO_PADRAO) =>
+  getSlotsLivresNoDia(data, duracaoMinutos, [], horarioEstendido);
+
+// Gera os horários de início realmente livres num dia, dada a duração do
+// NOVO serviço e os intervalos já ocupados naquele profissional/dia
+// (formato [{ inicioMin, fimMin }, ...], em minutos desde 00:00).
+//
+// Diferente de simplesmente "andar de duracaoMinutos em duracaoMinutos" a
+// partir da abertura (o que pula por cima de buracos deixados por
+// agendamentos de duração diferente — ex: dois cortes de 45min terminando
+// às 10:30 "escondiam" esse horário de um corte+barba de 60min, que só
+// aparecia às 11h), aqui o cursor anda livremente: pula direto para o fim
+// de cada agendamento existente e continua a grade a partir dali. Assim
+// buracos "torcidos" (tipo 30min sobrando) aparecem como opção real de
+// horário, sem precisar do modo Encaixe.
+export const getSlotsLivresNoDia = (data, duracaoMinutos = 60, intervalosOcupados = [], horarioEstendido = HORARIO_ESTENDIDO_PADRAO) => {
+  const blocos = getBlocosDoDia(data, horarioEstendido);
+  if (blocos.length === 0) return [];
+
+  const ocupadosOrdenados = [...intervalosOcupados].sort((a, b) => a.inicioMin - b.inicioMin);
+
   const slots = [];
   blocos.forEach(([inicioBloco, fimBloco]) => {
-    for (let m = inicioBloco; m + duracaoMinutos <= fimBloco; m += duracaoMinutos) {
+    let cursor = inicioBloco;
+    const ocupadosDoBloco = ocupadosOrdenados.filter(o => o.inicioMin < fimBloco && o.fimMin > inicioBloco);
+
+    ocupadosDoBloco.forEach(o => {
+      // preenche o espaço livre antes deste agendamento, em passos do
+      // tamanho do novo serviço
+      for (let m = cursor; m + duracaoMinutos <= o.inicioMin; m += duracaoMinutos) {
+        slots.push(paraHHMM(m));
+      }
+      cursor = Math.max(cursor, o.fimMin);
+    });
+
+    // espaço livre restante até o fim do bloco
+    for (let m = cursor; m + duracaoMinutos <= fimBloco; m += duracaoMinutos) {
       slots.push(paraHHMM(m));
     }
   });
+
   return slots;
 };
