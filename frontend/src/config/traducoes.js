@@ -66,6 +66,7 @@ const TEXTOS = {
     agendar_fora_periodo: 'Fora do período de agendamento',
 
     endereco_titulo: 'Localização',
+    endereco_ver_mapa: 'Ver no Google Maps',
     endereco_horario_titulo: 'Horário de Funcionamento',
     endereco_fechado: 'Fechado',
     endereco_almoco: 'Intervalo de almoço: {inicio} - {fim} (nos dias de funcionamento)',
@@ -169,6 +170,7 @@ const TEXTOS = {
     agendar_fora_periodo: 'Outside the booking window',
 
     endereco_titulo: 'Location',
+    endereco_ver_mapa: 'View on Google Maps',
     endereco_horario_titulo: 'Business Hours',
     endereco_fechado: 'Closed',
     endereco_almoco: 'Lunch break: {inicio} - {fim} (on business days)',
@@ -272,6 +274,7 @@ const TEXTOS = {
     agendar_fora_periodo: '予約可能期間外です',
 
     endereco_titulo: 'アクセス',
+    endereco_ver_mapa: 'Googleマップで見る',
     endereco_horario_titulo: '営業時間',
     endereco_fechado: '定休日',
     endereco_almoco: '昼休み: {inicio} - {fim}（営業日のみ）',
