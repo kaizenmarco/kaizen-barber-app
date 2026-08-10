@@ -266,6 +266,25 @@ body {
   margin: 0 auto;
 }
 
+/* Layout do Admin (sidebar + conteúdo). min-width: 0 no admin-main é
+   essencial: sem isso, um <select>/tabela largo dentro do conteúdo força
+   o flex item a crescer além da tela, empurrando a sidebar pra fora do
+   viewport no celular (mesmo com os grids internos já responsivos). */
+.admin-shell {
+  display: flex;
+}
+
+.admin-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  border-right: 2px solid var(--accent-gold);
+}
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .page-container h2 {
   color: var(--accent-gold);
   font-size: 24px;
@@ -1464,6 +1483,17 @@ body {
   font-family: inherit;
 }
 @media (max-width: 768px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 2px solid var(--accent-gold);
+    overflow-y: visible;
+  }
+
   .caixa-status {
     grid-template-columns: 1fr;
   }

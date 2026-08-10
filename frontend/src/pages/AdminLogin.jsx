@@ -320,12 +320,10 @@ function AdminLogin() {
 
   // Dashboard Admin
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#1a1a1a' }}>
+    <div className="admin-shell" style={{ minHeight: '100vh', background: '#1a1a1a' }}>
       {/* Sidebar */}
-      <aside style={{
-        width: '250px',
+      <aside className="admin-sidebar" style={{
         background: '#1a1a1a',
-        borderRight: '2px solid #d4af37',
         padding: '20px',
         overflowY: 'auto'
       }}>
@@ -384,7 +382,7 @@ function AdminLogin() {
       </aside>
 
       {/* Conteúdo Principal */}
-      <main style={{ flex: 1, overflow: 'auto' }}>
+      <main className="admin-main" style={{ overflow: 'auto' }}>
         {abaSelecionada === 'dashboard' && <Dashboard />}
         {abaSelecionada === 'agendamentos' && <Agendamentos t={t} />}
         {abaSelecionada === 'clientes' && <Clientes t={t} />}
