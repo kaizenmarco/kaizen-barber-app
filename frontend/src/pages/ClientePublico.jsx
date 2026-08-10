@@ -1061,32 +1061,30 @@ function ClientePublico() {
           <section>
             <h2 style={{ color: '#d4af37' }}>📍 {t('endereco_titulo')}</h2>
             <div style={{ maxWidth: '600px' }}>
-              <h3>Kaizen Barber Shop</h3>
-              <p>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
-              <p style={{ color: '#999', fontSize: '13px', marginTop: '-10px' }}>
-                {t('endereco_versao_japonesa')}<br />
-                <span style={{ color: '#e8e8e8' }}>{ENDERECO_JAPONES}</span>
-              </p>
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ENDERECO_JAPONES)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: '#d4af37',
-                  border: '1px solid #d4af37',
-                  borderRadius: '4px',
-                  padding: '8px 14px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  textDecoration: 'none',
-                  marginBottom: '20px',
-                }}
-              >
-                🗺️ {t('endereco_ver_mapa')}
-              </a>
+              <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
+                <h3 style={{ color: '#d4af37', marginTop: 0, marginBottom: '12px' }}>Kaizen Barber Shop</h3>
+                <p style={{ margin: '0 0 12px 0', lineHeight: '1.6' }}>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
+                <p style={{ margin: '0 0 16px 0', lineHeight: '1.6', color: '#e8e8e8' }}>{ENDERECO_JAPONES}</p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ENDERECO_JAPONES)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#d4af37',
+                    border: '1px solid #d4af37',
+                    borderRadius: '4px',
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    textDecoration: 'none',
+                  }}
+                >
+                  🗺️ {t('endereco_ver_mapa')}
+                </a>
+              </div>
 
               <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
                 <h3 style={{ color: '#d4af37', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
