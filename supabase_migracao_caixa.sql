@@ -1,6 +1,15 @@
 -- ============================================================================
 -- Migração: Comandas ↔ Caixa ↔ Comissão (Kaizen Barber Shop)
--- Rode este script inteiro no Supabase: Dashboard > SQL Editor > New query > Run
+-- Já foi aplicada diretamente no Supabase (projeto kaizen-barber) via MCP em
+-- 10/08/2026. Mantido aqui só como documentação — não precisa rodar de novo
+-- (os comandos são idempotentes, então rodar novamente não quebra nada).
+--
+-- Observação: o banco já tinha uma tabela "caixa" (vazia, criada num design
+-- anterior do projeto, com colunas categoria/registrado_por obrigatórias e
+-- sem conceito de "dia aberto/fechado"). Optei por não reaproveitá-la e criar
+-- caixa_dias/caixa_movimentacoes novas, mais simples e alinhadas com como o
+-- app realmente funciona hoje (sem tabela de usuários/login via Supabase
+-- Auth). A tabela "caixa" antiga ficou intocada, sem uso.
 -- ============================================================================
 
 -- 1) Comissão de cada profissional (editável na tela Profissionais do Admin)
@@ -35,16 +44,10 @@ create table if not exists public.caixa_movimentacoes (
 create index if not exists idx_caixa_mov_data on public.caixa_movimentacoes(data);
 create index if not exists idx_caixa_mov_profissional on public.caixa_movimentacoes(profissional_id);
 
--- 4) Permissões — mesma política aberta que as tabelas agendamentos/clientes
---    já usam (o app público/admin usa a chave anônima, sem login de usuário).
---    Se alguma das outras tabelas tiver RLS desativado em vez de policy,
---    e o Admin der erro de permissão ao salvar, desative o RLS aqui também
---    em Table Editor > (tabela) > ... > Disable RLS.
-alter table public.caixa_dias enable row level security;
-alter table public.caixa_movimentacoes enable row level security;
-
-drop policy if exists "Acesso total caixa_dias" on public.caixa_dias;
-create policy "Acesso total caixa_dias" on public.caixa_dias for all using (true) with check (true);
-
-drop policy if exists "Acesso total caixa_movimentacoes" on public.caixa_movimentacoes;
-create policy "Acesso total caixa_movimentacoes" on public.caixa_movimentacoes for all using (true) with check (true);
+-- 4) Permissões — NÃO ativei RLS aqui de propósito: todas as outras tabelas
+--    do projeto (profissionais, agendamentos, clientes, servicos etc.) estão
+--    com RLS desligado, porque o app inteiro (site público + Admin) acessa o
+--    Supabase direto pela chave anônima, sem login de usuário. Ativar RLS só
+--    nas tabelas novas, sem mexer nas outras, não resolveria a segurança e
+--    ainda quebraria a gravação automática do caixa. Isso é um problema maior
+--    do projeto todo — ver aviso de segurança separado.
