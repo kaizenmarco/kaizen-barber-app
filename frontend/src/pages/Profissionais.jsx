@@ -6,6 +6,7 @@ import {
   buscarHorarioEstendido,
   salvarHorarioEstendido,
 } from '../config/horarios';
+import { PROFISSIONAIS, COMISSAO_PADRAO, buscarComissoes, salvarComissao } from '../config/profissionais';
 
 const NOMES_DIAS = {
   domingo: 'Domingo',
@@ -20,11 +21,7 @@ const NOMES_DIAS = {
 const ORDEM_DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
 
 function Profissionais({ t }) {
-  const [profissionais, setProfissionais] = useState([
-    { id: 1, nome: 'Marco Kaizen', especialidades: 'Cortes, Barba', comissao: '40%', foto: '/images/marco.jpg' },
-    { id: 2, nome: 'Gabriel Little Kaizen', especialidades: 'Cortes, Permanente', comissao: '40%', foto: '/images/gabriel.jpg' },
-    { id: 3, nome: 'Neia', especialidades: 'Corte Feminino, Coloração, Alisamento', comissao: '40%', foto: '/images/neia.jpg' },
-  ]);
+  const [profissionaisExtras, setProfissionaisExtras] = useState([]);
 
   const [novoProfissional, setNovoProfissional] = useState({
     nome: '',
@@ -37,13 +34,47 @@ function Profissionais({ t }) {
   const [salvandoHorario, setSalvandoHorario] = useState(false);
   const [mensagemHorario, setMensagemHorario] = useState('');
 
+  const [comissoes, setComissoes] = useState({});
+  const [comissoesEditadas, setComissoesEditadas] = useState({});
+  const [salvandoComissao, setSalvandoComissao] = useState(null);
+  const [mensagemComissao, setMensagemComissao] = useState({});
+
   useEffect(() => {
     (async () => {
       const config = await buscarHorarioEstendido();
       setHorarioEstendido(config);
       setCarregandoHorario(false);
     })();
+    (async () => {
+      const mapa = await buscarComissoes();
+      setComissoes(mapa);
+      setComissoesEditadas(mapa);
+    })();
   }, []);
+
+  const handleComissaoInputChange = (uuid, valor) => {
+    setMensagemComissao({ ...mensagemComissao, [uuid]: '' });
+    setComissoesEditadas({ ...comissoesEditadas, [uuid]: valor });
+  };
+
+  const handleSalvarComissao = async (uuid) => {
+    const valor = parseFloat(comissoesEditadas[uuid]);
+    if (isNaN(valor) || valor < 0 || valor > 100) {
+      setMensagemComissao({ ...mensagemComissao, [uuid]: 'Digite um número entre 0 e 100.' });
+      return;
+    }
+    setSalvandoComissao(uuid);
+    try {
+      await salvarComissao(uuid, valor);
+      setComissoes({ ...comissoes, [uuid]: valor });
+      setMensagemComissao({ ...mensagemComissao, [uuid]: 'Salvo!' });
+    } catch (erro) {
+      console.error('Erro ao salvar comissão:', erro);
+      setMensagemComissao({ ...mensagemComissao, [uuid]: 'Não consegui salvar. Confira se a coluna comissao_percentual existe na tabela profissionais.' });
+    } finally {
+      setSalvandoComissao(null);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -53,8 +84,8 @@ function Profissionais({ t }) {
   const handleAdicionarProfissional = (e) => {
     e.preventDefault();
     if (novoProfissional.nome && novoProfissional.especialidades) {
-      setProfissionais([...profissionais, {
-        id: profissionais.length + 1,
+      setProfissionaisExtras([...profissionaisExtras, {
+        id: `extra-${profissionaisExtras.length + 1}`,
         ...novoProfissional,
         foto: '/images/logo.jpg'
       }]);
@@ -184,6 +215,10 @@ function Profissionais({ t }) {
 
       <section className="form-section">
         <h3>Novo Profissional</h3>
+        <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
+          Isso só adiciona um card visual aqui. Para o profissional aparecer de verdade na agenda pública e
+          no Admin (com horários, comissão etc.), é preciso cadastrá-lo no Supabase e em config/profissionais.js.
+        </p>
         <form onSubmit={handleAdicionarProfissional}>
           <input
             type="text"
@@ -216,15 +251,54 @@ function Profissionais({ t }) {
       </section>
 
       <section className="profissionais-grid">
-        {profissionais.map((profissional) => (
+        {PROFISSIONAIS.map((profissional) => (
+          <div key={profissional.uuid} className="profissional-card">
+            <img src={profissional.imagem} alt={profissional.nome} className="profissional-foto" />
+            <div className="profissional-info">
+              <h3>{profissional.nome}</h3>
+              <p className="especialidades">{profissional.especialidades}</p>
+              <div className="detalhes">
+                <p><strong>Horário:</strong> segue o horário do salão (acima)</p>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <strong>Comissão:</strong>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={comissoesEditadas[profissional.uuid] ?? COMISSAO_PADRAO}
+                    onChange={(e) => handleComissaoInputChange(profissional.uuid, e.target.value)}
+                    style={{ width: '70px' }}
+                  />
+                  <span>%</span>
+                </label>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ marginTop: '8px' }}
+                  onClick={() => handleSalvarComissao(profissional.uuid)}
+                  disabled={salvandoComissao === profissional.uuid || Number(comissoesEditadas[profissional.uuid]) === Number(comissoes[profissional.uuid] ?? COMISSAO_PADRAO)}
+                >
+                  {salvandoComissao === profissional.uuid ? 'Salvando...' : 'Salvar Comissão'}
+                </button>
+                {mensagemComissao[profissional.uuid] && (
+                  <p style={{ fontSize: '12px', marginTop: '6px', color: mensagemComissao[profissional.uuid] === 'Salvo!' ? '#4ade80' : '#f87171' }}>
+                    {mensagemComissao[profissional.uuid]}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {profissionaisExtras.map((profissional) => (
           <div key={profissional.id} className="profissional-card">
             <img src={profissional.foto} alt={profissional.nome} className="profissional-foto" />
             <div className="profissional-info">
               <h3>{profissional.nome}</h3>
               <p className="especialidades">{profissional.especialidades}</p>
               <div className="detalhes">
-                <p><strong>Comissão:</strong> {profissional.comissao}</p>
-                <p><strong>Horário:</strong> segue o horário do salão (acima)</p>
+                <p><strong>Comissão:</strong> {profissional.comissao} (não salvo — cadastro só visual)</p>
               </div>
             </div>
           </div>

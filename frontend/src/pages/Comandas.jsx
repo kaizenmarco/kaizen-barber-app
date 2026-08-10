@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
+import { SERVICOS } from '../config/servicos';
+import { PROFISSIONAIS } from '../config/profissionais';
 
 function Comandas({ t }) {
   const hoje = new Date();
+  const hojeStr = hoje.toISOString().split('T')[0];
 
-  const [comandaAberta, setComandaAberta] = useState(false);
-  const [itens, setItens] = useState([]);
+  const [caixaHoje, setCaixaHoje] = useState(null);
+  const [comandasAbertas, setComandasAbertas] = useState([]);
+  const [realizadosHoje, setRealizadosHoje] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
   const [novoItem, setNovoItem] = useState({
@@ -15,132 +19,209 @@ function Comandas({ t }) {
     profissional: ''
   });
 
-  const servicosLista = [
-    { nome: 'Corte', valor: 4000 },
-    { nome: 'Corte + Sobrancelhas', valor: 4500 },
-    { nome: 'Corte + Barba', valor: 6500 },
-    { nome: 'Coloração', valor: 15000 },
-    { nome: 'Alisamento', valor: 15000 },
-    { nome: 'Corte Feminino', valor: 4000 },
-    { nome: 'Permanente', valor: 6000 },
-    { nome: 'Limpeza de Pele', valor: 5000 },
-  ];
+  const caixaAberto = caixaHoje?.status === 'aberto';
 
-  useEffect(() => {
-    buscarComandas();
-  }, []);
+  const profissionaisDoServico = novoItem.servico
+    ? PROFISSIONAIS.filter(p => {
+        const s = SERVICOS.find(sv => sv.nome === novoItem.servico);
+        return s ? s.profissionaisIds.includes(p.id) : true;
+      })
+    : PROFISSIONAIS;
 
-  const buscarComandas = async () => {
+  const buscarTudo = useCallback(async () => {
     setCarregando(true);
     try {
-      const { data, error } = await supabase
-        .from('agendamentos')
-        .select(`
-          id,
-          cliente_id,
-          profissional_id,
-          servico_id,
-          data_hora,
-          status,
-          preco_final,
-          clientes(id, nome),
-          profissionais:profissional_id(id, nome),
-          servicos:servico_id(id, nome)
-        `)
-        .eq('status', 'REALIZADO')
-        .order('data_hora', { ascending: false });
+      const [caixaResp, abertasResp, realizadasResp] = await Promise.all([
+        supabase.from('caixa_dias').select('*').eq('data', hojeStr).maybeSingle(),
+        supabase
+          .from('agendamentos')
+          .select(`
+            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final,
+            clientes(id, nome),
+            profissionais:profissional_id(id, nome),
+            servicos:servico_id(id, nome)
+          `)
+          .gte('data_hora', `${hojeStr}T00:00:00`)
+          .lte('data_hora', `${hojeStr}T23:59:59`)
+          .in('status', ['AGENDADO', 'CONFIRMADO'])
+          .order('data_hora', { ascending: true }),
+        supabase
+          .from('agendamentos')
+          .select(`
+            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final,
+            clientes(id, nome),
+            profissionais:profissional_id(id, nome),
+            servicos:servico_id(id, nome)
+          `)
+          .gte('data_hora', `${hojeStr}T00:00:00`)
+          .lte('data_hora', `${hojeStr}T23:59:59`)
+          .eq('status', 'REALIZADO')
+          .order('data_hora', { ascending: false }),
+      ]);
 
-      if (error) throw error;
+      if (caixaResp.error) throw caixaResp.error;
+      if (abertasResp.error) throw abertasResp.error;
+      if (realizadasResp.error) throw realizadasResp.error;
 
-      const itensFormatados = data.map(agendamento => {
-        const dataHora = new Date(agendamento.data_hora);
-        const diaSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dataHora.getDay()];
-        const dia = String(dataHora.getDate()).padStart(2, '0');
-        const hora = agendamento.data_hora.split('T')[1]?.substring(0, 5) || '';
-
-        return {
-          id: agendamento.id,
-          cliente: agendamento.clientes?.nome || 'Desconhecido',
-          servico: agendamento.servicos?.nome || 'N/A',
-          valor: agendamento.preco_final || 0,
-          profissional: agendamento.profissionais?.nome || 'N/A',
-          hora: hora,
-          data: agendamento.data_hora?.split('T')[0] || '',
-          diaSemana: diaSemana,
-          dia: dia
-        };
+      const formatar = (a) => ({
+        id: a.id,
+        clienteId: a.cliente_id,
+        profissionalId: a.profissional_id,
+        servicoId: a.servico_id,
+        cliente: a.clientes?.nome || 'Desconhecido',
+        servico: a.servicos?.nome || 'N/A',
+        profissional: a.profissionais?.nome || 'N/A',
+        valor: a.preco_final || 0,
+        hora: a.data_hora?.split('T')[1]?.substring(0, 5) || '',
       });
 
-      setItens(itensFormatados);
+      setCaixaHoje(caixaResp.data);
+      setComandasAbertas(abertasResp.data.map(formatar));
+      setRealizadosHoje(realizadasResp.data.map(formatar));
     } catch (error) {
       alert('❌ Erro ao buscar comandas: ' + error.message);
     } finally {
       setCarregando(false);
     }
-  };
+  }, [hojeStr]);
 
-  const handleAbrirComanda = () => {
-    setComandaAberta(true);
-  };
-
-  const handleFecharComanda = () => {
-    setComandaAberta(false);
-  };
+  useEffect(() => {
+    buscarTudo();
+  }, [buscarTudo]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setNovoItem({ ...novoItem, [name]: value });
+    const atualizado = { ...novoItem, [name]: value };
+    if (name === 'servico') {
+      const s = SERVICOS.find(sv => sv.nome === value);
+      atualizado.valor = s ? String(s.preco) : '';
+      atualizado.profissional = '';
+    }
+    setNovoItem(atualizado);
+  };
+
+  const registrarNoCaixa = async ({ descricao, valor, profissionalId, agendamentoId }) => {
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const { error } = await supabase.from('caixa_movimentacoes').insert([{
+      data: hojeStr,
+      hora,
+      tipo: 'entrada',
+      descricao,
+      valor,
+      profissional_id: profissionalId,
+      agendamento_id: agendamentoId,
+    }]);
+    if (error) throw error;
+  };
+
+  const handleFecharComanda = async (item) => {
+    if (!caixaAberto) {
+      alert('⚠️ O caixa de hoje ainda não foi aberto. Vá na aba Caixa e abra o caixa antes de fechar comandas.');
+      return;
+    }
+
+    const servicoInfo = SERVICOS.find(s => s.uuid === item.servicoId);
+    const sugestao = item.valor > 0 ? item.valor : (servicoInfo?.preco ?? 0);
+    const valorStr = window.prompt(
+      `Fechar "${item.servico}" de ${item.cliente} (${item.profissional}).\nValor final (¥):`,
+      String(sugestao)
+    );
+    if (valorStr === null) return;
+    const valor = parseFloat(valorStr);
+    if (isNaN(valor) || valor < 0) {
+      alert('⚠️ Valor inválido.');
+      return;
+    }
+
+    try {
+      const { error: erroUpdate } = await supabase
+        .from('agendamentos')
+        .update({ status: 'REALIZADO', preco_final: valor })
+        .eq('id', item.id);
+      if (erroUpdate) throw erroUpdate;
+
+      await registrarNoCaixa({
+        descricao: `${item.servico} - ${item.cliente}`,
+        valor,
+        profissionalId: item.profissionalId,
+        agendamentoId: item.id,
+      });
+
+      alert('✅ Comanda fechada e lançada no caixa!');
+      buscarTudo();
+    } catch (error) {
+      alert('❌ Erro ao fechar comanda: ' + error.message);
+    }
   };
 
   const handleAdicionarItem = async (e) => {
     e.preventDefault();
-    
+
+    if (!caixaAberto) {
+      alert('⚠️ O caixa de hoje ainda não foi aberto. Vá na aba Caixa e abra o caixa antes de lançar atendimentos avulsos.');
+      return;
+    }
     if (!novoItem.cliente || !novoItem.servico || !novoItem.valor || !novoItem.profissional) {
       alert('⚠️ Preencha todos os campos!');
       return;
     }
 
     try {
+      const servicoInfo = SERVICOS.find(s => s.nome === novoItem.servico);
+      const profInfo = PROFISSIONAIS.find(p => p.nome === novoItem.profissional);
+      if (!servicoInfo || !profInfo) {
+        alert('⚠️ Serviço ou profissional inválido.');
+        return;
+      }
+
       const { data: clienteExistente } = await supabase
         .from('clientes')
         .select('id')
         .eq('nome', novoItem.cliente)
-        .single();
+        .maybeSingle();
 
-      if (!clienteExistente) {
-        const { error: erroCliente } = await supabase
+      let clienteId = clienteExistente?.id;
+      if (!clienteId) {
+        const { data: novoCliente, error: erroCliente } = await supabase
           .from('clientes')
-          .insert([{ nome: novoItem.cliente }]);
-
+          .insert([{ nome: novoItem.cliente }])
+          .select('id')
+          .single();
         if (erroCliente) throw erroCliente;
+        clienteId = novoCliente.id;
       }
 
-      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      const dataHora = new Date();
-      const diaSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dataHora.getDay()];
-      const dia = String(dataHora.getDate()).padStart(2, '0');
+      const valor = parseFloat(novoItem.valor);
+      const { data: novoAgendamento, error: erroAgendamento } = await supabase
+        .from('agendamentos')
+        .insert([{
+          cliente_id: clienteId,
+          profissional_id: profInfo.uuid,
+          servico_id: servicoInfo.uuid,
+          data_hora: new Date().toISOString(),
+          status: 'REALIZADO',
+          preco_final: valor,
+        }])
+        .select('id')
+        .single();
+      if (erroAgendamento) throw erroAgendamento;
 
-      const novoItemFormatado = {
-        id: Date.now(),
-        cliente: novoItem.cliente,
-        servico: novoItem.servico,
-        valor: parseFloat(novoItem.valor),
-        profissional: novoItem.profissional,
-        hora: hora,
-        data: dataHora.toISOString().split('T')[0],
-        diaSemana: diaSemana,
-        dia: dia
-      };
+      await registrarNoCaixa({
+        descricao: `${servicoInfo.nome} - ${novoItem.cliente}`,
+        valor,
+        profissionalId: profInfo.uuid,
+        agendamentoId: novoAgendamento.id,
+      });
 
-      setItens([novoItemFormatado, ...itens]);
       setNovoItem({ cliente: '', servico: '', valor: '', profissional: '' });
-      alert('✅ Serviço adicionado à comanda!');
+      alert('✅ Atendimento lançado na comanda e no caixa!');
+      buscarTudo();
     } catch (error) {
       alert('❌ Erro ao adicionar: ' + error.message);
     }
   };
 
-  const total = itens.reduce((sum, item) => sum + item.valor, 0);
+  const totalRealizadoHoje = realizadosHoje.reduce((sum, item) => sum + item.valor, 0);
 
   const nomeDia = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][hoje.getDay()];
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -153,31 +234,65 @@ function Comandas({ t }) {
 
       <section className="caixa-status">
         <div className="status-card">
-          <h3>Status da Comanda</h3>
-          <p className={`status ${comandaAberta ? 'aberto' : 'fechado'}`}>
-            {comandaAberta ? '✅ ABERTA' : '❌ FECHADA'}
+          <h3>Status do Caixa</h3>
+          <p className={`status ${caixaAberto ? 'aberto' : 'fechado'}`}>
+            {caixaAberto ? '✅ ABERTO' : '❌ FECHADO'}
           </p>
-          {!comandaAberta ? (
-            <button className="btn-primary" onClick={handleAbrirComanda}>
-              Abrir Comanda
-            </button>
-          ) : (
-            <button className="btn-danger" onClick={handleFecharComanda}>
-              Fechar Comanda
-            </button>
+          {!caixaAberto && (
+            <p style={{ fontSize: '13px', color: '#f87171' }}>
+              Abra o caixa na aba Caixa para poder fechar comandas ou lançar atendimentos avulsos.
+            </p>
           )}
         </div>
 
         <div className="status-card">
-          <h3>Total do Dia</h3>
-          <p>Itens: <strong>{itens.length}</strong></p>
-          <p className="saldo-final">Total: <strong>¥{total.toLocaleString('ja-JP')}</strong></p>
+          <h3>Total Realizado Hoje</h3>
+          <p>Atendimentos: <strong>{realizadosHoje.length}</strong></p>
+          <p className="saldo-final">Total: <strong>¥{totalRealizadoHoje.toLocaleString('ja-JP')}</strong></p>
         </div>
       </section>
 
-      {comandaAberta && (
+      <section className="list-section">
+        <h3>🕓 Comandas Abertas (agendamentos de hoje)</h3>
+        {carregando ? (
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando...</p>
+        ) : comandasAbertas.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999' }}>Nenhuma comanda aberta para hoje</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Cliente</th>
+                  <th>Serviço</th>
+                  <th>Profissional</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comandasAbertas.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.hora}</td>
+                    <td>{item.cliente}</td>
+                    <td>{item.servico}</td>
+                    <td>{item.profissional}</td>
+                    <td>
+                      <button className="btn-primary" onClick={() => handleFecharComanda(item)}>
+                        ✅ Fechar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {caixaAberto && (
         <section className="form-section">
-          <h3>Adicionar Serviço</h3>
+          <h3>Lançar Atendimento Avulso</h3>
           <form onSubmit={handleAdicionarItem}>
             <input
               type="text"
@@ -194,8 +309,19 @@ function Comandas({ t }) {
               required
             >
               <option value="">Selecione um serviço</option>
-              {servicosLista.map((s, idx) => (
-                <option key={idx} value={s.nome}>{s.nome} - ¥{s.valor.toLocaleString('ja-JP')}</option>
+              {SERVICOS.map((s) => (
+                <option key={s.id} value={s.nome}>{s.nome} - ¥{s.preco.toLocaleString('ja-JP')}</option>
+              ))}
+            </select>
+            <select
+              name="profissional"
+              value={novoItem.profissional}
+              onChange={handleInputChange}
+              required
+            >
+              <option value="">Selecione profissional</option>
+              {profissionaisDoServico.map((p) => (
+                <option key={p.uuid} value={p.nome}>{p.nome}</option>
               ))}
             </select>
             <input
@@ -206,66 +332,45 @@ function Comandas({ t }) {
               onChange={handleInputChange}
               required
             />
-            <select
-              name="profissional"
-              value={novoItem.profissional}
-              onChange={handleInputChange}
-              required
-            >
-              <option value="">Selecione profissional</option>
-              <option value="Marco Kaizen">Marco Kaizen</option>
-              <option value="Gabriel Little Kaizen">Gabriel Little Kaizen</option>
-              <option value="Neia">Neia</option>
-            </select>
             <button type="submit" className="btn-primary">Adicionar Serviço</button>
           </form>
         </section>
       )}
 
       <section className="list-section">
-        <h3>📊 Serviços Realizados</h3>
-        
+        <h3>📊 Serviços Realizados Hoje</h3>
+
         {carregando ? (
           <p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando...</p>
-        ) : itens.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum serviço realizado ainda</p>
+        ) : realizadosHoje.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum serviço realizado ainda hoje</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Dia</th>
-                  <th>Dia da Semana</th>
                   <th>Hora</th>
                   <th>Cliente</th>
                   <th>Serviço</th>
                   <th>Profissional</th>
                   <th>Valor</th>
-                  <th>Ação</th>
                 </tr>
               </thead>
               <tbody>
-                {itens.map((item) => (
+                {realizadosHoje.map((item) => (
                   <tr key={item.id}>
-                    <td style={{ fontWeight: 'bold', color: '#d4af37' }}>{item.dia}</td>
-                    <td style={{ fontWeight: 'bold', color: '#4ade80' }}>{item.diaSemana}</td>
                     <td>{item.hora}</td>
                     <td>{item.cliente}</td>
                     <td>{item.servico}</td>
                     <td>{item.profissional}</td>
                     <td style={{ fontWeight: 'bold', color: '#d4af37' }}>¥{item.valor.toLocaleString('ja-JP')}</td>
-                    <td>
-                      <button 
-                        className="btn-delete"
-                        onClick={() => setItens(itens.filter(i => i.id !== item.id))}
-                      >
-                        🗑️ Deletar
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+              Já lançados no caixa do dia — para corrigir um valor, ajuste diretamente na aba Caixa.
+            </p>
           </div>
         )}
       </section>
