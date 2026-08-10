@@ -14,6 +14,16 @@ import { SERVICOS } from '../config/servicos';
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
 const DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+const ORDEM_DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+const NOMES_DIAS_SEMANA = {
+  segunda: 'Segunda-feira',
+  terca: 'Terça-feira',
+  quarta: 'Quarta-feira',
+  quinta: 'Quinta-feira',
+  sexta: 'Sexta-feira',
+  sabado: 'Sábado',
+  domingo: 'Domingo',
+};
 const DIAS_CARROSSEL = 90; // até quantos dias à frente o cliente pode agendar (~3 meses, cobre os períodos de feriados prolongados no Japão)
 const OPCOES_LEMBRETE = [15, 20, 30, 60];
 
@@ -1008,6 +1018,44 @@ function ClientePublico() {
             <div style={{ maxWidth: '600px' }}>
               <h3>Kaizen Barber Shop</h3>
               <p>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
+
+              <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
+                <h3 style={{ color: '#d4af37', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🕒 Horário de Funcionamento
+                </h3>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    {ORDEM_DIAS_SEMANA.map((dia) => {
+                      const h = HORARIO_SALAO[dia];
+                      const ehHoje = dia === getDiaSemana(new Date());
+                      return (
+                        <tr
+                          key={dia}
+                          style={{
+                            borderBottom: '1px solid #404040',
+                            background: ehHoje ? 'rgba(212, 175, 55, 0.14)' : 'transparent',
+                          }}
+                        >
+                          <td style={{ padding: '10px 8px', color: ehHoje ? '#d4af37' : '#e8e8e8', fontWeight: ehHoje ? 'bold' : 'normal' }}>
+                            {ehHoje && '▶ '}{NOMES_DIAS_SEMANA[dia]}
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'right', fontWeight: ehHoje ? 'bold' : 'normal' }}>
+                            {h.aberto ? (
+                              <span style={{ color: '#4ade80' }}>{h.abertura} - {h.fechamento}</span>
+                            ) : (
+                              <span style={{ color: '#f87171' }}>Fechado</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p style={{ fontSize: '13px', color: '#999', marginTop: '14px', marginBottom: 0 }}>
+                  ☕ Intervalo de almoço: {HORARIO_ALMOCO.inicio} - {HORARIO_ALMOCO.fim} (nos dias de funcionamento)
+                </p>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                 <img src="/images/fachada.jpg" alt="Fachada" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
                 <img src="/images/interior.jpg" alt="Interior" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px' }} />
