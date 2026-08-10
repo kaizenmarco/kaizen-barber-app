@@ -656,10 +656,16 @@ function ClientePublico() {
 
   return (
     <div style={{ background: '#1a1a1a', color: '#e8e8e8', minHeight: '100vh' }}>
-      <header style={{ borderBottom: '3px solid #d4af37', padding: '20px', textAlign: 'center' }}>
-        <img src="/images/logo.jpg" alt="Kaizen" style={{ width: '60px', height: '60px', marginBottom: '10px' }} />
-        <h1 style={{ color: '#d4af37', fontSize: '32px', margin: '0' }}>Kaizen Barber Shop</h1>
-        <p style={{ color: '#999', margin: '0' }}>Premium Barbershop - Anjo, Aichi</p>
+      <header style={{ borderBottom: '3px solid #d4af37' }}>
+        <img
+          src="/images/header_banner.jpg"
+          alt="Kaizen Barber Shop"
+          style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center' }}
+        />
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <h1 style={{ color: '#d4af37', fontSize: '32px', margin: '0' }}>Kaizen Barber Shop</h1>
+          <p style={{ color: '#999', margin: '0' }}>Premium Barbershop - Anjo, Aichi</p>
+        </div>
       </header>
 
       <nav style={{ display: 'flex', gap: '10px', padding: '20px', borderBottom: '1px solid #404040', overflowX: 'auto' }}>
