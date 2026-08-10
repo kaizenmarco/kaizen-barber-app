@@ -66,6 +66,7 @@ const TEXTOS = {
     agendar_fora_periodo: 'Fora do período de agendamento',
 
     endereco_titulo: 'Localização',
+    endereco_versao_japonesa: 'Endereço em japonês (para GPS/táxi)',
     endereco_ver_mapa: 'Ver no Google Maps',
     endereco_horario_titulo: 'Horário de Funcionamento',
     endereco_fechado: 'Fechado',
@@ -170,6 +171,7 @@ const TEXTOS = {
     agendar_fora_periodo: 'Outside the booking window',
 
     endereco_titulo: 'Location',
+    endereco_versao_japonesa: 'Japanese address (for GPS/taxi)',
     endereco_ver_mapa: 'View on Google Maps',
     endereco_horario_titulo: 'Business Hours',
     endereco_fechado: 'Closed',
@@ -274,6 +276,7 @@ const TEXTOS = {
     agendar_fora_periodo: '予約可能期間外です',
 
     endereco_titulo: 'アクセス',
+    endereco_versao_japonesa: '日本語の住所（タクシー・GPS用）',
     endereco_ver_mapa: 'Googleマップで見る',
     endereco_horario_titulo: '営業時間',
     endereco_fechado: '定休日',

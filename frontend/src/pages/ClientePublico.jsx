@@ -14,6 +14,7 @@ import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, L
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
+const ENDERECO_JAPONES = '〒446-0022 Aichi, Anjo, Hamatomicho, 4−17 サン シテイ オーミ 302号';
 const ORDEM_DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
 const DIAS_CARROSSEL = 90; // até quantos dias à frente o cliente pode agendar (~3 meses, cobre os períodos de feriados prolongados no Japão)
 const OPCOES_LEMBRETE = [15, 20, 30, 60];
@@ -1062,8 +1063,12 @@ function ClientePublico() {
             <div style={{ maxWidth: '600px' }}>
               <h3>Kaizen Barber Shop</h3>
               <p>Aichi-Ken Anjo-Shi<br />Hamatomi-Cho 4-17<br />San City Oomy 302</p>
+              <p style={{ color: '#999', fontSize: '13px', marginTop: '-10px' }}>
+                {t('endereco_versao_japonesa')}<br />
+                <span style={{ color: '#e8e8e8' }}>{ENDERECO_JAPONES}</span>
+              </p>
               <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ENDERECO_ESTABELECIMENTO)}`}
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ENDERECO_JAPONES)}`}
                 target="_blank"
                 rel="noreferrer"
                 style={{
