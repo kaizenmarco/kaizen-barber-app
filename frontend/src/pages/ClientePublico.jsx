@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { supabase } from '../supabaseClient';
 import {
   getSlotsLivresNoDia,
@@ -17,6 +18,7 @@ const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San Cit
 const ENDERECO_JAPONES = '〒446-0022 Aichi, Anjo, Hamatomicho, 4−17 サン シテイ オーミ 302号';
 const WHATSAPP_NUMERO = '818097242512'; // +81-80-9724-2512, só dígitos (formato exigido pelo wa.me)
 const INSTAGRAM_USUARIO = 'marco.kaizen';
+const TIKTOK_USUARIO = 'marco.kaizen';
 
 const botaoContatoStyle = {
   display: 'inline-flex',
@@ -1094,17 +1096,25 @@ function ClientePublico() {
                     href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ ...botaoContatoStyle, color: '#4ade80', border: '1px solid #4ade80' }}
+                    style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366' }}
                   >
-                    💬 WhatsApp
+                    <FaWhatsapp size={16} /> WhatsApp
                   </a>
                   <a
                     href={`https://instagram.com/${INSTAGRAM_USUARIO}`}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ ...botaoContatoStyle, color: '#e1306c', border: '1px solid #e1306c' }}
+                    style={{ ...botaoContatoStyle, color: '#E4405F', border: '1px solid #E4405F' }}
                   >
-                    📸 Instagram
+                    <FaInstagram size={16} /> Instagram
+                  </a>
+                  <a
+                    href={`https://www.tiktok.com/@${TIKTOK_USUARIO}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ ...botaoContatoStyle, color: '#e8e8e8', border: '1px solid #e8e8e8' }}
+                  >
+                    <FaTiktok size={16} /> TikTok
                   </a>
                 </div>
               </div>
@@ -1245,17 +1255,25 @@ function ClientePublico() {
             href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
             target="_blank"
             rel="noreferrer"
-            style={{ ...botaoContatoStyle, color: '#4ade80', border: '1px solid #4ade80' }}
+            style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366' }}
           >
-            💬 WhatsApp
+            <FaWhatsapp size={16} /> WhatsApp
           </a>
           <a
             href={`https://instagram.com/${INSTAGRAM_USUARIO}`}
             target="_blank"
             rel="noreferrer"
-            style={{ ...botaoContatoStyle, color: '#e1306c', border: '1px solid #e1306c' }}
+            style={{ ...botaoContatoStyle, color: '#E4405F', border: '1px solid #E4405F' }}
           >
-            📸 Instagram
+            <FaInstagram size={16} /> Instagram
+          </a>
+          <a
+            href={`https://www.tiktok.com/@${TIKTOK_USUARIO}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ ...botaoContatoStyle, color: '#e8e8e8', border: '1px solid #e8e8e8' }}
+          >
+            <FaTiktok size={16} /> TikTok
           </a>
         </div>
         <p>&copy; 2026 Kaizen Barber Shop. {t('footer_direitos')}</p>
