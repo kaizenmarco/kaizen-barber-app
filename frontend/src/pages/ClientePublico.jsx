@@ -102,13 +102,26 @@ const linkGoogleCalendar = ({ servico, profissional, dataStr, horaInicio, horaFi
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 };
 
+// Se o cliente chegou por um subdomínio de idioma (en.kaizenbarbershop.com,
+// jp.kaizenbarbershop.com), usa isso como idioma inicial. Só vale na
+// primeira visita — se a pessoa já escolheu um idioma manualmente antes
+// (salvo no localStorage), essa escolha continua tendo prioridade.
+const idiomaPorSubdominio = () => {
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (host.startsWith('en.')) return 'en';
+  if (host.startsWith('jp.')) return 'ja';
+  return null;
+};
+
 function ClientePublico() {
   const [idioma, setIdioma] = useState(() => {
     try {
-      return localStorage.getItem(CHAVE_IDIOMA_STORAGE) || IDIOMA_PADRAO;
+      const salvo = localStorage.getItem(CHAVE_IDIOMA_STORAGE);
+      if (salvo) return salvo;
     } catch {
-      return IDIOMA_PADRAO;
+      // localStorage indisponível — segue sem preferência salva
     }
+    return idiomaPorSubdominio() || IDIOMA_PADRAO;
   });
   const t = (chave, valores) => traduzir(idioma, chave, valores);
   const localeAtual = LOCALE_POR_IDIOMA[idioma] || LOCALE_POR_IDIOMA[IDIOMA_PADRAO];
