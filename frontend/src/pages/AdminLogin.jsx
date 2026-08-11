@@ -232,8 +232,13 @@ function AdminLogin() {
           maxWidth: '400px',
           width: '100%'
         }}>
+          <img
+            src="/images/logo.jpg"
+            alt="Kaizen Barber Shop"
+            style={{ width: '110px', height: '110px', borderRadius: '50%', display: 'block', margin: '0 auto 20px', boxShadow: '0 0 0 1px #d4af37' }}
+          />
           <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '10px' }}>
-            {modoTela === 'login' ? '🔐 Login Admin' : '📝 Criar conta'}
+            {modoTela === 'login' ? 'Login Admin' : 'Criar conta'}
           </h2>
           <p style={{ color: '#999', fontSize: '12px', textAlign: 'center', marginBottom: '20px' }}>
             {modoTela === 'login'
@@ -328,7 +333,12 @@ function AdminLogin() {
         overflowY: 'auto'
       }}>
         <div style={{ marginBottom: '30px', textAlign: 'center' }}>
-          <h2 style={{ color: '#d4af37', marginBottom: '10px' }}>🏺 Kaizen</h2>
+          <img
+            src="/images/logo.jpg"
+            alt="Kaizen Barber Shop"
+            style={{ width: '72px', height: '72px', borderRadius: '50%', display: 'block', margin: '0 auto 10px', boxShadow: '0 0 0 1px #d4af37' }}
+          />
+          <h2 style={{ color: '#d4af37', marginBottom: '4px', fontSize: '18px' }}>Kaizen</h2>
           <p style={{ color: '#999', fontSize: '12px' }}>Admin Panel</p>
         </div>
 
