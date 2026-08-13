@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
-function Fidelidade({ t }) {
+function Fidelidade({ t: tProp, idioma: idiomaProp }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+
   const [clientes, setClientes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [filtroCliente, setFiltroCliente] = useState('');
 
   useEffect(() => {
     buscarClientesComPontos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const buscarClientesComPontos = async () => {
@@ -54,7 +59,7 @@ function Fidelidade({ t }) {
 
       setClientes(clientesComPontos);
     } catch (error) {
-      alert('❌ Erro ao buscar clientes: ' + error.message);
+      alert(t('fidelidade.erroBuscar', { msg: error.message }));
     } finally {
       setCarregando(false);
     }
@@ -71,53 +76,53 @@ function Fidelidade({ t }) {
 
   return (
     <div className="page-container">
-      <h2>🎁 Programa de Fidelidade</h2>
+      <h2>{t('fidelidade.titulo')}</h2>
 
       {/* RESUMO */}
       <section className="caixa-status">
         <div className="status-card">
-          <h3>📊 Total de Pontos</h3>
+          <h3>{t('fidelidade.totalPontos')}</h3>
           <p style={{ fontSize: '32px', color: '#d4af37', fontWeight: 'bold', margin: '10px 0' }}>
             {totalPontosGeral}
           </p>
-          <p style={{ fontSize: '12px', color: '#999' }}>Em toda base de clientes</p>
+          <p style={{ fontSize: '12px', color: '#999' }}>{t('fidelidade.emTodaBase')}</p>
         </div>
 
         <div className="status-card">
-          <h3>👥 Clientes Ativos</h3>
+          <h3>{t('fidelidade.clientesAtivos')}</h3>
           <p style={{ fontSize: '32px', color: '#4ade80', fontWeight: 'bold', margin: '10px 0' }}>
             {clientes.length}
           </p>
-          <p style={{ fontSize: '12px', color: '#999' }}>Com agendamentos</p>
+          <p style={{ fontSize: '12px', color: '#999' }}>{t('fidelidade.comAgendamentos')}</p>
         </div>
 
         <div className="status-card">
-          <h3>💰 Descontos Resgatados</h3>
+          <h3>{t('fidelidade.descontosResgatados')}</h3>
           <p style={{ fontSize: '28px', color: '#60a5fa', fontWeight: 'bold', margin: '10px 0' }}>
             ¥{totalDescontos.toLocaleString('ja-JP')}
           </p>
-          <p style={{ fontSize: '12px', color: '#999' }}>Valor total resgatado</p>
+          <p style={{ fontSize: '12px', color: '#999' }}>{t('fidelidade.valorTotalResgatado')}</p>
         </div>
 
         <div className="status-card">
-          <h3>ℹ️ Regras do Programa</h3>
+          <h3>{t('fidelidade.regrasPrograma')}</h3>
           <p style={{ fontSize: '12px', color: '#e8e8e8', lineHeight: '1.6' }}>
-            ✅ 2 pontos por serviço realizado<br/>
-            ✅ 10 pontos = ¥500 desconto<br/>
-            ✅ Válido por 3 meses<br/>
-            ✅ Intransferível
+            {t('fidelidade.regra1')}<br/>
+            {t('fidelidade.regra2')}<br/>
+            {t('fidelidade.regra3')}<br/>
+            {t('fidelidade.regra4')}
           </p>
         </div>
       </section>
 
       {/* LISTA DE CLIENTES */}
       <section className="list-section">
-        <h3>👥 Clientes - Saldo de Pontos</h3>
+        <h3>{t('fidelidade.clientesSaldoPontos')}</h3>
 
         <div style={{ marginBottom: '20px' }}>
           <input
             type="text"
-            placeholder="Buscar cliente por nome..."
+            placeholder={t('fidelidade.buscarClientePlaceholder')}
             value={filtroCliente}
             onChange={(e) => setFiltroCliente(e.target.value)}
             style={{
@@ -132,22 +137,22 @@ function Fidelidade({ t }) {
         </div>
 
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : clientesFiltrados.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum cliente encontrado</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('fidelidade.nenhumEncontrado')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Cliente</th>
-                  <th>Email</th>
-                  <th>Data Inscrição</th>
-                  <th>Agendamentos</th>
-                  <th>Pontos Disponíveis</th>
-                  <th>Pontos a Resgatar</th>
-                  <th>Desconto (¥)</th>
-                  <th>Status</th>
+                  <th>{t('comum.cliente')}</th>
+                  <th>{t('comum.email')}</th>
+                  <th>{t('fidelidade.dataInscricao')}</th>
+                  <th>{t('fidelidade.agendamentos')}</th>
+                  <th>{t('fidelidade.pontosDisponiveis')}</th>
+                  <th>{t('fidelidade.pontosResgatar')}</th>
+                  <th>{t('fidelidade.descontoIene')}</th>
+                  <th>{t('comum.status')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,7 +196,7 @@ function Fidelidade({ t }) {
                         fontWeight: 'bold',
                         fontSize: '12px'
                       }}>
-                        {cliente.totalPontos > 0 ? '✅ Ativo' : '⚪ Sem pontos'}
+                        {cliente.totalPontos > 0 ? t('fidelidade.ativo') : t('fidelidade.semPontos')}
                       </span>
                     </td>
                   </tr>
@@ -204,14 +209,14 @@ function Fidelidade({ t }) {
 
       {/* INFORMAÇÕES */}
       <section style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '12px', padding: '20px', marginTop: '30px' }}>
-        <h3 style={{ color: '#d4af37', marginBottom: '15px' }}>📋 Como Funciona o Programa</h3>
+        <h3 style={{ color: '#d4af37', marginBottom: '15px' }}>{t('fidelidade.comoFunciona')}</h3>
         <div style={{ color: '#e8e8e8', lineHeight: '1.8' }}>
-          <p><strong>🎯 Objetivo:</strong> Recompensar clientes fiéis com descontos em serviços futuros</p>
-          <p><strong>⭐ Pontos:</strong> Cliente ganha 2 pontos para cada serviço realizado</p>
-          <p><strong>💳 Resgate:</strong> A cada 10 pontos acumulados, cliente ganha ¥500 de desconto</p>
-          <p><strong>⏰ Validade:</strong> Pontos são válidos por 3 meses a partir da data do serviço</p>
-          <p><strong>🔒 Intransferível:</strong> Pontos não podem ser transferidos entre clientes</p>
-          <p><strong>📊 Rastreamento:</strong> Cliente pode ver seu saldo na página de fidelidade</p>
+          <p><strong>{t('fidelidade.objetivo')}</strong> {t('fidelidade.objetivoTexto')}</p>
+          <p><strong>{t('fidelidade.pontosLabel')}</strong> {t('fidelidade.pontosTexto')}</p>
+          <p><strong>{t('fidelidade.resgate')}</strong> {t('fidelidade.resgateTexto')}</p>
+          <p><strong>{t('fidelidade.validade')}</strong> {t('fidelidade.validadeTexto')}</p>
+          <p><strong>{t('fidelidade.intransferivel')}</strong> {t('fidelidade.intransferivelTexto')}</p>
+          <p><strong>{t('fidelidade.rastreamento')}</strong> {t('fidelidade.rastreamentoTexto')}</p>
         </div>
       </section>
     </div>

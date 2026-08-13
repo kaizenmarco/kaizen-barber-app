@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { IDIOMAS_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import Dashboard from './Dashboard';
 import Agendamentos from './Agendamentos';
 import Clientes from './Clientes';
@@ -10,18 +11,20 @@ import Comandas from './Comandas';
 import Fidelidade from './Fidelidade';
 import OrdemChegada from './OrdemChegada';
 
+const CHAVE_IDIOMA_ADMIN_STORAGE = 'kaizen_admin_idioma';
+
 // Cada aba diz se aparece para quem tem acesso completo (admin) e/ou
 // restrito (profissional_restrito). Qualquer conta nova nasce restrita —
 // só vira admin manualmente (via SQL Editor do Supabase).
-const ABAS = [
-  { key: 'dashboard', label: '📊 Dashboard', admin: true, restrito: false },
-  { key: 'agendamentos', label: '📅 Agendamentos', admin: true, restrito: true },
-  { key: 'clientes', label: '👥 Clientes', admin: true, restrito: false },
-  { key: 'profissionais', label: '💈 Profissionais', admin: true, restrito: false },
-  { key: 'caixa', label: '💰 Caixa', admin: true, restrito: false },
-  { key: 'comandas', label: '📋 Comandas', admin: true, restrito: true },
-  { key: 'fidelidade', label: '🎁 Fidelidade', admin: true, restrito: false },
-  { key: 'ordem', label: '📍 Ordem de Chegada', admin: true, restrito: true },
+const CHAVES_ABAS = [
+  { key: 'dashboard', labelChave: 'nav.dashboard', admin: true, restrito: false },
+  { key: 'agendamentos', labelChave: 'nav.agendamentos', admin: true, restrito: true },
+  { key: 'clientes', labelChave: 'nav.clientes', admin: true, restrito: false },
+  { key: 'profissionais', labelChave: 'nav.profissionais', admin: true, restrito: false },
+  { key: 'caixa', labelChave: 'nav.caixa', admin: true, restrito: false },
+  { key: 'comandas', labelChave: 'nav.comandas', admin: true, restrito: true },
+  { key: 'fidelidade', labelChave: 'nav.fidelidade', admin: true, restrito: false },
+  { key: 'ordem', labelChave: 'nav.ordem', admin: true, restrito: true },
 ];
 
 const inputStyle = {
@@ -75,18 +78,28 @@ function AdminLogin() {
 
   const [abaSelecionada, setAbaSelecionada] = useState(null);
 
-  const t = (chave) => {
-    const traducoes = {
-      'nav.agendamentos': 'Agendamentos',
-      'nav.clientes': 'Clientes',
-      'nav.profissionais': 'Profissionais',
-      'nav.caixa': 'Caixa',
-      'nav.comandas': 'Comandas',
-      'nav.fidelidade': 'Fidelidade',
-      'nav.ordem': 'Ordem de Chegada'
-    };
-    return traducoes[chave] || chave;
+  const [idioma, setIdioma] = useState(() => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_IDIOMA_ADMIN_STORAGE);
+      if (salvo) return salvo;
+    } catch {
+      // localStorage indisponível — segue com o padrão.
+    }
+    return IDIOMA_ADMIN_PADRAO;
+  });
+
+  const t = (chave, valores) => traduzirAdmin(idioma, chave, valores);
+
+  const mudarIdioma = (novoIdioma) => {
+    setIdioma(novoIdioma);
+    try {
+      localStorage.setItem(CHAVE_IDIOMA_ADMIN_STORAGE, novoIdioma);
+    } catch {
+      // sem localStorage, só não persiste entre sessões.
+    }
   };
+
+  const ABAS = CHAVES_ABAS.map(a => ({ ...a, label: t(a.labelChave) }));
 
   // Sessão do Supabase Auth: carrega a atual e escuta login/logout.
   useEffect(() => {
@@ -154,7 +167,7 @@ function AdminLogin() {
     setEnviando(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
     if (error) {
-      setErro(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message);
+      setErro(error.message === 'Invalid login credentials' ? t('login.emailOuSenhaIncorretos') : error.message);
     }
     setEnviando(false);
   };
@@ -178,13 +191,13 @@ function AdminLogin() {
       // login automático (confirmação de e-mail desativada no projeto)
       return;
     }
-    setMensagem('Conta criada! Verifique seu e-mail para confirmar antes de entrar.');
+    setMensagem(t('login.contaCriada'));
     setModoTela('login');
   };
 
   const handleEsqueciSenha = async () => {
     if (!email) {
-      setErro('Digite seu e-mail acima primeiro, depois clique em "Esqueci minha senha".');
+      setErro(t('login.digiteEmailPrimeiro'));
       return;
     }
     setErro('');
@@ -194,7 +207,7 @@ function AdminLogin() {
     if (error) {
       setErro(error.message);
     } else {
-      setMensagem('Enviamos um link de redefinição de senha para o seu e-mail.');
+      setMensagem(t('login.linkResetEnviado'));
     }
   };
 
@@ -206,10 +219,34 @@ function AdminLogin() {
     setModoTela('login');
   };
 
+  const SeletorIdioma = ({ estilo }) => (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '16px', ...estilo }}>
+      {IDIOMAS_ADMIN.map(op => (
+        <button
+          key={op.codigo}
+          type="button"
+          onClick={() => mudarIdioma(op.codigo)}
+          style={{
+            padding: '4px 10px',
+            borderRadius: '999px',
+            border: '1px solid #d4af37',
+            background: idioma === op.codigo ? '#d4af37' : 'transparent',
+            color: idioma === op.codigo ? '#1a1a1a' : '#d4af37',
+            fontWeight: 'bold',
+            fontSize: '11px',
+            cursor: 'pointer'
+          }}
+        >
+          {op.rotulo}
+        </button>
+      ))}
+    </div>
+  );
+
   if (carregandoSessao || (session && carregandoPerfil)) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#1a1a1a', color: '#d4af37' }}>
-        Carregando...
+        {t('login.carregando')}
       </div>
     );
   }
@@ -232,25 +269,24 @@ function AdminLogin() {
           maxWidth: '400px',
           width: '100%'
         }}>
+          <SeletorIdioma />
           <img
             src="/images/logo.jpg"
             alt="Kaizen Barber Shop"
             style={{ width: '110px', height: '110px', borderRadius: '50%', display: 'block', margin: '0 auto 20px', boxShadow: '0 0 0 1px #d4af37' }}
           />
           <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '10px' }}>
-            {modoTela === 'login' ? 'Login Admin' : 'Criar conta'}
+            {modoTela === 'login' ? t('login.tituloLogin') : t('login.tituloCadastro')}
           </h2>
           <p style={{ color: '#999', fontSize: '12px', textAlign: 'center', marginBottom: '20px' }}>
-            {modoTela === 'login'
-              ? 'Entre com o e-mail e senha da sua conta.'
-              : 'Toda conta nova começa com acesso restrito. Peça para promoverem sua conta a acesso completo, se precisar.'}
+            {modoTela === 'login' ? t('login.subtituloLogin') : t('login.subtituloCadastro')}
           </p>
 
           <form onSubmit={modoTela === 'login' ? handleLogin : handleCadastro}>
             {modoTela === 'cadastro' && (
               <input
                 type="text"
-                placeholder="Seu nome"
+                placeholder={t('login.nome')}
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 style={inputStyle}
@@ -259,7 +295,7 @@ function AdminLogin() {
             )}
             <input
               type="email"
-              placeholder="Email"
+              placeholder={t('login.email')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={inputStyle}
@@ -267,7 +303,7 @@ function AdminLogin() {
             />
             <input
               type="password"
-              placeholder="Senha"
+              placeholder={t('login.senha')}
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               style={inputStyle}
@@ -279,7 +315,7 @@ function AdminLogin() {
             {mensagem && <p style={{ color: '#4ade80', fontSize: '13px', marginBottom: '15px' }}>{mensagem}</p>}
 
             <button type="submit" style={botaoPrimario} disabled={enviando}>
-              {enviando ? 'Aguarde...' : (modoTela === 'login' ? 'Entrar' : 'Criar conta')}
+              {enviando ? t('login.aguarde') : (modoTela === 'login' ? t('login.entrar') : t('login.criarConta'))}
             </button>
 
             {modoTela === 'login' ? (
@@ -290,14 +326,14 @@ function AdminLogin() {
                   style={{ ...botaoSecundario, marginBottom: '10px' }}
                   disabled={enviando}
                 >
-                  Esqueci minha senha
+                  {t('login.esqueciSenha')}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setModoTela('cadastro'); setErro(''); setMensagem(''); }}
                   style={{ ...botaoSecundario, marginBottom: '10px' }}
                 >
-                  Criar uma conta
+                  {t('login.criarUmaConta')}
                 </button>
               </>
             ) : (
@@ -306,7 +342,7 @@ function AdminLogin() {
                 onClick={() => { setModoTela('login'); setErro(''); setMensagem(''); }}
                 style={{ ...botaoSecundario, marginBottom: '10px' }}
               >
-                Já tenho conta
+                {t('login.jaTenhoConta')}
               </button>
             )}
 
@@ -315,7 +351,7 @@ function AdminLogin() {
               onClick={() => navigate('/')}
               style={botaoSecundario}
             >
-              Voltar para Página Pública
+              {t('login.voltarPublico')}
             </button>
           </form>
         </div>
@@ -339,7 +375,8 @@ function AdminLogin() {
             style={{ width: '72px', height: '72px', borderRadius: '50%', display: 'block', margin: '0 auto 10px', boxShadow: '0 0 0 1px #d4af37' }}
           />
           <h2 style={{ color: '#d4af37', marginBottom: '4px', fontSize: '18px' }}>Kaizen</h2>
-          <p style={{ color: '#999', fontSize: '12px' }}>Admin Panel</p>
+          <p style={{ color: '#999', fontSize: '12px', marginBottom: '10px' }}>{t('sidebar.adminPanel')}</p>
+          <SeletorIdioma estilo={{ marginBottom: 0 }} />
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -364,10 +401,10 @@ function AdminLogin() {
 
           <div style={{ borderTop: '1px solid #d4af37', marginTop: '20px', paddingTop: '20px' }}>
             <p style={{ color: '#999', fontSize: '12px', marginBottom: '4px' }}>
-              Logado como: <strong>{perfil?.nome || session.user.email}</strong>
+              {t('sidebar.logadoComo')} <strong>{perfil?.nome || session.user.email}</strong>
             </p>
             <p style={{ color: '#999', fontSize: '11px', marginBottom: '10px' }}>
-              Acesso: <strong>{perfil?.role === 'admin' ? 'Completo' : 'Restrito'}</strong>
+              {t('sidebar.acesso')} <strong>{perfil?.role === 'admin' ? t('sidebar.acessoCompleto') : t('sidebar.acessoRestrito')}</strong>
             </p>
             <button
               onClick={() => {
@@ -385,7 +422,7 @@ function AdminLogin() {
                 cursor: 'pointer'
               }}
             >
-              🚪 Logout
+              {t('sidebar.logout')}
             </button>
           </div>
         </nav>
@@ -393,14 +430,14 @@ function AdminLogin() {
 
       {/* Conteúdo Principal */}
       <main className="admin-main" style={{ overflow: 'auto' }}>
-        {abaSelecionada === 'dashboard' && <Dashboard />}
-        {abaSelecionada === 'agendamentos' && <Agendamentos t={t} />}
-        {abaSelecionada === 'clientes' && <Clientes t={t} />}
-        {abaSelecionada === 'profissionais' && <Profissionais t={t} />}
-        {abaSelecionada === 'caixa' && <Caixa t={t} />}
-        {abaSelecionada === 'comandas' && <Comandas t={t} />}
-        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} />}
-        {abaSelecionada === 'ordem' && <OrdemChegada t={t} />}
+        {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={idioma} />}
+        {abaSelecionada === 'agendamentos' && <Agendamentos t={t} idioma={idioma} />}
+        {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} />}
+        {abaSelecionada === 'profissionais' && <Profissionais t={t} idioma={idioma} />}
+        {abaSelecionada === 'caixa' && <Caixa t={t} idioma={idioma} />}
+        {abaSelecionada === 'comandas' && <Comandas t={t} idioma={idioma} />}
+        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} />}
+        {abaSelecionada === 'ordem' && <OrdemChegada t={t} idioma={idioma} />}
       </main>
     </div>
   );

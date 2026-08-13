@@ -2,8 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { SERVICOS } from '../config/servicos';
 import { PROFISSIONAIS } from '../config/profissionais';
+import { DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
-function Comandas({ t }) {
+function Comandas({ t: tProp, idioma: idiomaProp }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+  const diasNomes = DIAS_SEMANA_ADMIN[idioma] || DIAS_SEMANA_ADMIN['pt-BR'];
+
   const hoje = new Date();
   const hojeStr = hoje.toISOString().split('T')[0];
 
@@ -68,7 +73,7 @@ function Comandas({ t }) {
         clienteId: a.cliente_id,
         profissionalId: a.profissional_id,
         servicoId: a.servico_id,
-        cliente: a.clientes?.nome || 'Desconhecido',
+        cliente: a.clientes?.nome || t('agendamentos.desconhecido'),
         servico: a.servicos?.nome || 'N/A',
         profissional: a.profissionais?.nome || 'N/A',
         valor: a.preco_final || 0,
@@ -79,10 +84,11 @@ function Comandas({ t }) {
       setComandasAbertas(abertasResp.data.map(formatar));
       setRealizadosHoje(realizadasResp.data.map(formatar));
     } catch (error) {
-      alert('❌ Erro ao buscar comandas: ' + error.message);
+      alert(t('comandas.erroBuscar', { msg: error.message }));
     } finally {
       setCarregando(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hojeStr]);
 
   useEffect(() => {
@@ -116,20 +122,20 @@ function Comandas({ t }) {
 
   const handleFecharComanda = async (item) => {
     if (!caixaAberto) {
-      alert('⚠️ O caixa de hoje ainda não foi aberto. Vá na aba Caixa e abra o caixa antes de fechar comandas.');
+      alert(t('comandas.caixaNaoAberto'));
       return;
     }
 
     const servicoInfo = SERVICOS.find(s => s.uuid === item.servicoId);
     const sugestao = item.valor > 0 ? item.valor : (servicoInfo?.preco ?? 0);
     const valorStr = window.prompt(
-      `Fechar "${item.servico}" de ${item.cliente} (${item.profissional}).\nValor final (¥):`,
+      t('comandas.fecharPrompt', { servico: item.servico, cliente: item.cliente, profissional: item.profissional }),
       String(sugestao)
     );
     if (valorStr === null) return;
     const valor = parseFloat(valorStr);
     if (isNaN(valor) || valor < 0) {
-      alert('⚠️ Valor inválido.');
+      alert(t('comandas.valorInvalido'));
       return;
     }
 
@@ -147,10 +153,10 @@ function Comandas({ t }) {
         agendamentoId: item.id,
       });
 
-      alert('✅ Comanda fechada e lançada no caixa!');
+      alert(t('comandas.fechadaComSucesso'));
       buscarTudo();
     } catch (error) {
-      alert('❌ Erro ao fechar comanda: ' + error.message);
+      alert(t('comandas.erroFechar', { msg: error.message }));
     }
   };
 
@@ -158,11 +164,11 @@ function Comandas({ t }) {
     e.preventDefault();
 
     if (!caixaAberto) {
-      alert('⚠️ O caixa de hoje ainda não foi aberto. Vá na aba Caixa e abra o caixa antes de lançar atendimentos avulsos.');
+      alert(t('comandas.caixaNaoAbertoAvulso'));
       return;
     }
     if (!novoItem.cliente || !novoItem.servico || !novoItem.valor || !novoItem.profissional) {
-      alert('⚠️ Preencha todos os campos!');
+      alert(t('comandas.preencherTodosCampos'));
       return;
     }
 
@@ -170,7 +176,7 @@ function Comandas({ t }) {
       const servicoInfo = SERVICOS.find(s => s.nome === novoItem.servico);
       const profInfo = PROFISSIONAIS.find(p => p.nome === novoItem.profissional);
       if (!servicoInfo || !profInfo) {
-        alert('⚠️ Serviço ou profissional inválido.');
+        alert(t('comandas.servicoOuProfInvalido'));
         return;
       }
 
@@ -214,60 +220,60 @@ function Comandas({ t }) {
       });
 
       setNovoItem({ cliente: '', servico: '', valor: '', profissional: '' });
-      alert('✅ Atendimento lançado na comanda e no caixa!');
+      alert(t('comandas.lancadaComSucesso'));
       buscarTudo();
     } catch (error) {
-      alert('❌ Erro ao adicionar: ' + error.message);
+      alert(t('comandas.erroAdicionar', { msg: error.message }));
     }
   };
 
   const totalRealizadoHoje = realizadosHoje.reduce((sum, item) => sum + item.valor, 0);
 
-  const nomeDia = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][hoje.getDay()];
+  const nomeDia = diasNomes[hoje.getDay()];
   const dia = String(hoje.getDate()).padStart(2, '0');
   const mes = String(hoje.getMonth() + 1).padStart(2, '0');
   const ano = hoje.getFullYear();
 
   return (
     <div className="page-container">
-      <h2>📋 Comandas do Dia - {nomeDia}, {dia}/{mes}/{ano}</h2>
+      <h2>{t('comandas.titulo', { dia: nomeDia, data: `${dia}/${mes}/${ano}` })}</h2>
 
       <section className="caixa-status">
         <div className="status-card">
-          <h3>Status do Caixa</h3>
+          <h3>{t('comandas.statusCaixa')}</h3>
           <p className={`status ${caixaAberto ? 'aberto' : 'fechado'}`}>
-            {caixaAberto ? '✅ ABERTO' : '❌ FECHADO'}
+            {caixaAberto ? t('caixa.aberto') : t('caixa.fechado')}
           </p>
           {!caixaAberto && (
             <p style={{ fontSize: '13px', color: '#f87171' }}>
-              Abra o caixa na aba Caixa para poder fechar comandas ou lançar atendimentos avulsos.
+              {t('comandas.abraCaixaAviso')}
             </p>
           )}
         </div>
 
         <div className="status-card">
-          <h3>Total Realizado Hoje</h3>
-          <p>Atendimentos: <strong>{realizadosHoje.length}</strong></p>
-          <p className="saldo-final">Total: <strong>¥{totalRealizadoHoje.toLocaleString('ja-JP')}</strong></p>
+          <h3>{t('comandas.totalRealizadoHoje')}</h3>
+          <p>{t('comandas.atendimentos')} <strong>{realizadosHoje.length}</strong></p>
+          <p className="saldo-final">{t('comum.total')}: <strong>¥{totalRealizadoHoje.toLocaleString('ja-JP')}</strong></p>
         </div>
       </section>
 
       <section className="list-section">
-        <h3>🕓 Comandas Abertas (agendamentos de hoje)</h3>
+        <h3>{t('comandas.comandasAbertas')}</h3>
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : comandasAbertas.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhuma comanda aberta para hoje</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('comandas.nenhumaComandaAberta')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Hora</th>
-                  <th>Cliente</th>
-                  <th>Serviço</th>
-                  <th>Profissional</th>
-                  <th>Ação</th>
+                  <th>{t('comum.hora')}</th>
+                  <th>{t('comum.cliente')}</th>
+                  <th>{t('comum.servico')}</th>
+                  <th>{t('comum.profissional')}</th>
+                  <th>{t('comum.acao')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -279,7 +285,7 @@ function Comandas({ t }) {
                     <td>{item.profissional}</td>
                     <td>
                       <button className="btn-primary" onClick={() => handleFecharComanda(item)}>
-                        ✅ Fechar
+                        {t('comandas.fechar')}
                       </button>
                     </td>
                   </tr>
@@ -292,12 +298,12 @@ function Comandas({ t }) {
 
       {caixaAberto && (
         <section className="form-section">
-          <h3>Lançar Atendimento Avulso</h3>
+          <h3>{t('comandas.lancarAvulso')}</h3>
           <form onSubmit={handleAdicionarItem}>
             <input
               type="text"
               name="cliente"
-              placeholder="Nome do Cliente"
+              placeholder={t('agendamentos.nomeCliente')}
               value={novoItem.cliente}
               onChange={handleInputChange}
               required
@@ -308,7 +314,7 @@ function Comandas({ t }) {
               onChange={handleInputChange}
               required
             >
-              <option value="">Selecione um serviço</option>
+              <option value="">{t('comum.selecioneServico')}</option>
               {SERVICOS.map((s) => (
                 <option key={s.id} value={s.nome}>{s.nome} - ¥{s.preco.toLocaleString('ja-JP')}</option>
               ))}
@@ -319,7 +325,7 @@ function Comandas({ t }) {
               onChange={handleInputChange}
               required
             >
-              <option value="">Selecione profissional</option>
+              <option value="">{t('comandas.selecioneProfissional')}</option>
               {profissionaisDoServico.map((p) => (
                 <option key={p.uuid} value={p.nome}>{p.nome}</option>
               ))}
@@ -327,33 +333,33 @@ function Comandas({ t }) {
             <input
               type="number"
               name="valor"
-              placeholder="Valor (¥)"
+              placeholder={t('caixa.valorPlaceholder')}
               value={novoItem.valor}
               onChange={handleInputChange}
               required
             />
-            <button type="submit" className="btn-primary">Adicionar Serviço</button>
+            <button type="submit" className="btn-primary">{t('comandas.adicionarServico')}</button>
           </form>
         </section>
       )}
 
       <section className="list-section">
-        <h3>📊 Serviços Realizados Hoje</h3>
+        <h3>{t('comandas.servicosRealizadosHoje')}</h3>
 
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : realizadosHoje.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum serviço realizado ainda hoje</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('comandas.nenhumRealizadoAinda')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Hora</th>
-                  <th>Cliente</th>
-                  <th>Serviço</th>
-                  <th>Profissional</th>
-                  <th>Valor</th>
+                  <th>{t('comum.hora')}</th>
+                  <th>{t('comum.cliente')}</th>
+                  <th>{t('comum.servico')}</th>
+                  <th>{t('comum.profissional')}</th>
+                  <th>{t('comum.valor')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -369,7 +375,7 @@ function Comandas({ t }) {
               </tbody>
             </table>
             <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
-              Já lançados no caixa do dia — para corrigir um valor, ajuste diretamente na aba Caixa.
+              {t('comandas.jaLancadosNoCaixa')}
             </p>
           </div>
         )}

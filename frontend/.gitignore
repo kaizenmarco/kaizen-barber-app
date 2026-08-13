@@ -1,6 +1,7 @@
 node_modules
 /build
 build_old_debris
+build_old_*
 build_test_tmp
 build_output.log
 .DS_Store

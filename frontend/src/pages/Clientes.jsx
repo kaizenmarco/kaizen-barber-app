@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
-function Clientes({ t }) {
+function Clientes({ t: tProp, idioma: idiomaProp }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+
   const [clientes, setClientes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [novoCliente, setNovoCliente] = useState({
@@ -14,6 +18,7 @@ function Clientes({ t }) {
   // Buscar clientes do Supabase
   useEffect(() => {
     buscarClientes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const buscarClientes = async () => {
@@ -46,7 +51,7 @@ function Clientes({ t }) {
 
       setClientes(clientesFormatados);
     } catch (error) {
-      alert('❌ Erro ao buscar clientes: ' + error.message);
+      alert(t('clientes.erroBuscar', { msg: error.message }));
     } finally {
       setCarregando(false);
     }
@@ -59,9 +64,9 @@ function Clientes({ t }) {
 
   const handleAdicionarCliente = async (e) => {
     e.preventDefault();
-    
+
     if (!novoCliente.nome || !novoCliente.email) {
-      alert('⚠️ Nome e email são obrigatórios!');
+      alert(t('clientes.nomeEmailObrigatorios'));
       return;
     }
 
@@ -79,16 +84,16 @@ function Clientes({ t }) {
 
       if (error) throw error;
 
-      alert('✅ Cliente adicionado com sucesso!');
+      alert(t('clientes.adicionadoComSucesso'));
       setNovoCliente({ nome: '', telefone: '', email: '', data_primeira_visita: '' });
       buscarClientes();
     } catch (error) {
-      alert('❌ Erro ao adicionar cliente: ' + error.message);
+      alert(t('clientes.erroAdicionar', { msg: error.message }));
     }
   };
 
   const handleDeletarCliente = async (clienteId) => {
-    if (!window.confirm('Tem certeza que deseja deletar este cliente? Seus agendamentos também serão deletados!')) return;
+    if (!window.confirm(t('clientes.confirmarDeletar'))) return;
 
     try {
       // Primeiro deleta os agendamentos
@@ -107,24 +112,24 @@ function Clientes({ t }) {
 
       if (erroCliente) throw erroCliente;
 
-      alert('✅ Cliente deletado!');
+      alert(t('clientes.deletado'));
       buscarClientes();
     } catch (error) {
-      alert('❌ Erro ao deletar cliente: ' + error.message);
+      alert(t('clientes.erroDeletar', { msg: error.message }));
     }
   };
 
   return (
     <div className="page-container">
-      <h2>👥 Clientes</h2>
+      <h2>{t('clientes.titulo')}</h2>
 
       <section className="form-section">
-        <h3>Novo Cliente</h3>
+        <h3>{t('clientes.novoCliente')}</h3>
         <form onSubmit={handleAdicionarCliente}>
           <input
             type="text"
             name="nome"
-            placeholder="Nome do Cliente"
+            placeholder={t('clientes.nomeCliente')}
             value={novoCliente.nome}
             onChange={handleInputChange}
             required
@@ -132,7 +137,7 @@ function Clientes({ t }) {
           <input
             type="email"
             name="email"
-            placeholder="Email"
+            placeholder={t('comum.email')}
             value={novoCliente.email}
             onChange={handleInputChange}
             required
@@ -140,7 +145,7 @@ function Clientes({ t }) {
           <input
             type="tel"
             name="telefone"
-            placeholder="Telefone"
+            placeholder={t('comum.telefone')}
             value={novoCliente.telefone}
             onChange={handleInputChange}
           />
@@ -150,33 +155,33 @@ function Clientes({ t }) {
             value={novoCliente.data_primeira_visita}
             onChange={handleInputChange}
           />
-          <button type="submit" className="btn-primary">Adicionar Cliente</button>
+          <button type="submit" className="btn-primary">{t('clientes.adicionarCliente')}</button>
         </form>
       </section>
 
       <section className="list-section">
-        <h3>Lista de Clientes</h3>
-        
+        <h3>{t('clientes.listaClientes')}</h3>
+
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando clientes...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : clientes.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum cliente cadastrado ainda</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('clientes.nenhumCadastrado')}</p>
         ) : (
           <>
             <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '15px' }}>
-              Total: {clientes.length} clientes
+              {t('clientes.totalClientes', { n: clientes.length })}
             </p>
             <div style={{ overflowX: 'auto' }}>
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Nome</th>
-                    <th>Email</th>
-                    <th>Telefone</th>
-                    <th>Primeira Visita</th>
-                    <th>Total Agendamentos</th>
-                    <th>Confirmados</th>
-                    <th>Ação</th>
+                    <th>{t('clientes.nome')}</th>
+                    <th>{t('comum.email')}</th>
+                    <th>{t('comum.telefone')}</th>
+                    <th>{t('clientes.primeiraVisita')}</th>
+                    <th>{t('clientes.totalAgendamentos')}</th>
+                    <th>{t('clientes.confirmados')}</th>
+                    <th>{t('comum.acao')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -193,11 +198,11 @@ function Clientes({ t }) {
                         {cliente.agendamentos_confirmados}
                       </td>
                       <td>
-                        <button 
+                        <button
                           className="btn-delete"
                           onClick={() => handleDeletarCliente(cliente.id)}
                         >
-                          🗑️ Deletar
+                          🗑️ {t('comum.deletar')}
                         </button>
                       </td>
                     </tr>

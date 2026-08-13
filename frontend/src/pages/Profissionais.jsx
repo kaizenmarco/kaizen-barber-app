@@ -7,20 +7,19 @@ import {
   salvarHorarioEstendido,
 } from '../config/horarios';
 import { PROFISSIONAIS, COMISSAO_PADRAO, buscarComissoes, salvarComissao } from '../config/profissionais';
+import { DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
-const NOMES_DIAS = {
-  domingo: 'Domingo',
-  segunda: 'Segunda-feira',
-  terca: 'Terça-feira',
-  quarta: 'Quarta-feira',
-  quinta: 'Quinta-feira',
-  sexta: 'Sexta-feira',
-  sabado: 'Sábado',
+const INDICE_DIA = {
+  domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6,
 };
 
 const ORDEM_DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
 
-function Profissionais({ t }) {
+function Profissionais({ t: tProp, idioma: idiomaProp }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+  const diasNomes = DIAS_SEMANA_ADMIN[idioma] || DIAS_SEMANA_ADMIN['pt-BR'];
+
   const [profissionaisExtras, setProfissionaisExtras] = useState([]);
 
   const [novoProfissional, setNovoProfissional] = useState({
@@ -32,7 +31,7 @@ function Profissionais({ t }) {
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [carregandoHorario, setCarregandoHorario] = useState(true);
   const [salvandoHorario, setSalvandoHorario] = useState(false);
-  const [mensagemHorario, setMensagemHorario] = useState('');
+  const [mensagemHorarioChave, setMensagemHorarioChave] = useState('');
 
   const [comissoes, setComissoes] = useState({});
   const [comissoesEditadas, setComissoesEditadas] = useState({});
@@ -60,17 +59,17 @@ function Profissionais({ t }) {
   const handleSalvarComissao = async (uuid) => {
     const valor = parseFloat(comissoesEditadas[uuid]);
     if (isNaN(valor) || valor < 0 || valor > 100) {
-      setMensagemComissao({ ...mensagemComissao, [uuid]: 'Digite um número entre 0 e 100.' });
+      setMensagemComissao({ ...mensagemComissao, [uuid]: t('profissionais.digiteNumeroValido') });
       return;
     }
     setSalvandoComissao(uuid);
     try {
       await salvarComissao(uuid, valor);
       setComissoes({ ...comissoes, [uuid]: valor });
-      setMensagemComissao({ ...mensagemComissao, [uuid]: 'Salvo!' });
+      setMensagemComissao({ ...mensagemComissao, [uuid]: t('profissionais.comissaoSalva') });
     } catch (erro) {
       console.error('Erro ao salvar comissão:', erro);
-      setMensagemComissao({ ...mensagemComissao, [uuid]: 'Não consegui salvar. Confira se a coluna comissao_percentual existe na tabela profissionais.' });
+      setMensagemComissao({ ...mensagemComissao, [uuid]: t('profissionais.erroSalvarComissao') });
     } finally {
       setSalvandoComissao(null);
     }
@@ -94,23 +93,23 @@ function Profissionais({ t }) {
   };
 
   const handleHorarioEstendidoChange = (campo, valor) => {
-    setMensagemHorario('');
+    setMensagemHorarioChave('');
     setHorarioEstendido({ ...horarioEstendido, [campo]: valor });
   };
 
   const handleSalvarHorarioEstendido = async () => {
     if (horarioEstendido.ativo && (!horarioEstendido.dataInicio || !horarioEstendido.dataFim)) {
-      setMensagemHorario('Preencha a data de início e fim antes de ativar.');
+      setMensagemHorarioChave('profissionais.preencherDatas');
       return;
     }
     setSalvandoHorario(true);
-    setMensagemHorario('');
+    setMensagemHorarioChave('');
     try {
       await salvarHorarioEstendido(horarioEstendido);
-      setMensagemHorario('Salvo! A agenda pública já está usando esse horário.');
+      setMensagemHorarioChave('profissionais.salvo');
     } catch (erro) {
       console.error('Erro ao salvar horário estendido:', erro);
-      setMensagemHorario('Não consegui salvar. Confira se a tabela configuracoes_horario existe no Supabase.');
+      setMensagemHorarioChave('profissionais.erroSalvarHorario');
     } finally {
       setSalvandoHorario(false);
     }
@@ -121,10 +120,9 @@ function Profissionais({ t }) {
       <h2>{t('nav.profissionais')}</h2>
 
       <section className="form-section">
-        <h3>🕒 Horário do Salão</h3>
+        <h3>{t('profissionais.horarioSalao')}</h3>
         <p style={{ fontSize: '13px', color: '#999', marginBottom: '10px' }}>
-          Todos os profissionais seguem este horário por padrão. Ele é a fonte única usada tanto aqui
-          quanto na agenda pública dos clientes.
+          {t('profissionais.horarioSalaoDesc')}
         </p>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px' }}>
           <tbody>
@@ -132,9 +130,9 @@ function Profissionais({ t }) {
               const h = HORARIO_SALAO[dia];
               return (
                 <tr key={dia} style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '6px 8px' }}>{NOMES_DIAS[dia]}</td>
+                  <td style={{ padding: '6px 8px' }}>{diasNomes[INDICE_DIA[dia]]}</td>
                   <td style={{ padding: '6px 8px' }}>
-                    {h.aberto ? `${h.abertura} - ${h.fechamento}` : 'Fechado'}
+                    {h.aberto ? `${h.abertura} - ${h.fechamento}` : t('comum.fechado')}
                   </td>
                 </tr>
               );
@@ -142,21 +140,18 @@ function Profissionais({ t }) {
           </tbody>
         </table>
         <p style={{ fontSize: '13px' }}>
-          <strong>Almoço:</strong> {HORARIO_ALMOCO.inicio} - {HORARIO_ALMOCO.fim} (todos os dias de funcionamento)
+          <strong>{t('profissionais.almoco')}</strong> {HORARIO_ALMOCO.inicio} - {HORARIO_ALMOCO.fim} {t('profissionais.almocoTodosDias')}
         </p>
       </section>
 
       <section className="form-section">
-        <h3>📅 Horário Estendido (feriados)</h3>
+        <h3>{t('profissionais.horarioEstendido')}</h3>
         <p style={{ fontSize: '13px', color: '#999', marginBottom: '12px' }}>
-          Use em feriados prolongados (ex: Golden Week, Obon, Ano Novo), quando os profissionais — como o
-          Gabriel, que já costuma abrir mais cedo durante a semana — atendem a partir de um horário diferente
-          do padrão. Enquanto ativo, o horário de abertura abaixo vale para TODOS os profissionais, nas datas
-          escolhidas. O fechamento e o almoço não mudam.
+          {t('profissionais.horarioEstendidoDesc')}
         </p>
 
         {carregandoHorario ? (
-          <p style={{ fontSize: '13px', color: '#999' }}>Carregando...</p>
+          <p style={{ fontSize: '13px', color: '#999' }}>{t('login.carregando')}</p>
         ) : (
           <>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', cursor: 'pointer' }}>
@@ -165,12 +160,12 @@ function Profissionais({ t }) {
                 checked={horarioEstendido.ativo}
                 onChange={(e) => handleHorarioEstendidoChange('ativo', e.target.checked)}
               />
-              <strong>{horarioEstendido.ativo ? 'Ativado' : 'Desativado'}</strong>
+              <strong>{horarioEstendido.ativo ? t('profissionais.ativado') : t('profissionais.desativado')}</strong>
             </label>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Abertura</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>{t('profissionais.abertura')}</label>
                 <input
                   type="time"
                   value={horarioEstendido.abertura || '08:00'}
@@ -178,7 +173,7 @@ function Profissionais({ t }) {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Data início</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>{t('profissionais.dataInicio')}</label>
                 <input
                   type="date"
                   value={horarioEstendido.dataInicio || ''}
@@ -186,7 +181,7 @@ function Profissionais({ t }) {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>Data fim</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>{t('profissionais.dataFim')}</label>
                 <input
                   type="date"
                   value={horarioEstendido.dataFim || ''}
@@ -201,12 +196,12 @@ function Profissionais({ t }) {
               onClick={handleSalvarHorarioEstendido}
               disabled={salvandoHorario}
             >
-              {salvandoHorario ? 'Salvando...' : 'Salvar'}
+              {salvandoHorario ? t('comum.salvando') : t('comum.salvar')}
             </button>
 
-            {mensagemHorario && (
-              <p style={{ fontSize: '13px', marginTop: '10px', color: mensagemHorario.startsWith('Salvo') ? '#4ade80' : '#f87171' }}>
-                {mensagemHorario}
+            {mensagemHorarioChave && (
+              <p style={{ fontSize: '13px', marginTop: '10px', color: mensagemHorarioChave === 'profissionais.salvo' ? '#4ade80' : '#f87171' }}>
+                {t(mensagemHorarioChave)}
               </p>
             )}
           </>
@@ -214,16 +209,15 @@ function Profissionais({ t }) {
       </section>
 
       <section className="form-section">
-        <h3>Novo Profissional</h3>
+        <h3>{t('profissionais.novoProfissional')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Isso só adiciona um card visual aqui. Para o profissional aparecer de verdade na agenda pública e
-          no Admin (com horários, comissão etc.), é preciso cadastrá-lo no Supabase e em config/profissionais.js.
+          {t('profissionais.novoProfissionalDesc')}
         </p>
         <form onSubmit={handleAdicionarProfissional}>
           <input
             type="text"
             name="nome"
-            placeholder="Nome do Profissional"
+            placeholder={t('profissionais.nomeProfissional')}
             value={novoProfissional.nome}
             onChange={handleInputChange}
             required
@@ -231,7 +225,7 @@ function Profissionais({ t }) {
           <input
             type="text"
             name="especialidades"
-            placeholder="Especialidades (ex: Cortes, Barba)"
+            placeholder={t('profissionais.especialidadesPlaceholder')}
             value={novoProfissional.especialidades}
             onChange={handleInputChange}
             required
@@ -242,11 +236,11 @@ function Profissionais({ t }) {
             onChange={handleInputChange}
             required
           >
-            <option value="40%">40% Comissão</option>
-            <option value="30%">30% Comissão</option>
-            <option value="50%">50% Comissão</option>
+            <option value="40%">40% {t('profissionais.comissao').replace(':', '')}</option>
+            <option value="30%">30% {t('profissionais.comissao').replace(':', '')}</option>
+            <option value="50%">50% {t('profissionais.comissao').replace(':', '')}</option>
           </select>
-          <button type="submit" className="btn-primary">Adicionar Profissional</button>
+          <button type="submit" className="btn-primary">{t('profissionais.adicionarProfissional')}</button>
         </form>
       </section>
 
@@ -258,9 +252,9 @@ function Profissionais({ t }) {
               <h3>{profissional.nome}</h3>
               <p className="especialidades">{profissional.especialidades}</p>
               <div className="detalhes">
-                <p><strong>Horário:</strong> segue o horário do salão (acima)</p>
+                <p><strong>{t('profissionais.horarioLabel')}</strong> {t('profissionais.segueHorarioSalao')}</p>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                  <strong>Comissão:</strong>
+                  <strong>{t('profissionais.comissao')}</strong>
                   <input
                     type="number"
                     min="0"
@@ -279,10 +273,10 @@ function Profissionais({ t }) {
                   onClick={() => handleSalvarComissao(profissional.uuid)}
                   disabled={salvandoComissao === profissional.uuid || Number(comissoesEditadas[profissional.uuid]) === Number(comissoes[profissional.uuid] ?? COMISSAO_PADRAO)}
                 >
-                  {salvandoComissao === profissional.uuid ? 'Salvando...' : 'Salvar Comissão'}
+                  {salvandoComissao === profissional.uuid ? t('comum.salvando') : t('profissionais.salvarComissao')}
                 </button>
                 {mensagemComissao[profissional.uuid] && (
-                  <p style={{ fontSize: '12px', marginTop: '6px', color: mensagemComissao[profissional.uuid] === 'Salvo!' ? '#4ade80' : '#f87171' }}>
+                  <p style={{ fontSize: '12px', marginTop: '6px', color: mensagemComissao[profissional.uuid] === t('profissionais.comissaoSalva') ? '#4ade80' : '#f87171' }}>
                     {mensagemComissao[profissional.uuid]}
                   </p>
                 )}
@@ -298,7 +292,7 @@ function Profissionais({ t }) {
               <h3>{profissional.nome}</h3>
               <p className="especialidades">{profissional.especialidades}</p>
               <div className="detalhes">
-                <p><strong>Comissão:</strong> {profissional.comissao} (não salvo — cadastro só visual)</p>
+                <p><strong>{t('profissionais.comissao')}</strong> {profissional.comissao} {t('profissionais.comissaoNaoSalvo')}</p>
               </div>
             </div>
           </div>

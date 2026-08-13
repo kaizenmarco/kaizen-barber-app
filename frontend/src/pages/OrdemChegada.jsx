@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
+import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
-function OrdemChegada({ t }) {
+function OrdemChegada({ t: tProp, idioma: idiomaProp }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+
   const hoje = new Date().toISOString().split('T')[0];
 
   const [bloqueios, setBloqueios] = useState([
@@ -52,7 +56,7 @@ function OrdemChegada({ t }) {
   };
 
   const handleMudarStatus = (id, novoStatus) => {
-    setFila(fila.map(cliente => 
+    setFila(fila.map(cliente =>
       cliente.id === id ? { ...cliente, status: novoStatus } : cliente
     ));
   };
@@ -69,19 +73,19 @@ function OrdemChegada({ t }) {
 
   return (
     <div className="page-container">
-      <h2>Ordem de Chegada</h2>
+      <h2>{t('ordem.titulo')}</h2>
 
       {bloquioHoje && (
         <section className="info-banner" style={{backgroundColor: 'rgba(244, 67, 54, 0.1)', borderLeft: '4px solid #f44336'}}>
-          <h3>🚫 Bloqueio Ativo Hoje</h3>
-          <p><strong>Motivo:</strong> {bloquioHoje.motivo}</p>
-          <p><strong>Tipo:</strong> {bloquioHoje.tipo === 'dia_inteiro' ? 'Dia Inteiro' : 'Período'}</p>
-          <p style={{color: '#f44336', fontWeight: 'bold'}}>⚠️ Agendamentos bloqueados! Apenas ordem de chegada.</p>
+          <h3>{t('ordem.bloqueioAtivoHoje')}</h3>
+          <p><strong>{t('ordem.motivo')}</strong> {bloquioHoje.motivo}</p>
+          <p><strong>{t('ordem.tipo')}</strong> {bloquioHoje.tipo === 'dia_inteiro' ? t('ordem.diaInteiro') : t('ordem.periodo')}</p>
+          <p style={{color: '#f44336', fontWeight: 'bold'}}>{t('ordem.agendamentosBloqueados')}</p>
         </section>
       )}
 
       <section className="form-section">
-        <h3>Bloquear Dia/Período</h3>
+        <h3>{t('ordem.bloquearDiaPeriodo')}</h3>
         <form onSubmit={handleAdicionarBloquio}>
           <input
             type="date"
@@ -93,55 +97,55 @@ function OrdemChegada({ t }) {
             value={novoBloquio.tipo}
             onChange={(e) => setNovoBloquio({...novoBloquio, tipo: e.target.value})}
           >
-            <option value="dia_inteiro">Dia Inteiro</option>
-            <option value="manha">Período (Manhã)</option>
-            <option value="tarde">Período (Tarde)</option>
-            <option value="noite">Período (Noite)</option>
+            <option value="dia_inteiro">{t('ordem.diaInteiro')}</option>
+            <option value="manha">{t('ordem.periodoManha')}</option>
+            <option value="tarde">{t('ordem.periodoTarde')}</option>
+            <option value="noite">{t('ordem.periodoNoite')}</option>
           </select>
           <input
             type="text"
-            placeholder="Motivo (ex: Feriado, Festival, Movimento Alto)"
+            placeholder={t('ordem.motivoPlaceholder')}
             value={novoBloquio.motivo}
             onChange={(e) => setNovoBloquio({...novoBloquio, motivo: e.target.value})}
             required
           />
           <button type="submit" className="btn-primary" style={{gridColumn: '1 / -1'}}>
-            Bloquear
+            {t('ordem.bloquear')}
           </button>
         </form>
       </section>
 
       <section className="list-section">
-        <h3>Dias Bloqueados</h3>
+        <h3>{t('ordem.diasBloqueados')}</h3>
         <table className="table">
           <thead>
             <tr>
-              <th>Data</th>
-              <th>Tipo</th>
-              <th>Motivo</th>
-              <th>Status</th>
-              <th>Ação</th>
+              <th>{t('comum.data')}</th>
+              <th>{t('caixa.tipo')}</th>
+              <th>{t('ordem.motivo').replace(':', '')}</th>
+              <th>{t('comum.status')}</th>
+              <th>{t('comum.acao')}</th>
             </tr>
           </thead>
           <tbody>
             {bloqueios.map((bloqueio) => (
               <tr key={bloqueio.id}>
                 <td>{bloqueio.data}</td>
-                <td>{bloqueio.tipo === 'dia_inteiro' ? '📅 Dia Inteiro' : '🕐 Período'}</td>
+                <td>{bloqueio.tipo === 'dia_inteiro' ? t('ordem.diaInteiroTag') : t('ordem.periodoTag')}</td>
                 <td>{bloqueio.motivo}</td>
                 <td>
                   {bloqueio.ativo ? (
-                    <span style={{color: '#f44336', fontWeight: 'bold'}}>🔒 Ativo</span>
+                    <span style={{color: '#f44336', fontWeight: 'bold'}}>{t('ordem.ativo')}</span>
                   ) : (
-                    <span style={{color: '#999'}}>Inativo</span>
+                    <span style={{color: '#999'}}>{t('ordem.inativo')}</span>
                   )}
                 </td>
                 <td>
-                  <button 
+                  <button
                     className="btn-delete"
                     onClick={() => handleDeletarBloquio(bloqueio.id)}
                   >
-                    Deletar
+                    {t('comum.deletar')}
                   </button>
                 </td>
               </tr>
@@ -153,11 +157,11 @@ function OrdemChegada({ t }) {
       {bloquioHoje && (
         <>
           <section className="form-section">
-            <h3>Registrar Chegada</h3>
+            <h3>{t('ordem.registrarChegada')}</h3>
             <form onSubmit={handleAdicionarChegada}>
               <input
                 type="text"
-                placeholder="Nome do Cliente"
+                placeholder={t('ordem.nomeCliente')}
                 value={novaChegada.nome}
                 onChange={(e) => setNovaChegada({...novaChegada, nome: e.target.value})}
                 required
@@ -167,29 +171,29 @@ function OrdemChegada({ t }) {
                 onChange={(e) => setNovaChegada({...novaChegada, servico: e.target.value})}
                 required
               >
-                <option value="">Selecione serviço</option>
+                <option value="">{t('ordem.selecioneServico')}</option>
                 <option value="Corte">Corte</option>
                 <option value="Corte & Barba">Corte & Barba</option>
                 <option value="Coloração">Coloração</option>
                 <option value="Alisamento">Alisamento</option>
               </select>
               <button type="submit" className="btn-primary" style={{gridColumn: '1 / -1'}}>
-                Registrar Chegada
+                {t('ordem.registrarChegada')}
               </button>
             </form>
           </section>
 
           <section className="list-section">
-            <h3>Fila de Espera (Ordem de Chegada)</h3>
+            <h3>{t('ordem.filaEspera')}</h3>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Ordem</th>
-                  <th>Cliente</th>
-                  <th>Horário de Chegada</th>
-                  <th>Serviço</th>
-                  <th>Status</th>
-                  <th>Ações</th>
+                  <th>{t('ordem.ordem')}</th>
+                  <th>{t('comum.cliente')}</th>
+                  <th>{t('ordem.horarioChegada')}</th>
+                  <th>{t('comum.servico')}</th>
+                  <th>{t('comum.status')}</th>
+                  <th>{t('comum.acoes')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,37 +205,37 @@ function OrdemChegada({ t }) {
                     <td>{cliente.servico}</td>
                     <td>
                       {cliente.status === 'atendendo' ? (
-                        <span style={{color: '#4caf50', fontWeight: 'bold'}}>✅ Atendendo</span>
+                        <span style={{color: '#4caf50', fontWeight: 'bold'}}>{t('ordem.atendendo')}</span>
                       ) : cliente.status === 'atendido' ? (
-                        <span style={{color: '#999'}}>✔️ Atendido</span>
+                        <span style={{color: '#999'}}>{t('ordem.atendido')}</span>
                       ) : (
-                        <span style={{color: '#ff9800', fontWeight: 'bold'}}>⏳ Aguardando</span>
+                        <span style={{color: '#ff9800', fontWeight: 'bold'}}>{t('ordem.aguardando')}</span>
                       )}
                     </td>
                     <td style={{display: 'flex', gap: '5px'}}>
                       {cliente.status !== 'atendendo' && (
-                        <button 
+                        <button
                           className="btn-primary"
                           onClick={() => handleMudarStatus(cliente.id, 'atendendo')}
                           style={{padding: '5px 10px', fontSize: '12px'}}
                         >
-                          Atender
+                          {t('ordem.atender')}
                         </button>
                       )}
                       {cliente.status === 'atendendo' && (
-                        <button 
+                        <button
                           className="btn-primary"
                           onClick={() => handleMudarStatus(cliente.id, 'atendido')}
                           style={{padding: '5px 10px', fontSize: '12px', backgroundColor: '#4caf50'}}
                         >
-                          Finalizar
+                          {t('ordem.finalizar')}
                         </button>
                       )}
-                      <button 
+                      <button
                         className="btn-delete"
                         onClick={() => handleDeletarChegada(cliente.id)}
                       >
-                        Remover
+                        {t('comum.remover')}
                       </button>
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { PROFISSIONAIS, buscarComissoes, COMISSAO_PADRAO } from '../config/profissionais';
+import { DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
 const paraReais = (v) => `¥${(v || 0).toLocaleString('ja-JP')}`;
 
@@ -19,7 +20,11 @@ const fimDaSemana = (data) => {
   return inicio.toISOString().split('T')[0];
 };
 
-function Caixa({ t }) {
+function Caixa({ t: tProp, idioma: idiomaProp }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+  const diasNomes = DIAS_SEMANA_ADMIN[idioma] || DIAS_SEMANA_ADMIN['pt-BR'];
+
   const hoje = new Date();
   const hojeStr = hoje.toISOString().split('T')[0];
   const mesAtualStr = hojeStr.substring(0, 7); // AAAA-MM
@@ -66,10 +71,11 @@ function Caixa({ t }) {
       setComissoes(comissoesResp);
       setSaldoInicialInput(String(caixaResp.data?.saldo_inicial ?? '0'));
     } catch (error) {
-      alert('❌ Erro ao carregar o caixa: ' + error.message);
+      alert(t('caixa.erroCarregar', { msg: error.message }));
     } finally {
       setCarregando(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hojeStr]);
 
   useEffect(() => {
@@ -94,11 +100,12 @@ function Caixa({ t }) {
         if (error) throw error;
         setMovimentacoesDoMes(data);
       } catch (error) {
-        alert('❌ Erro ao carregar o mês: ' + error.message);
+        alert(t('caixa.erroCarregarMes', { msg: error.message }));
       } finally {
         setCarregandoMes(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesSelecionado]);
 
   const handleAbrirCaixa = async () => {
@@ -118,12 +125,12 @@ function Caixa({ t }) {
       }
       buscarDadosGerais();
     } catch (error) {
-      alert('❌ Erro ao abrir caixa: ' + error.message);
+      alert(t('caixa.erroAbrir', { msg: error.message }));
     }
   };
 
   const handleFecharCaixa = async () => {
-    if (!window.confirm('Fechar o caixa de hoje? Depois disso não será possível fechar novas comandas hoje sem reabrir.')) return;
+    if (!window.confirm(t('caixa.confirmarFechar'))) return;
     try {
       const { error } = await supabase
         .from('caixa_dias')
@@ -132,7 +139,7 @@ function Caixa({ t }) {
       if (error) throw error;
       buscarDadosGerais();
     } catch (error) {
-      alert('❌ Erro ao fechar caixa: ' + error.message);
+      alert(t('caixa.erroFechar', { msg: error.message }));
     }
   };
 
@@ -152,18 +159,18 @@ function Caixa({ t }) {
       setNovaMovimentacao({ tipo: 'entrada', descricao: '', valor: '' });
       buscarDadosGerais();
     } catch (error) {
-      alert('❌ Erro ao adicionar movimentação: ' + error.message);
+      alert(t('caixa.erroAdicionarMov', { msg: error.message }));
     }
   };
 
   const handleDeletarMovimentacao = async (mov) => {
-    if (!window.confirm('Remover esta movimentação manual do caixa?')) return;
+    if (!window.confirm(t('caixa.confirmarRemoverMov'))) return;
     try {
       const { error } = await supabase.from('caixa_movimentacoes').delete().eq('id', mov.id);
       if (error) throw error;
       buscarDadosGerais();
     } catch (error) {
-      alert('❌ Erro ao remover: ' + error.message);
+      alert(t('caixa.erroRemoverMov', { msg: error.message }));
     }
   };
 
@@ -209,96 +216,96 @@ function Caixa({ t }) {
   const comissaoSemanal = comissaoPorProfissional(movimentosSemana);
   const comissaoMensal = comissaoPorProfissional(movimentacoesDoMes);
 
-  const nomeDia = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][hoje.getDay()];
+  const nomeDia = diasNomes[hoje.getDay()];
   const dia = String(hoje.getDate()).padStart(2, '0');
   const mes = String(hoje.getMonth() + 1).padStart(2, '0');
   const ano = hoje.getFullYear();
 
   if (carregando) {
-    return <div className="page-container"><p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando caixa...</p></div>;
+    return <div className="page-container"><p style={{ textAlign: 'center', color: '#d4af37' }}>{t('caixa.carregando')}</p></div>;
   }
 
   return (
     <div className="page-container">
-      <h2>Caixa - {nomeDia}, {dia}/{mes}/{ano}</h2>
+      <h2>{t('caixa.titulo', { dia: nomeDia, data: `${dia}/${mes}/${ano}` })}</h2>
 
       <section className="caixa-status">
         <div className="status-card">
-          <h3>Status do Caixa</h3>
+          <h3>{t('caixa.statusCaixa')}</h3>
           <p className={`status ${caixaAberto ? 'aberto' : 'fechado'}`}>
-            {caixaAberto ? '✅ ABERTO' : '❌ FECHADO'}
+            {caixaAberto ? t('caixa.aberto') : t('caixa.fechado')}
           </p>
           {!caixaAberto ? (
             <>
               <input
                 type="number"
-                placeholder="Saldo Inicial (¥)"
+                placeholder={t('caixa.saldoInicialPlaceholder')}
                 value={saldoInicialInput}
                 onChange={(e) => setSaldoInicialInput(e.target.value)}
               />
               <button className="btn-primary" onClick={handleAbrirCaixa}>
-                {caixaHoje ? 'Reabrir Caixa' : 'Abrir Caixa'}
+                {caixaHoje ? t('caixa.reabrirCaixa') : t('caixa.abrirCaixa')}
               </button>
             </>
           ) : (
             <button className="btn-danger" onClick={handleFecharCaixa}>
-              Fechar Caixa
+              {t('caixa.fecharCaixa')}
             </button>
           )}
         </div>
 
         <div className="status-card">
-          <h3>Resumo do Dia</h3>
-          <p>Saldo Inicial: <strong>{paraReais(caixaHoje?.saldo_inicial || 0)}</strong></p>
-          <p>Entradas: <strong style={{ color: '#4caf50' }}>{paraReais(totalEntradasHoje)}</strong></p>
-          <p>Saídas: <strong style={{ color: '#f44336' }}>{paraReais(totalSaidasHoje)}</strong></p>
-          <p className="saldo-final">Saldo Final: <strong>{paraReais(saldoFinalHoje)}</strong></p>
+          <h3>{t('caixa.resumoDia')}</h3>
+          <p>{t('caixa.saldoInicial')} <strong>{paraReais(caixaHoje?.saldo_inicial || 0)}</strong></p>
+          <p>{t('caixa.entradas')} <strong style={{ color: '#4caf50' }}>{paraReais(totalEntradasHoje)}</strong></p>
+          <p>{t('caixa.saidas')} <strong style={{ color: '#f44336' }}>{paraReais(totalSaidasHoje)}</strong></p>
+          <p className="saldo-final">{t('caixa.saldoFinal')} <strong>{paraReais(saldoFinalHoje)}</strong></p>
         </div>
       </section>
 
       {caixaAberto && (
         <section className="form-section">
-          <h3>Nova Movimentação Manual</h3>
+          <h3>{t('caixa.novaMovimentacao')}</h3>
           <form onSubmit={handleAdicionarMovimentacao}>
             <select
               value={novaMovimentacao.tipo}
               onChange={(e) => setNovaMovimentacao({ ...novaMovimentacao, tipo: e.target.value })}
             >
-              <option value="entrada">Entrada</option>
-              <option value="saida">Saída</option>
+              <option value="entrada">{t('caixa.entrada')}</option>
+              <option value="saida">{t('caixa.saida')}</option>
             </select>
             <input
               type="text"
-              placeholder="Descrição"
+              placeholder={t('caixa.descricaoPlaceholder')}
               value={novaMovimentacao.descricao}
               onChange={(e) => setNovaMovimentacao({ ...novaMovimentacao, descricao: e.target.value })}
               required
             />
             <input
               type="number"
-              placeholder="Valor (¥)"
+              placeholder={t('caixa.valorPlaceholder')}
               value={novaMovimentacao.valor}
               onChange={(e) => setNovaMovimentacao({ ...novaMovimentacao, valor: e.target.value })}
               required
             />
-            <button type="submit" className="btn-primary">Adicionar</button>
+            <button type="submit" className="btn-primary">{t('comum.adicionar')}</button>
           </form>
         </section>
       )}
 
       <section className="list-section">
-        <h3>Movimentações de Hoje</h3>
+        <h3>{t('caixa.movimentacoesHoje')}</h3>
         {movimentacoesHoje.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhuma movimentação ainda hoje</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('caixa.nenhumaMovimentacao')}</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Hora</th>
-                <th>Tipo</th>
-                <th>Descrição</th>
-                <th>Valor</th>
-                <th>Ação</th>
+                <th>{t('comum.hora')}</th>
+                <th>{t('caixa.tipo')}</th>
+                <th>{t('caixa.descricao')}</th>
+                <th>{t('comum.valor')}</th>
+                <th>{t('comum.acao')}</th>
               </tr>
             </thead>
             <tbody>
@@ -307,15 +314,15 @@ function Caixa({ t }) {
                   <td>{mov.hora?.substring(0, 5)}</td>
                   <td>
                     <span className={`badge ${mov.tipo}`}>
-                      {mov.tipo === 'entrada' ? '➕ Entrada' : '➖ Saída'}
+                      {mov.tipo === 'entrada' ? t('caixa.entradaTag') : t('caixa.saidaTag')}
                     </span>
                   </td>
-                  <td>{mov.descricao}{mov.agendamento_id && <span style={{ color: '#999', fontSize: '11px' }}> (comanda)</span>}</td>
+                  <td>{mov.descricao}{mov.agendamento_id && <span style={{ color: '#999', fontSize: '11px' }}> {t('caixa.comanda')}</span>}</td>
                   <td>{paraReais(mov.valor)}</td>
                   <td>
                     {!mov.agendamento_id && (
                       <button className="btn-delete" onClick={() => handleDeletarMovimentacao(mov)}>
-                        Deletar
+                        {t('comum.deletar')}
                       </button>
                     )}
                   </td>
@@ -327,20 +334,20 @@ function Caixa({ t }) {
       </section>
 
       <section className="list-section">
-        <h3>📅 Histórico de Dias (últimos 90 dias)</h3>
+        <h3>{t('caixa.historicoDias')}</h3>
         {historicoComTotais.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum dia de caixa registrado ainda</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('caixa.nenhumDiaRegistrado')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Data</th>
-                  <th>Status</th>
-                  <th>Entradas</th>
-                  <th>Saídas</th>
-                  <th>Saldo Final</th>
-                  <th>Ação</th>
+                  <th>{t('comum.data')}</th>
+                  <th>{t('comum.status')}</th>
+                  <th>{t('caixa.entradas').replace(':', '')}</th>
+                  <th>{t('caixa.saidas').replace(':', '')}</th>
+                  <th>{t('caixa.saldoFinal').replace(':', '')}</th>
+                  <th>{t('comum.acao')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -348,7 +355,7 @@ function Caixa({ t }) {
                   <React.Fragment key={dia.id}>
                     <tr>
                       <td>{dia.data}</td>
-                      <td>{dia.status === 'aberto' ? '✅ Aberto' : '❌ Fechado'}</td>
+                      <td>{dia.status === 'aberto' ? t('caixa.aberto') : t('caixa.fechado')}</td>
                       <td style={{ color: '#4caf50' }}>{paraReais(dia.entradas)}</td>
                       <td style={{ color: '#f44336' }}>{paraReais(dia.saidas)}</td>
                       <td style={{ fontWeight: 'bold', color: '#d4af37' }}>{paraReais(dia.saldoFinal)}</td>
@@ -357,7 +364,7 @@ function Caixa({ t }) {
                           className="btn-primary"
                           onClick={() => setDataExpandida(dataExpandida === dia.data ? null : dia.data)}
                         >
-                          {dataExpandida === dia.data ? 'Ocultar' : 'Detalhes'}
+                          {dataExpandida === dia.data ? t('comum.ocultar') : t('comum.detalhes')}
                         </button>
                       </td>
                     </tr>
@@ -365,15 +372,15 @@ function Caixa({ t }) {
                       <tr>
                         <td colSpan={6}>
                           {dia.movimentos.length === 0 ? (
-                            <p style={{ color: '#999' }}>Sem movimentações neste dia.</p>
+                            <p style={{ color: '#999' }}>{t('caixa.semMovimentacoesNesseDia')}</p>
                           ) : (
                             <table className="table">
                               <thead>
                                 <tr>
-                                  <th>Hora</th>
-                                  <th>Tipo</th>
-                                  <th>Descrição</th>
-                                  <th>Valor</th>
+                                  <th>{t('comum.hora')}</th>
+                                  <th>{t('caixa.tipo')}</th>
+                                  <th>{t('caixa.descricao')}</th>
+                                  <th>{t('comum.valor')}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -400,7 +407,7 @@ function Caixa({ t }) {
       </section>
 
       <section className="form-section">
-        <h3>📆 Movimento do Mês</h3>
+        <h3>{t('caixa.movimentoMes')}</h3>
         <input
           type="month"
           value={mesSelecionado}
@@ -408,27 +415,27 @@ function Caixa({ t }) {
           style={{ marginBottom: '12px' }}
         />
         {carregandoMes ? (
-          <p style={{ color: '#d4af37' }}>⏳ Carregando...</p>
+          <p style={{ color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : (
           <>
-            <p>Entradas: <strong style={{ color: '#4caf50' }}>{paraReais(totalMes.entradas)}</strong></p>
-            <p>Saídas: <strong style={{ color: '#f44336' }}>{paraReais(totalMes.saidas)}</strong></p>
-            <p className="saldo-final">Movimento Líquido: <strong>{paraReais(totalMes.saldo)}</strong></p>
+            <p>{t('caixa.entradas')} <strong style={{ color: '#4caf50' }}>{paraReais(totalMes.entradas)}</strong></p>
+            <p>{t('caixa.saidas')} <strong style={{ color: '#f44336' }}>{paraReais(totalMes.saidas)}</strong></p>
+            <p className="saldo-final">{t('caixa.movimentoLiquido')} <strong>{paraReais(totalMes.saldo)}</strong></p>
           </>
         )}
       </section>
 
       <section className="list-section">
-        <h3>💈 Comissão por Profissional</h3>
+        <h3>{t('caixa.comissaoPorProfissional')}</h3>
 
-        <h4 style={{ color: '#d4af37', marginTop: '10px' }}>Semana atual ({semanaInicio} a {semanaFim})</h4>
+        <h4 style={{ color: '#d4af37', marginTop: '10px' }}>{t('caixa.semanaAtual', { inicio: semanaInicio, fim: semanaFim })}</h4>
         <table className="table">
           <thead>
             <tr>
-              <th>Profissional</th>
-              <th>Faturado</th>
-              <th>Comissão %</th>
-              <th>Comissão Devida</th>
+              <th>{t('comum.profissional')}</th>
+              <th>{t('caixa.faturado')}</th>
+              <th>{t('caixa.comissaoPercentual')}</th>
+              <th>{t('caixa.comissaoDevida')}</th>
             </tr>
           </thead>
           <tbody>
@@ -443,17 +450,17 @@ function Caixa({ t }) {
           </tbody>
         </table>
 
-        <h4 style={{ color: '#d4af37', marginTop: '18px' }}>Mês selecionado ({mesSelecionado})</h4>
+        <h4 style={{ color: '#d4af37', marginTop: '18px' }}>{t('caixa.mesSelecionado', { mes: mesSelecionado })}</h4>
         {carregandoMes ? (
-          <p style={{ color: '#d4af37' }}>⏳ Carregando...</p>
+          <p style={{ color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Profissional</th>
-                <th>Faturado</th>
-                <th>Comissão %</th>
-                <th>Comissão Devida</th>
+                <th>{t('comum.profissional')}</th>
+                <th>{t('caixa.faturado')}</th>
+                <th>{t('caixa.comissaoPercentual')}</th>
+                <th>{t('caixa.comissaoDevida')}</th>
               </tr>
             </thead>
             <tbody>
@@ -469,7 +476,7 @@ function Caixa({ t }) {
           </table>
         )}
         <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
-          A comissão % de cada profissional é definida na aba Profissionais.
+          {t('caixa.comissaoDefinidaEm')}
         </p>
       </section>
     </div>

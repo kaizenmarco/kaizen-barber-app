@@ -2,8 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
 import { SERVICOS } from '../config/servicos';
+import { LOCALE_POR_IDIOMA_ADMIN, DIAS_SEMANA_ABREV_ADMIN, DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
-function Agendamentos({ t }) {
+function Agendamentos({ t: tProp, idioma: idiomaProp }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+  const locale = LOCALE_POR_IDIOMA_ADMIN[idioma] || 'pt-BR';
+  const diasAbrev = DIAS_SEMANA_ABREV_ADMIN[idioma] || DIAS_SEMANA_ABREV_ADMIN['pt-BR'];
+  const diasNomes = DIAS_SEMANA_ADMIN[idioma] || DIAS_SEMANA_ADMIN['pt-BR'];
+
   const [agendamentos, setAgendamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [abaProfissional, setAbaProfissional] = useState('11c0c7fb-e020-4c49-ab0a-28a16109b35f');
@@ -22,6 +29,8 @@ function Agendamentos({ t }) {
     profissional: ''
   });
 
+  const statusOpcoes = ['AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO'];
+
   const profissionaisLista = [
     { id: 1, uuid: '11c0c7fb-e020-4c49-ab0a-28a16109b35f', nome: 'Marco Kaizen' },
     { id: 2, uuid: '66266181-d06b-4f54-bcc9-12dccc100cb4', nome: 'Gabriel Little Kaizen' },
@@ -39,6 +48,7 @@ function Agendamentos({ t }) {
   // Buscar agendamentos
   useEffect(() => {
     buscarAgendamentos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---- Cálculo de horários disponíveis para o formulário "Novo Agendamento" ----
@@ -93,16 +103,15 @@ function Agendamentos({ t }) {
 
       const agendamentosFormatados = data.map(agendamento => {
         const dataHora = new Date(agendamento.data_hora);
-        const diaSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dataHora.getDay()];
-        
+
         return {
           id: agendamento.id,
-          cliente: agendamento.clientes?.nome || 'Desconhecido',
+          cliente: agendamento.clientes?.nome || t('agendamentos.desconhecido'),
           email: agendamento.clientes?.email || '',
           telefone: agendamento.clientes?.telefone || '',
           data: agendamento.data_hora?.split('T')[0] || '',
           hora: agendamento.data_hora?.split('T')[1]?.substring(0, 5) || '',
-          diaSemana: diaSemana,
+          diaSemanaIndex: dataHora.getDay(),
           servico: agendamento.servicos?.nome || 'N/A',
           profissional: agendamento.profissionais?.nome || 'N/A',
           profissionalId: agendamento.profissional_id,
@@ -114,7 +123,7 @@ function Agendamentos({ t }) {
 
       setAgendamentos(agendamentosFormatados);
     } catch (error) {
-      alert('❌ Erro ao buscar agendamentos: ' + error.message);
+      alert(t('agendamentos.erroBuscar', { msg: error.message }));
     } finally {
       setCarregando(false);
     }
@@ -129,14 +138,14 @@ function Agendamentos({ t }) {
     e.preventDefault();
 
     if (!novoAgendamento.cliente || !novoAgendamento.email || !novoAgendamento.data || !novoAgendamento.horario || !novoAgendamento.servico || !novoAgendamento.profissional) {
-      alert('⚠️ Preencha todos os campos obrigatórios!');
+      alert(t('agendamentos.preencherObrigatorios'));
       return;
     }
 
     // Fora do modo Encaixe, só deixa agendar em horários que a própria tela
     // calculou como livres (evita conflito criado por engano).
     if (!modoEncaixe && !slotsDisponiveisNovoAgendamento.includes(novoAgendamento.horario)) {
-      alert('⚠️ Esse horário não está mais disponível. Escolha outro na lista, ou ative o modo Encaixe para forçar mesmo assim.');
+      alert(t('agendamentos.horarioIndisponivel'));
       return;
     }
 
@@ -147,7 +156,7 @@ function Agendamentos({ t }) {
         .map(c => `${c.hora} - ${c.cliente} (${c.servico})`)
         .join('\n');
       const confirmou = window.confirm(
-        `⚠️ ENCAIXE: este horário (${novoAgendamento.horario}) invade o(s) seguinte(s) agendamento(s) de ${novoAgendamento.profissional}:\n\n${resumoConflito}\n\nAo confirmar, você assume a responsabilidade por resolver esse conflito com os clientes. Continuar?`
+        t('agendamentos.confirmarEncaixe', { horario: novoAgendamento.horario, prof: novoAgendamento.profissional, resumo: resumoConflito })
       );
       if (!confirmou) return;
     }
@@ -198,12 +207,12 @@ function Agendamentos({ t }) {
 
       if (erroAgendamento) throw erroAgendamento;
 
-      alert('✅ Agendamento criado com sucesso!');
+      alert(t('agendamentos.criadoComSucesso'));
       setNovoAgendamento({ cliente: '', email: '', telefone: '', data: '', horario: '', servico: '', profissional: '' });
       setModoEncaixe(false);
       buscarAgendamentos();
     } catch (error) {
-      alert('❌ Erro ao criar agendamento: ' + error.message);
+      alert(t('agendamentos.erroAoCriar', { msg: error.message }));
     }
   };
 
@@ -216,15 +225,15 @@ function Agendamentos({ t }) {
 
       if (error) throw error;
 
-      alert('✅ Status atualizado!');
+      alert(t('agendamentos.statusAtualizado'));
       buscarAgendamentos();
     } catch (error) {
-      alert('❌ Erro ao atualizar status: ' + error.message);
+      alert(t('agendamentos.erroAtualizarStatus', { msg: error.message }));
     }
   };
 
   const handleDeletar = async (agendamentoId) => {
-    if (!window.confirm('Tem certeza que deseja deletar este agendamento?')) return;
+    if (!window.confirm(t('agendamentos.confirmarDeletar'))) return;
 
     try {
       const { error } = await supabase
@@ -234,10 +243,10 @@ function Agendamentos({ t }) {
 
       if (error) throw error;
 
-      alert('✅ Agendamento deletado!');
+      alert(t('agendamentos.deletado'));
       buscarAgendamentos();
     } catch (error) {
-      alert('❌ Erro ao deletar: ' + error.message);
+      alert(t('agendamentos.erroDeletar', { msg: error.message }));
     }
   };
 
@@ -264,7 +273,7 @@ function Agendamentos({ t }) {
   const gerarCalendario = () => {
     const ano = mesAtual.getFullYear();
     const mes = mesAtual.getMonth();
-    
+
     const primeiroDia = new Date(ano, mes, 1);
     const ultimoDia = new Date(ano, mes + 1, 0);
     const diasMes = ultimoDia.getDate();
@@ -305,7 +314,7 @@ function Agendamentos({ t }) {
             <div key={a.id} style={{ fontSize: '11px', color: '#e8e8e8', marginTop: '5px', paddingTop: '5px', borderTop: '1px solid #404040' }}>
               <span style={{ color: getCorStatus(a.status), fontWeight: 'bold' }}>● </span>
               {a.hora} - {a.cliente}
-              {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold' }}> 🔀 encaixe</span>}
+              {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold' }}> {t('agendamentos.encaixeTag')}</span>}
               <div style={{ color: '#999', fontSize: '10px' }}>{a.servico}</div>
             </div>
           ))}
@@ -316,15 +325,15 @@ function Agendamentos({ t }) {
 
   return (
     <div className="page-container">
-      <h2>📅 Agendamentos</h2>
+      <h2>{t('agendamentos.titulo')}</h2>
 
       <section className="form-section">
-        <h3>Novo Agendamento</h3>
+        <h3>{t('agendamentos.novoAgendamento')}</h3>
         <form onSubmit={handleAgendar}>
           <input
             type="text"
             name="cliente"
-            placeholder="Nome do Cliente"
+            placeholder={t('agendamentos.nomeCliente')}
             value={novoAgendamento.cliente}
             onChange={handleInputChange}
             required
@@ -332,7 +341,7 @@ function Agendamentos({ t }) {
           <input
             type="email"
             name="email"
-            placeholder="Email do Cliente"
+            placeholder={t('agendamentos.emailCliente')}
             value={novoAgendamento.email}
             onChange={handleInputChange}
             required
@@ -340,7 +349,7 @@ function Agendamentos({ t }) {
           <input
             type="tel"
             name="telefone"
-            placeholder="Telefone (opcional)"
+            placeholder={t('agendamentos.telefoneOpcional')}
             value={novoAgendamento.telefone}
             onChange={handleInputChange}
           />
@@ -350,7 +359,7 @@ function Agendamentos({ t }) {
             onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, servico: e.target.value, horario: '' })); }}
             required
           >
-            <option value="">Selecione um serviço</option>
+            <option value="">{t('comum.selecioneServico')}</option>
             {servicosLista.map(s => (
               <option key={s.id} value={s.nome}>{s.nome} ({s.duracao})</option>
             ))}
@@ -361,7 +370,7 @@ function Agendamentos({ t }) {
             onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, profissional: e.target.value, horario: '' })); }}
             required
           >
-            <option value="">Selecione um profissional</option>
+            <option value="">{t('comum.selecioneProfissional')}</option>
             {profissionaisLista.map(p => (
               <option key={p.id} value={p.nome}>{p.nome}</option>
             ))}
@@ -381,12 +390,12 @@ function Agendamentos({ t }) {
               onChange={(e) => { setModoEncaixe(e.target.checked); setNovoAgendamento(prev => ({ ...prev, horario: '' })); }}
             />
             <strong style={{ color: modoEncaixe ? '#f97316' : undefined }}>
-              🔀 Modo Encaixe {modoEncaixe ? '(ativado — permite sobrepor outro horário)' : ''}
+              {t('agendamentos.modoEncaixe')} {modoEncaixe ? t('agendamentos.modoEncaixeAtivado') : ''}
             </strong>
           </label>
 
           {!novoAgendamento.profissional || !novoAgendamento.servico || !novoAgendamento.data ? (
-            <p style={{ fontSize: '13px', color: '#999' }}>Selecione serviço, profissional e data para ver os horários.</p>
+            <p style={{ fontSize: '13px', color: '#999' }}>{t('agendamentos.selecioneParaVerHorarios')}</p>
           ) : modoEncaixe ? (
             <>
               <input
@@ -398,20 +407,20 @@ function Agendamentos({ t }) {
               />
               {novoAgendamento.horario && conflitosEncaixe.length > 0 && (
                 <div style={{ background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px', margin: '8px 0', fontSize: '13px' }}>
-                  <strong style={{ color: '#f97316' }}>⚠️ Conflito: </strong>
+                  <strong style={{ color: '#f97316' }}>{t('agendamentos.conflito')} </strong>
                   {conflitosEncaixe.map(c => `${c.hora} - ${c.cliente} (${c.servico})`).join('; ')}
                 </div>
               )}
               {intervalosOcupadosNoDia.length > 0 && (
                 <p style={{ fontSize: '12px', color: '#999', margin: '4px 0' }}>
-                  Já ocupado nesse dia: {intervalosOcupadosNoDia.map(o => o.hora).join(', ')}
+                  {t('agendamentos.jaOcupadoNesseDia', { lista: intervalosOcupadosNoDia.map(o => o.hora).join(', ') })}
                 </p>
               )}
             </>
           ) : (
             <div style={{ margin: '8px 0' }}>
               {slotsDisponiveisNovoAgendamento.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#f87171' }}>Nenhum horário livre nesse dia para esse profissional/serviço. Ative o Modo Encaixe para forçar um horário.</p>
+                <p style={{ fontSize: '13px', color: '#f87171' }}>{t('agendamentos.nenhumHorarioLivre')}</p>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {slotsDisponiveisNovoAgendamento.map(h => (
@@ -438,29 +447,29 @@ function Agendamentos({ t }) {
             </div>
           )}
 
-          <button type="submit" className="btn-primary">Agendar</button>
+          <button type="submit" className="btn-primary">{t('agendamentos.agendar')}</button>
         </form>
       </section>
 
       {/* CALENDÁRIO VISUAL */}
       <section className="list-section">
-        <h3>📅 Calendário - {profissionaisLista.find(p => p.uuid === abaProfissional)?.nome}</h3>
+        <h3>{t('agendamentos.calendario', { nome: profissionaisLista.find(p => p.uuid === abaProfissional)?.nome })}</h3>
 
         <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button 
+          <button
             onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1))}
             style={{ padding: '8px 16px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
           >
-            ← Anterior
+            {t('agendamentos.anterior')}
           </button>
           <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '150px', textAlign: 'center' }}>
-            {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            {mesAtual.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
           </span>
-          <button 
+          <button
             onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1))}
             style={{ padding: '8px 16px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
           >
-            Próximo →
+            {t('agendamentos.proximo')}
           </button>
         </div>
 
@@ -493,7 +502,7 @@ function Agendamentos({ t }) {
           gap: '10px',
           marginBottom: '30px'
         }}>
-          {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map(dia => (
+          {diasAbrev.map(dia => (
             <div key={dia} style={{ textAlign: 'center', color: '#d4af37', fontWeight: 'bold', padding: '10px' }}>
               {dia}
             </div>
@@ -504,44 +513,43 @@ function Agendamentos({ t }) {
 
       {/* TABELA COM DIA DA SEMANA */}
       <section className="list-section">
-        <h3>📋 Lista Detalhada</h3>
+        <h3>{t('agendamentos.listaDetalhada')}</h3>
 
         <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <select 
-            value={filtroStatus} 
+          <select
+            value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value)}
             style={{ padding: '8px', borderRadius: '6px', border: '1px solid #d4af37', background: '#2d2d2d', color: '#e8e8e8' }}
           >
-            <option value="todos">Todos os Status</option>
-            <option value="AGENDADO">Agendado</option>
-            <option value="CONFIRMADO">Confirmado</option>
-            <option value="REALIZADO">Realizado</option>
-            <option value="CANCELADO">Cancelado</option>
+            <option value="todos">{t('statusAg.todos')}</option>
+            {statusOpcoes.map(s => (
+              <option key={s} value={s}>{t(`statusAg.${s}`)}</option>
+            ))}
           </select>
 
           <p style={{ color: '#d4af37', fontWeight: 'bold' }}>
-            Total: {agendamentosFiltrados.length} agendamentos
+            {t('agendamentos.totalAgendamentos', { n: agendamentosFiltrados.length })}
           </p>
         </div>
 
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>⏳ Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : agendamentosFiltrados.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum agendamento encontrado</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('agendamentos.nenhumEncontrado')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Cliente</th>
-                  <th>Email</th>
-                  <th>Data</th>
-                  <th>Dia da Semana</th>
-                  <th>Hora</th>
-                  <th>Serviço</th>
-                  <th>Status</th>
-                  <th>Preço (¥)</th>
-                  <th>Ações</th>
+                  <th>{t('comum.cliente')}</th>
+                  <th>{t('comum.email')}</th>
+                  <th>{t('comum.data')}</th>
+                  <th>{t('agendamentos.diaSemana')}</th>
+                  <th>{t('comum.hora')}</th>
+                  <th>{t('comum.servico')}</th>
+                  <th>{t('comum.status')}</th>
+                  <th>{t('agendamentos.preco')}</th>
+                  <th>{t('comum.acoes')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -549,11 +557,11 @@ function Agendamentos({ t }) {
                   <tr key={agendamento.id}>
                     <td style={{ fontWeight: 'bold' }}>
                       {agendamento.cliente}
-                      {agendamento.encaixe && <span title="Criado como encaixe" style={{ color: '#f97316', marginLeft: '6px', fontSize: '11px' }}>🔀 encaixe</span>}
+                      {agendamento.encaixe && <span title={t('agendamentos.criadoComoEncaixe')} style={{ color: '#f97316', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}
                     </td>
                     <td style={{ fontSize: '12px', color: '#999' }}>{agendamento.email}</td>
                     <td>{agendamento.data}</td>
-                    <td style={{ color: '#d4af37', fontWeight: 'bold' }}>{agendamento.diaSemana}</td>
+                    <td style={{ color: '#d4af37', fontWeight: 'bold' }}>{diasNomes[agendamento.diaSemanaIndex]}</td>
                     <td>{agendamento.hora}</td>
                     <td>{agendamento.servico}</td>
                     <td>
@@ -570,17 +578,16 @@ function Agendamentos({ t }) {
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="AGENDADO">Agendado</option>
-                        <option value="CONFIRMADO">Confirmado</option>
-                        <option value="REALIZADO">Realizado</option>
-                        <option value="CANCELADO">Cancelado</option>
+                        {statusOpcoes.map(s => (
+                          <option key={s} value={s}>{t(`statusAg.${s}`)}</option>
+                        ))}
                       </select>
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#d4af37' }}>
                       {agendamento.preco || '-'}
                     </td>
                     <td>
-                      <button 
+                      <button
                         className="btn-delete"
                         onClick={() => handleDeletar(agendamento.id)}
                       >
