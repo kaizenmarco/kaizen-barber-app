@@ -10,7 +10,7 @@ import {
   HORARIO_ALMOCO,
   getDiaSemana,
 } from '../config/horarios';
-import { SERVICOS, getNomeServico, getDescricaoServico } from '../config/servicos';
+import { SERVICOS, getNomeServico } from '../config/servicos';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
@@ -156,7 +156,6 @@ function ClientePublico() {
     return d;
   });
   const [profissionalSelecionadoId, setProfissionalSelecionadoId] = useState(null);
-  const [descricaoExpandida, setDescricaoExpandida] = useState({});
 
   const [listaEsperaAberta, setListaEsperaAberta] = useState(false);
   const [listaEsperaDados, setListaEsperaDados] = useState({ nome: '', email: '', telefone: '' });
@@ -787,12 +786,6 @@ function ClientePublico() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {servicos.map((servico, idx) => {
                 const nomeServico = getNomeServico(servico, idioma);
-                const descricaoServico = getDescricaoServico(servico, idioma);
-                const descricaoLonga = descricaoServico.length > 60;
-                const expandida = !!descricaoExpandida[servico.id];
-                const descricaoExibida = !descricaoLonga || expandida
-                  ? descricaoServico
-                  : `${descricaoServico.slice(0, 60)}...`;
 
                 return (
                   <div
@@ -815,20 +808,9 @@ function ClientePublico() {
                     />
 
                     <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-                      <h3 style={{ color: '#d4af37', margin: '0 0 4px 0', fontSize: '16px', letterSpacing: '0.3px' }}>
+                      <h3 style={{ color: '#d4af37', margin: '0 0 6px 0', fontSize: '16px', letterSpacing: '0.3px' }}>
                         {idx + 1}. {nomeServico.toUpperCase()}
                       </h3>
-                      <p style={{ color: '#999', fontSize: '13px', margin: '0 0 6px 0' }}>
-                        {descricaoExibida}
-                        {descricaoLonga && (
-                          <button
-                            onClick={() => setDescricaoExpandida({ ...descricaoExpandida, [servico.id]: !expandida })}
-                            style={{ background: 'none', border: 'none', color: '#d4af37', cursor: 'pointer', fontSize: '13px', padding: 0, marginLeft: '4px', textDecoration: 'underline' }}
-                          >
-                            {expandida ? t('servicos_ver_menos') : t('servicos_ver_mais')}
-                          </button>
-                        )}
-                      </p>
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>{formatarPreco(servico.preco)}</span>
                         <span style={{ color: '#999', fontSize: '13px' }}>⏱️ {servico.duracao}</span>
