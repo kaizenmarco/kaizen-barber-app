@@ -182,6 +182,12 @@ const TEXTOS = {
     'agendamentos.erroDeletarBloqueio': 'Erro ao remover bloqueio: {msg}',
     'agendamentos.bloqueiosAtivos': 'Bloqueios agendados',
     'agendamentos.bloqueioTag': 'Bloqueado',
+    'agendamentos.dataInicioLabel': 'Data inicial',
+    'agendamentos.dataFimOpcionalLabel': 'Data final (opcional, para períodos)',
+    'agendamentos.diaInteiroLabel': 'Fechar o dia todo (feriado, folga completa)',
+    'agendamentos.diaTodo': 'Fechado (dia todo)',
+    'agendamentos.bloqueioCriadoPeriodo': '{n} dias bloqueados com sucesso!',
+    'agendamentos.dataFimAntesInicio': 'A data final deve ser depois (ou igual) da data inicial.',
 
     // Clientes
     'clientes.titulo': '👥 Clientes',
@@ -518,6 +524,12 @@ const TEXTOS = {
     'agendamentos.erroDeletarBloqueio': 'Error removing block: {msg}',
     'agendamentos.bloqueiosAtivos': 'Scheduled blocks',
     'agendamentos.bloqueioTag': 'Blocked',
+    'agendamentos.dataInicioLabel': 'Start date',
+    'agendamentos.dataFimOpcionalLabel': 'End date (optional, for periods)',
+    'agendamentos.diaInteiroLabel': 'Close the whole day (holiday, full day off)',
+    'agendamentos.diaTodo': 'Closed (all day)',
+    'agendamentos.bloqueioCriadoPeriodo': '{n} days blocked successfully!',
+    'agendamentos.dataFimAntesInicio': 'End date must be on or after the start date.',
 
     'clientes.titulo': '👥 Clients',
     'clientes.novoCliente': 'New Client',
@@ -848,6 +860,12 @@ const TEXTOS = {
     'agendamentos.erroDeletarBloqueio': 'ブロックの削除エラー: {msg}',
     'agendamentos.bloqueiosAtivos': '予定されているブロック',
     'agendamentos.bloqueioTag': 'ブロック中',
+    'agendamentos.dataInicioLabel': '開始日',
+    'agendamentos.dataFimOpcionalLabel': '終了日(任意、期間指定用)',
+    'agendamentos.diaInteiroLabel': '終日休業にする(祝日・全休)',
+    'agendamentos.diaTodo': '休業(終日)',
+    'agendamentos.bloqueioCriadoPeriodo': '{n}日間をブロックしました!',
+    'agendamentos.dataFimAntesInicio': '終了日は開始日以降にしてください。',
 
     'clientes.titulo': '👥 顧客',
     'clientes.novoCliente': '新規顧客',

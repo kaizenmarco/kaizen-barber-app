@@ -34,10 +34,32 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [novoBloqueio, setNovoBloqueio] = useState({
     profissional: '',
     data: '',
+    dataFim: '',
+    diaInteiro: false,
     horaInicio: '',
     horaFim: '',
     motivo: ''
   });
+
+  // Sentinela usado para representar "dia inteiro" — cobre de sobra o
+  // horário de funcionamento do salão (ver getSlotsLivresNoDia), então
+  // nenhum slot sobra livre naquele dia, sem precisar saber o horário exato.
+  const HORA_INICIO_DIA_INTEIRO = '00:00';
+  const HORA_FIM_DIA_INTEIRO = '23:59';
+  const ehBloqueioDiaInteiro = (b) => b.horaInicio === HORA_INICIO_DIA_INTEIRO && b.horaFim === HORA_FIM_DIA_INTEIRO;
+  const formatarHorarioBloqueio = (b) => ehBloqueioDiaInteiro(b) ? t('agendamentos.diaTodo') : `${b.horaInicio}–${b.horaFim}`;
+
+  // Gera a lista de datas (YYYY-MM-DD) entre dataInicio e dataFim, inclusive.
+  const gerarIntervaloDatas = (dataInicioStr, dataFimStr) => {
+    const datas = [];
+    const cursor = new Date(`${dataInicioStr}T00:00:00`);
+    const fim = new Date(`${dataFimStr || dataInicioStr}T00:00:00`);
+    while (cursor <= fim) {
+      datas.push(cursor.toISOString().split('T')[0]);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return datas;
+  };
 
   const statusOpcoes = ['AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO'];
 
@@ -181,40 +203,55 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   };
 
   const handleBloqueioInputChange = (e) => {
-    const { name, value } = e.target;
-    setNovoBloqueio({ ...novoBloqueio, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setNovoBloqueio({ ...novoBloqueio, [name]: type === 'checkbox' ? checked : value });
   };
 
   const handleCriarBloqueio = async (e) => {
     e.preventDefault();
 
-    if (!novoBloqueio.profissional || !novoBloqueio.data || !novoBloqueio.horaInicio || !novoBloqueio.horaFim) {
+    if (!novoBloqueio.profissional || !novoBloqueio.data) {
       alert(t('agendamentos.preencherObrigatorios'));
       return;
     }
 
-    if (paraMinutos(novoBloqueio.horaFim) <= paraMinutos(novoBloqueio.horaInicio)) {
+    if (!novoBloqueio.diaInteiro && (!novoBloqueio.horaInicio || !novoBloqueio.horaFim)) {
+      alert(t('agendamentos.preencherObrigatorios'));
+      return;
+    }
+
+    if (novoBloqueio.dataFim && novoBloqueio.dataFim < novoBloqueio.data) {
+      alert(t('agendamentos.dataFimAntesInicio'));
+      return;
+    }
+
+    if (!novoBloqueio.diaInteiro && paraMinutos(novoBloqueio.horaFim) <= paraMinutos(novoBloqueio.horaInicio)) {
       alert(t('agendamentos.horarioFimAntesInicio'));
       return;
     }
 
     try {
       const profissionalSelecionado = profissionaisLista.find(p => p.nome === novoBloqueio.profissional);
+      const horaInicio = novoBloqueio.diaInteiro ? HORA_INICIO_DIA_INTEIRO : novoBloqueio.horaInicio;
+      const horaFim = novoBloqueio.diaInteiro ? HORA_FIM_DIA_INTEIRO : novoBloqueio.horaFim;
+      const datas = gerarIntervaloDatas(novoBloqueio.data, novoBloqueio.dataFim);
+
+      const linhas = datas.map(data => ({
+        profissional_id: profissionalSelecionado?.uuid,
+        data,
+        horario_inicio: horaInicio,
+        horario_fim: horaFim,
+        motivo: novoBloqueio.motivo || null
+      }));
 
       const { error } = await supabase
         .from('bloqueios_horario')
-        .insert([{
-          profissional_id: profissionalSelecionado?.uuid,
-          data: novoBloqueio.data,
-          horario_inicio: novoBloqueio.horaInicio,
-          horario_fim: novoBloqueio.horaFim,
-          motivo: novoBloqueio.motivo || null
-        }]);
+        .insert(linhas);
 
       if (error) throw error;
 
-      alert(t('agendamentos.bloqueioCriado'));
-      setNovoBloqueio({ profissional: '', data: '', horaInicio: '', horaFim: '', motivo: '' });
+      alert(datas.length > 1 ? t('agendamentos.bloqueioCriadoPeriodo', { n: datas.length }) : t('agendamentos.bloqueioCriado'));
+      setNovoBloqueio({ profissional: '', data: '', dataFim: '', diaInteiro: false, horaInicio: '', horaFim: '', motivo: '' });
       buscarBloqueios();
     } catch (error) {
       alert(t('agendamentos.erroCriarBloqueio', { msg: error.message }));
@@ -434,7 +471,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           <strong style={{ color: '#d4af37' }}>{dia}</strong>
           {bloqueiosNoDia.map(b => (
             <div key={`b-${b.id}`} style={{ fontSize: '11px', color: '#f87171', marginTop: '5px', paddingTop: '5px', borderTop: '1px solid #404040' }}>
-              🚫 {b.horaInicio}–{b.horaFim}
+              🚫 {formatarHorarioBloqueio(b)}
               {b.motivo && <div style={{ color: '#999', fontSize: '10px' }}>{b.motivo}</div>}
             </div>
           ))}
@@ -597,31 +634,60 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
               <option key={p.id} value={p.nome}>{p.nome}</option>
             ))}
           </select>
-          <input
-            type="date"
-            name="data"
-            value={novoBloqueio.data}
-            onChange={handleBloqueioInputChange}
-            required
-          />
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <input
-              type="time"
-              name="horaInicio"
-              value={novoBloqueio.horaInicio}
-              onChange={handleBloqueioInputChange}
-              required
-              style={{ flex: 1, minWidth: '120px' }}
-            />
-            <input
-              type="time"
-              name="horaFim"
-              value={novoBloqueio.horaFim}
-              onChange={handleBloqueioInputChange}
-              required
-              style={{ flex: 1, minWidth: '120px' }}
-            />
+            <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
+              {t('agendamentos.dataInicioLabel')}
+              <input
+                type="date"
+                name="data"
+                value={novoBloqueio.data}
+                onChange={handleBloqueioInputChange}
+                required
+              />
+            </label>
+            <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
+              {t('agendamentos.dataFimOpcionalLabel')}
+              <input
+                type="date"
+                name="dataFim"
+                value={novoBloqueio.dataFim}
+                min={novoBloqueio.data || undefined}
+                onChange={handleBloqueioInputChange}
+              />
+            </label>
           </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              name="diaInteiro"
+              checked={novoBloqueio.diaInteiro}
+              onChange={handleBloqueioInputChange}
+            />
+            <strong>{t('agendamentos.diaInteiroLabel')}</strong>
+          </label>
+
+          {!novoBloqueio.diaInteiro && (
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <input
+                type="time"
+                name="horaInicio"
+                value={novoBloqueio.horaInicio}
+                onChange={handleBloqueioInputChange}
+                required={!novoBloqueio.diaInteiro}
+                style={{ flex: 1, minWidth: '120px' }}
+              />
+              <input
+                type="time"
+                name="horaFim"
+                value={novoBloqueio.horaFim}
+                onChange={handleBloqueioInputChange}
+                required={!novoBloqueio.diaInteiro}
+                style={{ flex: 1, minWidth: '120px' }}
+              />
+            </div>
+          )}
+
           <input
             type="text"
             name="motivo"
@@ -655,7 +721,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                     }}
                   >
                     <span style={{ color: '#e8e8e8' }}>
-                      🚫 {b.data} · {b.horaInicio}–{b.horaFim}
+                      🚫 {b.data} · {formatarHorarioBloqueio(b)}
                       {b.motivo && <span style={{ color: '#999' }}> — {b.motivo}</span>}
                     </span>
                     <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
@@ -893,7 +959,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                       }}
                     >
                       <span style={{ color: '#f87171', fontWeight: 'bold' }}>
-                        🚫 {b.horaInicio}–{b.horaFim}
+                        🚫 {formatarHorarioBloqueio(b)}
                         {b.motivo && <span style={{ color: '#999', fontWeight: 'normal' }}> — {b.motivo}</span>}
                       </span>
                       <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
