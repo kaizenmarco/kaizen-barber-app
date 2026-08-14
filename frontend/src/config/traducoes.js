@@ -78,6 +78,7 @@ const TEXTOS = {
     endereco_ambiente: 'Ambiente',
 
     profissionais_titulo: 'Profissionais',
+    profissionais_contato: 'Contato',
 
     fidelidade_titulo: 'Fidelidade',
     fidelidade_regra1: '2 pontos por atendimento realizado',
@@ -184,6 +185,7 @@ const TEXTOS = {
     endereco_ambiente: 'Atmosphere',
 
     profissionais_titulo: 'Our Team',
+    profissionais_contato: 'Contact',
 
     fidelidade_titulo: 'Rewards',
     fidelidade_regra1: '2 points per completed appointment',
@@ -290,6 +292,7 @@ const TEXTOS = {
     endereco_ambiente: '雰囲気',
 
     profissionais_titulo: 'スタイリスト紹介',
+    profissionais_contato: '連絡先',
 
     fidelidade_titulo: 'ポイントプログラム',
     fidelidade_regra1: '施術1回につき2ポイント',

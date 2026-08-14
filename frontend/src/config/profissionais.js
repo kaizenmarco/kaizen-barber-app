@@ -20,6 +20,7 @@ export const PROFISSIONAIS = [
     especialidade: 'Especialista em Cortes e Barba',
     especialidades: 'Cortes, Barba',
     imagem: '/images/marco.jpg',
+    email: 'marco@kaizenbarbershop.com',
   },
   {
     id: 2,
@@ -28,6 +29,7 @@ export const PROFISSIONAIS = [
     especialidade: 'Especialista em Cortes',
     especialidades: 'Cortes, Permanente',
     imagem: '/images/gabriel.jpg',
+    email: 'gabriel@kaizenbarbershop.com',
   },
   {
     id: 3,
@@ -36,6 +38,7 @@ export const PROFISSIONAIS = [
     especialidade: 'Especialista em Coloração e Estética',
     especialidades: 'Corte Feminino, Coloração, Alisamento',
     imagem: '/images/neia.jpg',
+    email: 'neia@kaizenbarbershop.com',
   },
 ];
 

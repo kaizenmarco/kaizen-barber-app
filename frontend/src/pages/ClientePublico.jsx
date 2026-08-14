@@ -201,6 +201,7 @@ function ClientePublico() {
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
       servicos: ['Cortes', 'Barba', 'Coloração'],
       imagem: '/images/marco.jpg',
+      email: 'marco@kaizenbarbershop.com',
     },
     {
       id: 2,
@@ -212,6 +213,7 @@ function ClientePublico() {
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
       imagem: '/images/gabriel.jpg',
+      email: 'gabriel@kaizenbarbershop.com',
     },
     {
       id: 3,
@@ -223,6 +225,7 @@ function ClientePublico() {
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
       imagem: '/images/neia.jpg',
+      email: 'neia@kaizenbarbershop.com',
     },
   ];
   const getEspecialidadeProf = (prof) => {
@@ -1172,6 +1175,14 @@ function ClientePublico() {
                   <div style={{ padding: '15px' }}>
                     <h3 style={{ color: '#d4af37' }}>{prof.nome}</h3>
                     <p style={{ color: '#999', fontSize: '14px' }}>{getEspecialidadeProf(prof)}</p>
+                    {prof.email && (
+                      <p style={{ marginTop: '10px', fontSize: '13px' }}>
+                        <span style={{ color: '#666' }}>✉️ {t('profissionais_contato')}: </span>
+                        <a href={`mailto:${prof.email}`} style={{ color: '#d4af37', textDecoration: 'none' }}>
+                          {prof.email}
+                        </a>
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
