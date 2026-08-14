@@ -17,7 +17,7 @@ const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
 const ENDERECO_JAPONES = '〒446-0022 Aichi, Anjo, Hamatomicho, 4−17 サン シテイ オーミ 302号';
 const WHATSAPP_NUMERO = '818097242512'; // +81-80-9724-2512, só dígitos (formato exigido pelo wa.me)
-const INSTAGRAM_USUARIO = 'marco.kaizen';
+const INSTAGRAM_USUARIO = 'kaizenbarbershopjp';
 const TIKTOK_USUARIO = 'marco.kaizen';
 
 const botaoContatoStyle = {
