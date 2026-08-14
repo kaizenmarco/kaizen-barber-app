@@ -377,6 +377,27 @@ function ClientePublico() {
         ocupados[profUUID].push({ data: dataStr, inicioMin, fimMin: inicioMin + duracaoMin });
       });
 
+      // Períodos bloqueados manualmente pelo Admin (ex: consulta médica, folga
+      // parcial) também ocupam o horário — cliente não pode agendar em cima.
+      const { data: bloqueios, error: erroBloqueios } = await supabase
+        .from('bloqueios_horario')
+        .select('profissional_id, data, horario_inicio, horario_fim')
+        .gte('data', dataInicio)
+        .lte('data', dataFim);
+
+      if (erroBloqueios) throw erroBloqueios;
+
+      (bloqueios || []).forEach(bloqueio => {
+        const profUUID = bloqueio.profissional_id;
+        const inicioMin = paraMinutos(bloqueio.horario_inicio.substring(0, 5));
+        const fimMin = paraMinutos(bloqueio.horario_fim.substring(0, 5));
+
+        if (!ocupados[profUUID]) {
+          ocupados[profUUID] = [];
+        }
+        ocupados[profUUID].push({ data: bloqueio.data, inicioMin, fimMin });
+      });
+
       setHorariosOcupados(ocupados);
     } catch (error) {
       console.error('Erro ao buscar horários:', error);

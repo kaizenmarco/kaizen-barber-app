@@ -19,6 +19,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [modoEncaixe, setModoEncaixe] = useState(false);
   const [diaModal, setDiaModal] = useState(null); // data (YYYY-MM-DD) do dia clicado no calendário, ou null se fechado
+  const [bloqueios, setBloqueios] = useState([]);
 
   const [novoAgendamento, setNovoAgendamento] = useState({
     cliente: '',
@@ -28,6 +29,14 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     horario: '',
     servico: '',
     profissional: ''
+  });
+
+  const [novoBloqueio, setNovoBloqueio] = useState({
+    profissional: '',
+    data: '',
+    horaInicio: '',
+    horaFim: '',
+    motivo: ''
   });
 
   const statusOpcoes = ['AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO'];
@@ -49,6 +58,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   // Buscar agendamentos
   useEffect(() => {
     buscarAgendamentos();
+    buscarBloqueios();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -61,13 +71,24 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const servicoNovoObj = servicosLista.find(s => s.nome === novoAgendamento.servico);
   const duracaoNovoAgendamento = servicoNovoObj ? servicoNovoObj.duracaoMinutos : 60;
 
-  const intervalosOcupadosNoDia = (!profissionalNovoObj || !novoAgendamento.data) ? [] : agendamentos
-    .filter(a => a.profissionalId === profissionalNovoObj.uuid && a.data === novoAgendamento.data && a.status !== 'CANCELADO')
-    .map(a => {
-      const inicioMin = paraMinutos(a.hora);
-      const duracao = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
-      return { inicioMin, fimMin: inicioMin + duracao, cliente: a.cliente, hora: a.hora, servico: a.servico };
-    });
+  const intervalosOcupadosNoDia = (!profissionalNovoObj || !novoAgendamento.data) ? [] : [
+    ...agendamentos
+      .filter(a => a.profissionalId === profissionalNovoObj.uuid && a.data === novoAgendamento.data && a.status !== 'CANCELADO')
+      .map(a => {
+        const inicioMin = paraMinutos(a.hora);
+        const duracao = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+        return { inicioMin, fimMin: inicioMin + duracao, cliente: a.cliente, hora: a.hora, servico: a.servico };
+      }),
+    ...bloqueios
+      .filter(b => b.profissionalId === profissionalNovoObj.uuid && b.data === novoAgendamento.data)
+      .map(b => ({
+        inicioMin: paraMinutos(b.horaInicio),
+        fimMin: paraMinutos(b.horaFim),
+        cliente: b.motivo ? `${t('agendamentos.bloqueioTag')} — ${b.motivo}` : t('agendamentos.bloqueioTag'),
+        hora: b.horaInicio,
+        servico: t('agendamentos.bloqueioTag')
+      }))
+  ];
 
   const slotsDisponiveisNovoAgendamento = (!profissionalNovoObj || !servicoNovoObj || !novoAgendamento.data) ? [] : (() => {
     const dataObj = new Date(`${novoAgendamento.data}T00:00:00`);
@@ -130,9 +151,92 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     }
   };
 
+  const buscarBloqueios = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bloqueios_horario')
+        .select('id, profissional_id, data, horario_inicio, horario_fim, motivo')
+        .order('data', { ascending: true });
+
+      if (error) throw error;
+
+      const bloqueiosFormatados = data.map(b => ({
+        id: b.id,
+        profissionalId: b.profissional_id,
+        data: b.data,
+        horaInicio: b.horario_inicio?.substring(0, 5) || '',
+        horaFim: b.horario_fim?.substring(0, 5) || '',
+        motivo: b.motivo || ''
+      }));
+
+      setBloqueios(bloqueiosFormatados);
+    } catch (error) {
+      console.error('Erro ao buscar bloqueios:', error);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNovoAgendamento({ ...novoAgendamento, [name]: value });
+  };
+
+  const handleBloqueioInputChange = (e) => {
+    const { name, value } = e.target;
+    setNovoBloqueio({ ...novoBloqueio, [name]: value });
+  };
+
+  const handleCriarBloqueio = async (e) => {
+    e.preventDefault();
+
+    if (!novoBloqueio.profissional || !novoBloqueio.data || !novoBloqueio.horaInicio || !novoBloqueio.horaFim) {
+      alert(t('agendamentos.preencherObrigatorios'));
+      return;
+    }
+
+    if (paraMinutos(novoBloqueio.horaFim) <= paraMinutos(novoBloqueio.horaInicio)) {
+      alert(t('agendamentos.horarioFimAntesInicio'));
+      return;
+    }
+
+    try {
+      const profissionalSelecionado = profissionaisLista.find(p => p.nome === novoBloqueio.profissional);
+
+      const { error } = await supabase
+        .from('bloqueios_horario')
+        .insert([{
+          profissional_id: profissionalSelecionado?.uuid,
+          data: novoBloqueio.data,
+          horario_inicio: novoBloqueio.horaInicio,
+          horario_fim: novoBloqueio.horaFim,
+          motivo: novoBloqueio.motivo || null
+        }]);
+
+      if (error) throw error;
+
+      alert(t('agendamentos.bloqueioCriado'));
+      setNovoBloqueio({ profissional: '', data: '', horaInicio: '', horaFim: '', motivo: '' });
+      buscarBloqueios();
+    } catch (error) {
+      alert(t('agendamentos.erroCriarBloqueio', { msg: error.message }));
+    }
+  };
+
+  const handleDeletarBloqueio = async (bloqueioId) => {
+    if (!window.confirm(t('agendamentos.confirmarDeletarBloqueio'))) return;
+
+    try {
+      const { error } = await supabase
+        .from('bloqueios_horario')
+        .delete()
+        .eq('id', bloqueioId);
+
+      if (error) throw error;
+
+      alert(t('agendamentos.bloqueioDeletado'));
+      buscarBloqueios();
+    } catch (error) {
+      alert(t('agendamentos.erroDeletarBloqueio', { msg: error.message }));
+    }
   };
 
   const handleAgendar = async (e) => {
@@ -270,6 +374,9 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     return statusOk && profissionalOk;
   });
 
+  // Bloqueios (folgas/consultas etc.) da aba ativa
+  const bloqueiosFiltrados = bloqueios.filter(b => b.profissionalId === abaProfissional);
+
   // Gerar calendário
   const gerarCalendario = () => {
     const ano = mesAtual.getFullYear();
@@ -293,32 +400,44 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       return dataAgendamento.getFullYear() === ano && dataAgendamento.getMonth() === mes;
     });
 
+    const bloqueadosDeste = bloqueiosFiltrados.filter(b => {
+      const dataBloqueio = new Date(b.data);
+      return dataBloqueio.getFullYear() === ano && dataBloqueio.getMonth() === mes;
+    });
+
     return dias.map((dia, idx) => {
       if (!dia) return <div key={`vazio-${idx}`} style={{ padding: '10px' }}></div>;
 
       const dataStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
       const agendadosNoDia = agendadosDeste.filter(a => a.data === dataStr);
+      const bloqueiosNoDia = bloqueadosDeste.filter(b => b.data === dataStr);
 
-      const temAgendamentos = agendadosNoDia.length > 0;
+      const temConteudo = agendadosNoDia.length > 0 || bloqueiosNoDia.length > 0;
 
       return (
         <div
           key={dia}
-          onClick={temAgendamentos ? () => setDiaModal(dataStr) : undefined}
-          title={temAgendamentos ? t('agendamentos.agendamentosDoDia', { data: dia }) : undefined}
+          onClick={temConteudo ? () => setDiaModal(dataStr) : undefined}
+          title={temConteudo ? t('agendamentos.agendamentosDoDia', { data: dia }) : undefined}
           style={{
             border: '1px solid #404040',
             padding: '10px',
             borderRadius: '6px',
-            background: agendadosNoDia.length > 0 ? '#2d3d2d' : '#2d2d2d',
+            background: agendadosNoDia.length > 0 ? '#2d3d2d' : (bloqueiosNoDia.length > 0 ? '#3d2d2d' : '#2d2d2d'),
             minHeight: '80px',
-            cursor: temAgendamentos ? 'pointer' : 'default',
+            cursor: temConteudo ? 'pointer' : 'default',
             transition: 'border-color 0.15s, background 0.15s'
           }}
-          onMouseEnter={(e) => { if (temAgendamentos) e.currentTarget.style.borderColor = '#d4af37'; }}
-          onMouseLeave={(e) => { if (temAgendamentos) e.currentTarget.style.borderColor = '#404040'; }}
+          onMouseEnter={(e) => { if (temConteudo) e.currentTarget.style.borderColor = '#d4af37'; }}
+          onMouseLeave={(e) => { if (temConteudo) e.currentTarget.style.borderColor = '#404040'; }}
         >
           <strong style={{ color: '#d4af37' }}>{dia}</strong>
+          {bloqueiosNoDia.map(b => (
+            <div key={`b-${b.id}`} style={{ fontSize: '11px', color: '#f87171', marginTop: '5px', paddingTop: '5px', borderTop: '1px solid #404040' }}>
+              🚫 {b.horaInicio}–{b.horaFim}
+              {b.motivo && <div style={{ color: '#999', fontSize: '10px' }}>{b.motivo}</div>}
+            </div>
+          ))}
           {agendadosNoDia.map(a => (
             <div key={a.id} style={{ fontSize: '11px', color: '#e8e8e8', marginTop: '5px', paddingTop: '5px', borderTop: '1px solid #404040' }}>
               <span style={{ color: getCorStatus(a.status), fontWeight: 'bold' }}>● </span>
@@ -458,6 +577,93 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
           <button type="submit" className="btn-primary">{t('agendamentos.agendar')}</button>
         </form>
+      </section>
+
+      {/* BLOQUEIO DE HORÁRIO (folga, consulta médica etc.) */}
+      <section className="form-section">
+        <h3>{t('agendamentos.bloquearHorario')}</h3>
+        <p style={{ fontSize: '13px', color: '#999', marginTop: '-6px', marginBottom: '10px' }}>
+          {t('agendamentos.bloquearHorarioDescricao')}
+        </p>
+        <form onSubmit={handleCriarBloqueio}>
+          <select
+            name="profissional"
+            value={novoBloqueio.profissional}
+            onChange={handleBloqueioInputChange}
+            required
+          >
+            <option value="">{t('comum.selecioneProfissional')}</option>
+            {profissionaisLista.map(p => (
+              <option key={p.id} value={p.nome}>{p.nome}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            name="data"
+            value={novoBloqueio.data}
+            onChange={handleBloqueioInputChange}
+            required
+          />
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <input
+              type="time"
+              name="horaInicio"
+              value={novoBloqueio.horaInicio}
+              onChange={handleBloqueioInputChange}
+              required
+              style={{ flex: 1, minWidth: '120px' }}
+            />
+            <input
+              type="time"
+              name="horaFim"
+              value={novoBloqueio.horaFim}
+              onChange={handleBloqueioInputChange}
+              required
+              style={{ flex: 1, minWidth: '120px' }}
+            />
+          </div>
+          <input
+            type="text"
+            name="motivo"
+            placeholder={t('agendamentos.motivoOpcional')}
+            value={novoBloqueio.motivo}
+            onChange={handleBloqueioInputChange}
+          />
+          <button type="submit" className="btn-primary">{t('agendamentos.criarBloqueio')}</button>
+        </form>
+
+        {bloqueiosFiltrados.filter(b => b.data >= new Date().toISOString().split('T')[0]).length > 0 && (
+          <div style={{ marginTop: '18px' }}>
+            <p style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>
+              {t('agendamentos.bloqueiosAtivos')}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {bloqueiosFiltrados
+                .filter(b => b.data >= new Date().toISOString().split('T')[0])
+                .sort((a, b) => (a.data + a.horaInicio).localeCompare(b.data + b.horaInicio))
+                .map(b => (
+                  <div
+                    key={b.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      border: '1px solid #404040',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <span style={{ color: '#e8e8e8' }}>
+                      🚫 {b.data} · {b.horaInicio}–{b.horaFim}
+                      {b.motivo && <span style={{ color: '#999' }}> — {b.motivo}</span>}
+                    </span>
+                    <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* CALENDÁRIO VISUAL */}
@@ -616,6 +822,9 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
         const agendamentosDoDia = agendamentosFiltrados
           .filter(a => a.data === diaModal)
           .sort((a, b) => a.hora.localeCompare(b.hora));
+        const bloqueiosDoDia = bloqueiosFiltrados
+          .filter(b => b.data === diaModal)
+          .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
         const dataFormatada = new Date(`${diaModal}T00:00:00`)
           .toLocaleDateString(locale, { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -666,9 +875,36 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 </button>
               </div>
 
-              {agendamentosDoDia.length === 0 ? (
+              {bloqueiosDoDia.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: agendamentosDoDia.length > 0 ? '16px' : 0 }}>
+                  {bloqueiosDoDia.map(b => (
+                    <div
+                      key={`b-${b.id}`}
+                      style={{
+                        border: '1px solid #f87171',
+                        borderRadius: '8px',
+                        padding: '12px 14px',
+                        background: '#1a1a1a',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                      }}
+                    >
+                      <span style={{ color: '#f87171', fontWeight: 'bold' }}>
+                        🚫 {b.horaInicio}–{b.horaFim}
+                        {b.motivo && <span style={{ color: '#999', fontWeight: 'normal' }}> — {b.motivo}</span>}
+                      </span>
+                      <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {agendamentosDoDia.length === 0 && bloqueiosDoDia.length === 0 ? (
                 <p style={{ color: '#999', textAlign: 'center' }}>{t('agendamentos.nenhumAgendamentoNoDia')}</p>
-              ) : (
+              ) : agendamentosDoDia.length === 0 ? null : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {agendamentosDoDia.map(a => (
                     <div
