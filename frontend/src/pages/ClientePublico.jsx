@@ -198,6 +198,7 @@ function ClientePublico() {
       especialidade: 'Especialista em Cortes e Barba',
       especialidadeEn: 'Cuts & Beard Specialist',
       especialidadeJa: 'カット・ひげ専門',
+      especialidadeEs: 'Especialista en Cortes y Barba',
       qualificacoes: ['14 anos de experiência', 'Dono da Kaizen', 'Especialista em Barba'],
       servicos: ['Cortes', 'Barba', 'Coloração'],
       imagem: '/images/marco.jpg',
@@ -210,6 +211,7 @@ function ClientePublico() {
       especialidade: 'Especialista em Cortes',
       especialidadeEn: 'Haircut Specialist',
       especialidadeJa: 'カット専門',
+      especialidadeEs: 'Especialista en Cortes',
       qualificacoes: ['Profissional certificado', 'Especialista em Permanente', 'Técnica moderna'],
       servicos: ['Cortes', 'Permanente', 'Lavagem'],
       imagem: '/images/gabriel.jpg',
@@ -222,6 +224,7 @@ function ClientePublico() {
       especialidade: 'Especialista em Coloração e Estética',
       especialidadeEn: 'Coloring & Esthetics Specialist',
       especialidadeJa: 'カラーリング・エステ専門',
+      especialidadeEs: 'Especialista en Coloración y Estética',
       qualificacoes: ['Coloração avançada', 'Limpeza facial', 'Massagem facial'],
       servicos: ['Coloração', 'Alisamento', 'Estética'],
       imagem: '/images/neia.jpg',
@@ -231,6 +234,7 @@ function ClientePublico() {
   const getEspecialidadeProf = (prof) => {
     if (idioma === 'en') return prof.especialidadeEn || prof.especialidade;
     if (idioma === 'ja') return prof.especialidadeJa || prof.especialidade;
+    if (idioma === 'es') return prof.especialidadeEs || prof.especialidade;
     return prof.especialidade;
   };
 

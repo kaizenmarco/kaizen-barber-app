@@ -10,6 +10,7 @@ export const IDIOMAS = [
   { codigo: 'pt-BR', rotulo: 'PT', bandeira: '🇧🇷' },
   { codigo: 'en', rotulo: 'EN', bandeira: '🇺🇸' },
   { codigo: 'ja', rotulo: '日本語', bandeira: '🇯🇵' },
+  { codigo: 'es', rotulo: 'ES', bandeira: '🇪🇸' },
 ];
 
 export const IDIOMA_PADRAO = 'pt-BR';
@@ -335,12 +336,120 @@ const TEXTOS = {
     alerta_erro_lista_espera: '現在、キャンセル待ちに登録できませんでした: ',
     alerta_avaliacao_enviada: '口コミを送信しました!',
   },
+
+  es: {
+    header_subtitulo: 'Barbería Premium - Anjo, Aichi',
+
+    nav_servicos: 'Servicios',
+    nav_agendar: 'Reservar',
+    nav_endereco: 'Ubicación',
+    nav_profissionais: 'Equipo',
+    nav_fidelidade: 'Puntos',
+    nav_avaliacoes: 'Reseñas',
+
+    conf_titulo: '¡Turno reservado con éxito!',
+    conf_profissional: 'Profesional:',
+    conf_data: 'Fecha:',
+    conf_horario: 'Hora:',
+    conf_valor: 'Precio:',
+    conf_desconto_aplicado: '(descuento de {valor} aplicado)',
+    conf_pontos_fidelidade: 'Ganarás +2 puntos de fidelidad en cuanto se complete este servicio.',
+    conf_criar_lembrete: 'Crear recordatorio',
+    conf_min_antes: '{min} min antes',
+    conf_add_calendario: 'Agregar recordatorio al calendario del celular',
+    conf_google_agenda: 'o agregar a Google Calendar',
+    conf_presenca_confirmada: 'Asistencia confirmada',
+    conf_confirmar_presenca: 'Confirmar asistencia',
+    conf_voltar_site: 'Volver al sitio',
+
+    servicos_titulo: 'Nuestros Servicios',
+    servicos_ver_mais: 'Ver más',
+    servicos_ver_menos: 'Ver menos',
+    servicos_agendar: 'Reservar',
+
+    agendar_titulo: 'Reservar turno',
+    agendar_servico_label: 'Servicio:',
+    agendar_servico_placeholder: 'Selecciona un servicio',
+    agendar_escolha_servico: 'Elige un servicio arriba para ver los horarios disponibles.',
+    agendar_profissional_label: 'Profesional:',
+    agendar_sem_horario: 'No hay horarios disponibles con {prof} este día.',
+    agendar_este_profissional: 'este profesional',
+    agendar_lista_espera: 'Lista de espera',
+    agendar_anotado: '¡Anotado! Te avisaremos en cuanto se libere un horario.',
+    agendar_le_nome: 'Nombre',
+    agendar_le_email: 'Correo electrónico',
+    agendar_le_telefone: 'Teléfono (opcional)',
+    agendar_le_enviar: 'Unirme a la lista de espera',
+    agendar_le_enviando: 'Enviando...',
+    agendar_manha: 'Mañana ({n})',
+    agendar_tarde: 'Tarde ({n})',
+    agendar_mes_anterior: 'Mes anterior',
+    agendar_proximo_mes: 'Mes siguiente',
+    agendar_fora_periodo: 'Fuera del período de reservas',
+
+    endereco_titulo: 'Ubicación',
+    endereco_ver_mapa: 'Ver en Google Maps',
+    contato_titulo: 'Contáctanos',
+    contato_whatsapp_mensagem: '¡Hola! Me gustaría reservar un turno en Kaizen Barber Shop.',
+    endereco_horario_titulo: 'Horario de Atención',
+    endereco_fechado: 'Cerrado',
+    endereco_almoco: 'Pausa de almuerzo: {inicio} - {fim} (en días de atención)',
+    endereco_fachada: 'Fachada',
+    endereco_interior: 'Interior',
+    endereco_detalhes: 'Detalles',
+    endereco_ambiente: 'Ambiente',
+
+    profissionais_titulo: 'Equipo',
+    profissionais_contato: 'Contacto',
+
+    fidelidade_titulo: 'Puntos',
+    fidelidade_regra1: '2 puntos por servicio realizado',
+    fidelidade_regra2: '10 puntos = ¥500 de descuento en tu próximo turno',
+    fidelidade_consultar_titulo: 'Consultar mi saldo',
+    fidelidade_email_placeholder: 'Tu correo registrado',
+    fidelidade_consultar_botao: 'Consultar',
+    fidelidade_atendimentos: 'Servicios realizados:',
+    fidelidade_resgatados: 'Puntos ya canjeados:',
+    fidelidade_saldo: 'Saldo disponible:',
+    fidelidade_pontos: 'puntos',
+    fidelidade_pode_resgatar: '¡Ya puedes canjear ¥500 de descuento en tu próximo turno! Solo marca la opción al confirmar el horario.',
+    fidelidade_faltam: 'Te faltan {n} puntos para el próximo descuento de ¥500.',
+
+    avaliacoes_titulo: 'Reseñas',
+    avaliacoes_deixe: '¡Deja tu reseña!',
+    avaliacoes_nome_placeholder: 'Tu nombre',
+    avaliacoes_texto_placeholder: 'Tu reseña',
+    avaliacoes_enviar: 'Enviar',
+
+    footer_direitos: 'Todos los derechos reservados.',
+
+    modal_nome_placeholder: 'Nombre',
+    modal_email_placeholder: 'Correo electrónico',
+    modal_telefone_placeholder: 'Teléfono',
+    modal_obs_placeholder: '¿Alguna observación? (Ej: No es necesario lavar, etc...)',
+    modal_consultando_pontos: 'Consultando tus puntos de fidelidad...',
+    modal_pontos_disponiveis: 'Tienes {n} puntos de fidelidad disponibles.',
+    modal_usar_pontos: 'Usar 10 puntos ahora para obtener ¥500 de descuento en este turno',
+    modal_faltam_pontos: 'Te faltan {n} puntos ({a} servicio(s)) para el próximo descuento de ¥500.',
+    modal_agendando: 'Reservando turno...',
+    modal_confirmar: 'Confirmar reserva',
+    modal_cancelar: 'Cancelar',
+
+    alerta_preencha_nome_email: '¡Completa tu nombre y correo electrónico!',
+    alerta_selecione_servico: '¡Selecciona un servicio!',
+    alerta_pontos_insuficientes: '¡No tienes suficientes puntos para canjear el descuento!',
+    alerta_erro_agendar: 'Error al reservar: ',
+    alerta_erro_presenca: 'No fue posible confirmar la asistencia en este momento: ',
+    alerta_erro_lista_espera: 'No fue posible registrarte en la lista de espera en este momento: ',
+    alerta_avaliacao_enviada: '¡Reseña enviada!',
+  },
 };
 
 export const DIAS_ABREV_POR_IDIOMA = {
   'pt-BR': ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'],
   en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   ja: ['日', '月', '火', '水', '木', '金', '土'],
+  es: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
 };
 
 export const DIAS_NOMES_POR_IDIOMA = {
@@ -356,6 +465,10 @@ export const DIAS_NOMES_POR_IDIOMA = {
     segunda: '月曜日', terca: '火曜日', quarta: '水曜日',
     quinta: '木曜日', sexta: '金曜日', sabado: '土曜日', domingo: '日曜日',
   },
+  es: {
+    segunda: 'Lunes', terca: 'Martes', quarta: 'Miércoles',
+    quinta: 'Jueves', sexta: 'Viernes', sabado: 'Sábado', domingo: 'Domingo',
+  },
 };
 
 // Locale usado em toLocaleDateString / toLocaleTimeString para cada idioma.
@@ -363,6 +476,7 @@ export const LOCALE_POR_IDIOMA = {
   'pt-BR': 'pt-BR',
   en: 'en-US',
   ja: 'ja-JP',
+  es: 'es-ES',
 };
 
 // traduzir('en', 'conf_min_antes', { min: 15 }) => "15 min before"
