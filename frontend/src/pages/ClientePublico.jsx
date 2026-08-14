@@ -865,7 +865,7 @@ function ClientePublico() {
 
         {abaAtiva === 'agendar' && (
           <section style={{
-            backgroundImage: 'url(/images/interior.jpg)',
+            backgroundImage: 'url(/images/agendar_bg.jpg)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundAttachment: 'fixed',
