@@ -37,6 +37,26 @@ const DIAS_CARROSSEL = 90; // até quantos dias à frente o cliente pode agendar
 const OPCOES_LEMBRETE = [15, 20, 30, 60];
 const CHAVE_IDIOMA_STORAGE = 'kaizen_idioma';
 
+// Converte um Date "de calendário" (ex: new Date(ano, mes, dia), meia-noite
+// local) para a string AAAA-MM-DD correspondente. NÃO usar .toISOString()
+// para isso — ela converte para UTC, e em fusos adiantados em relação a UTC
+// (como o do Japão, UTC+9) a meia-noite local "volta" para o dia anterior em
+// UTC, fazendo a data mostrada/salva ficar um dia errada.
+const paraDataStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Salão fica em Anjo, Aichi, Japão — sempre UTC+9, sem horário de verão.
+// Calculamos "agora" nesse fuso a partir de Date.now() (que é sempre UTC,
+// não depende do fuso/relógio do aparelho de quem está acessando o site),
+// para nunca deixar agendar um horário que já passou lá no salão — mesmo
+// que o cliente esteja acessando de outro fuso horário.
+const obterAgoraNoJapao = () => {
+  const utcMaisNove = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return {
+    dataStr: `${utcMaisNove.getUTCFullYear()}-${String(utcMaisNove.getUTCMonth() + 1).padStart(2, '0')}-${String(utcMaisNove.getUTCDate()).padStart(2, '0')}`,
+    minutos: utcMaisNove.getUTCHours() * 60 + utcMaisNove.getUTCMinutes(),
+  };
+};
+
 const formatarPreco = (valor) => `¥${valor.toLocaleString('ja-JP')}`;
 
 const somarMinutos = (horaStr, minutos) => {
@@ -351,8 +371,8 @@ function ClientePublico() {
       const fimJanela = new Date(hoje);
       fimJanela.setDate(hoje.getDate() + DIAS_CARROSSEL);
 
-      const dataInicio = hoje.toISOString().split('T')[0];
-      const dataFim = fimJanela.toISOString().split('T')[0];
+      const dataInicio = paraDataStr(hoje);
+      const dataFim = paraDataStr(fimJanela);
 
       // Qualquer agendamento não cancelado ocupa o horário — inclui os
       // criados manualmente pelo Admin (status AGENDADO), que antes não
@@ -414,9 +434,18 @@ function ClientePublico() {
   const getHorariosProfissional = (prof, data, duracaoMinutos) => {
     if (!prof) return [];
     const duracao = duracaoMinutos || 60;
-    const dataStr = data.toISOString().split('T')[0];
+    const dataStr = paraDataStr(data);
     const intervalosOcupados = (horariosOcupados[prof.uuid] || []).filter(o => o.data === dataStr);
-    return getSlotsLivresNoDia(data, duracao, intervalosOcupados, horarioEstendido);
+    const slots = getSlotsLivresNoDia(data, duracao, intervalosOcupados, horarioEstendido);
+
+    // Se o dia selecionado é "hoje" no horário do Japão, esconde os horários
+    // que já passaram lá no salão (evita agendar às 9h sendo já 20h, por
+    // exemplo), independente do fuso horário de quem está acessando o site.
+    const agora = obterAgoraNoJapao();
+    if (dataStr === agora.dataStr) {
+      return slots.filter(h => paraMinutos(h) > agora.minutos);
+    }
+    return slots;
   };
 
   const calcularPrecoFinal = () => {
@@ -442,7 +471,7 @@ function ClientePublico() {
     setDiaHorarioSelecionado({ data: dataSelecionada, prof: profissionalSelecionado, hora });
     setDadosAgendamento({
       ...dadosAgendamento,
-      data: dataSelecionada.toISOString().split('T')[0],
+      data: paraDataStr(dataSelecionada),
       profissional: profissionalSelecionado.nome,
       hora
     });
@@ -595,7 +624,7 @@ function ClientePublico() {
         telefone: listaEsperaDados.telefone || null,
         servico: dadosAgendamento.servico || null,
         profissional: profissionalSelecionado?.nome || null,
-        data_desejada: dataSelecionada.toISOString().split('T')[0],
+        data_desejada: paraDataStr(dataSelecionada),
       }]);
       if (error) throw error;
       setListaEsperaEnviada(true);
