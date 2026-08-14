@@ -18,6 +18,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [modoEncaixe, setModoEncaixe] = useState(false);
+  const [diaModal, setDiaModal] = useState(null); // data (YYYY-MM-DD) do dia clicado no calendário, ou null se fechado
 
   const [novoAgendamento, setNovoAgendamento] = useState({
     cliente: '',
@@ -298,16 +299,24 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       const dataStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
       const agendadosNoDia = agendadosDeste.filter(a => a.data === dataStr);
 
+      const temAgendamentos = agendadosNoDia.length > 0;
+
       return (
         <div
           key={dia}
+          onClick={temAgendamentos ? () => setDiaModal(dataStr) : undefined}
+          title={temAgendamentos ? t('agendamentos.agendamentosDoDia', { data: dia }) : undefined}
           style={{
             border: '1px solid #404040',
             padding: '10px',
             borderRadius: '6px',
             background: agendadosNoDia.length > 0 ? '#2d3d2d' : '#2d2d2d',
-            minHeight: '80px'
+            minHeight: '80px',
+            cursor: temAgendamentos ? 'pointer' : 'default',
+            transition: 'border-color 0.15s, background 0.15s'
           }}
+          onMouseEnter={(e) => { if (temAgendamentos) e.currentTarget.style.borderColor = '#d4af37'; }}
+          onMouseLeave={(e) => { if (temAgendamentos) e.currentTarget.style.borderColor = '#404040'; }}
         >
           <strong style={{ color: '#d4af37' }}>{dia}</strong>
           {agendadosNoDia.map(a => (
@@ -601,6 +610,128 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           </div>
         )}
       </section>
+
+      {/* MODAL DE AGENDAMENTOS DO DIA */}
+      {diaModal && (() => {
+        const agendamentosDoDia = agendamentosFiltrados
+          .filter(a => a.data === diaModal)
+          .sort((a, b) => a.hora.localeCompare(b.hora));
+        const dataFormatada = new Date(`${diaModal}T00:00:00`)
+          .toLocaleDateString(locale, { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        return (
+          <div
+            onClick={() => setDiaModal(null)}
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0, 0, 0, 0.65)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#2d2d2d',
+                border: '1px solid #d4af37',
+                borderRadius: '10px',
+                padding: '24px',
+                maxWidth: '600px',
+                width: '100%',
+                maxHeight: '80vh',
+                overflowY: 'auto'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                <h3 style={{ color: '#d4af37', margin: 0, textTransform: 'capitalize' }}>
+                  {t('agendamentos.agendamentosDoDia', { data: dataFormatada })}
+                </h3>
+                <button
+                  onClick={() => setDiaModal(null)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #d4af37',
+                    color: '#d4af37',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  ✕ {t('agendamentos.fecharModal')}
+                </button>
+              </div>
+
+              {agendamentosDoDia.length === 0 ? (
+                <p style={{ color: '#999', textAlign: 'center' }}>{t('agendamentos.nenhumAgendamentoNoDia')}</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {agendamentosDoDia.map(a => (
+                    <div
+                      key={a.id}
+                      style={{
+                        border: '1px solid #404040',
+                        borderRadius: '8px',
+                        padding: '14px',
+                        background: '#1a1a1a'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                        <div>
+                          <strong style={{ color: '#d4af37', fontSize: '16px' }}>{a.hora}</strong>
+                          {' — '}
+                          <strong style={{ color: '#e8e8e8' }}>{a.cliente}</strong>
+                          {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}
+                        </div>
+                        <button
+                          className="btn-delete"
+                          onClick={() => handleDeletar(a.id)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+
+                      <div style={{ color: '#999', fontSize: '13px', marginTop: '6px' }}>{a.servico}</div>
+
+                      {(a.telefone || a.email) && (
+                        <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+                          {a.telefone && <span>📞 {a.telefone}</span>}
+                          {a.telefone && a.email && <span> · </span>}
+                          {a.email && <span>✉️ {a.email}</span>}
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: '10px' }}>
+                        <select
+                          value={a.status}
+                          onChange={(e) => handleAlterarStatus(a.id, e.target.value)}
+                          style={{
+                            padding: '6px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            background: getCorStatus(a.status),
+                            color: '#1a1a1a',
+                            fontWeight: 'bold',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {statusOpcoes.map(s => (
+                            <option key={s} value={s}>{t(`statusAg.${s}`)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

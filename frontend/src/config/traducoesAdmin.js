@@ -167,6 +167,9 @@ const TEXTOS = {
     'agendamentos.erroDeletar': '❌ Erro ao deletar: {msg}',
     'agendamentos.erroBuscar': '❌ Erro ao buscar agendamentos: {msg}',
     'agendamentos.desconhecido': 'Desconhecido',
+    'agendamentos.agendamentosDoDia': 'Agendamentos de {data}',
+    'agendamentos.nenhumAgendamentoNoDia': 'Nenhum agendamento nesse dia.',
+    'agendamentos.fecharModal': 'Fechar',
 
     // Clientes
     'clientes.titulo': '👥 Clientes',
@@ -488,6 +491,9 @@ const TEXTOS = {
     'agendamentos.erroDeletar': '❌ Error deleting: {msg}',
     'agendamentos.erroBuscar': '❌ Error fetching appointments: {msg}',
     'agendamentos.desconhecido': 'Unknown',
+    'agendamentos.agendamentosDoDia': 'Appointments for {data}',
+    'agendamentos.nenhumAgendamentoNoDia': 'No appointments that day.',
+    'agendamentos.fecharModal': 'Close',
 
     'clientes.titulo': '👥 Clients',
     'clientes.novoCliente': 'New Client',
@@ -803,6 +809,9 @@ const TEXTOS = {
     'agendamentos.erroDeletar': '❌ 削除エラー: {msg}',
     'agendamentos.erroBuscar': '❌ 予約の取得エラー: {msg}',
     'agendamentos.desconhecido': '不明',
+    'agendamentos.agendamentosDoDia': '{data}の予約',
+    'agendamentos.nenhumAgendamentoNoDia': 'その日の予約はありません。',
+    'agendamentos.fecharModal': '閉じる',
 
     'clientes.titulo': '👥 顧客',
     'clientes.novoCliente': '新規顧客',
