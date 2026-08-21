@@ -20,6 +20,9 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [modoEncaixe, setModoEncaixe] = useState(false);
   const [diaModal, setDiaModal] = useState(null); // data (YYYY-MM-DD) do dia clicado no calendário, ou null se fechado
   const [bloqueios, setBloqueios] = useState([]);
+  const [agendamentoEditando, setAgendamentoEditando] = useState(null); // agendamento sendo editado (data/hora), ou null se fechado
+  const [edicaoForm, setEdicaoForm] = useState({ data: '', horario: '', encaixe: false });
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   const [novoAgendamento, setNovoAgendamento] = useState({
     cliente: '',
@@ -121,6 +124,44 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     const inicioMin = paraMinutos(novoAgendamento.horario);
     const fimMin = inicioMin + duracaoNovoAgendamento;
     return intervalosOcupadosNoDia.filter(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
+  })();
+
+  // ---- Cálculo de horários disponíveis para o modal "Editar Agendamento" ----
+  // Mesma lógica do "Novo Agendamento" acima, mas excluindo o próprio
+  // agendamento em edição da lista de ocupados (senão ele "colidiria" consigo
+  // mesmo e nenhum horário apareceria livre, nem o horário atual dele).
+  const duracaoEdicao = agendamentoEditando
+    ? (servicosLista.find(s => s.nome === agendamentoEditando.servico)?.duracaoMinutos || 60)
+    : 60;
+
+  const intervalosOcupadosEdicao = (!agendamentoEditando || !edicaoForm.data) ? [] : [
+    ...agendamentos
+      .filter(a => a.id !== agendamentoEditando.id && a.profissionalId === agendamentoEditando.profissionalId && a.data === edicaoForm.data && a.status !== 'CANCELADO')
+      .map(a => {
+        const inicioMin = paraMinutos(a.hora);
+        const duracao = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+        return { inicioMin, fimMin: inicioMin + duracao, cliente: a.cliente, hora: a.hora, servico: a.servico };
+      }),
+    ...bloqueios
+      .filter(b => b.profissionalId === agendamentoEditando.profissionalId && b.data === edicaoForm.data)
+      .map(b => ({
+        inicioMin: paraMinutos(b.horaInicio),
+        fimMin: paraMinutos(b.horaFim),
+        cliente: b.motivo ? `${t('agendamentos.bloqueioTag')} — ${b.motivo}` : t('agendamentos.bloqueioTag'),
+        hora: b.horaInicio,
+        servico: t('agendamentos.bloqueioTag')
+      }))
+  ];
+
+  const slotsDisponiveisEdicao = (!agendamentoEditando || !edicaoForm.data) ? [] : (() => {
+    const dataObj = new Date(`${edicaoForm.data}T00:00:00`);
+    return getSlotsLivresNoDia(dataObj, duracaoEdicao, intervalosOcupadosEdicao, horarioEstendido);
+  })();
+
+  const conflitosEncaixeEdicao = (!edicaoForm.encaixe || !edicaoForm.horario) ? [] : (() => {
+    const inicioMin = paraMinutos(edicaoForm.horario);
+    const fimMin = inicioMin + duracaoEdicao;
+    return intervalosOcupadosEdicao.filter(o => inicioMin < o.fimMin && fimMin > o.inicioMin);
   })();
 
   const buscarAgendamentos = async () => {
@@ -389,6 +430,74 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       buscarAgendamentos();
     } catch (error) {
       alert(t('agendamentos.erroDeletar', { msg: error.message }));
+    }
+  };
+
+  const abrirEdicao = (agendamento) => {
+    setAgendamentoEditando(agendamento);
+    setEdicaoForm({ data: agendamento.data, horario: agendamento.hora, encaixe: false });
+  };
+
+  const fecharEdicao = () => {
+    setAgendamentoEditando(null);
+    setEdicaoForm({ data: '', horario: '', encaixe: false });
+  };
+
+  const handleEdicaoInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setEdicaoForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  // Altera a data/hora do agendamento. O e-mail para o cliente e para o
+  // profissional é disparado automaticamente pelo trigger do banco (ver
+  // migração trg_notificar_reagendamento) assim que o UPDATE abaixo mudar
+  // o campo data_hora — não precisa chamar nada daqui.
+  const handleSalvarEdicao = async (e) => {
+    e.preventDefault();
+    if (!agendamentoEditando) return;
+
+    if (!edicaoForm.data || !edicaoForm.horario) {
+      alert(t('agendamentos.preencherObrigatorios'));
+      return;
+    }
+
+    const semMudanca = edicaoForm.data === agendamentoEditando.data && edicaoForm.horario === agendamentoEditando.hora;
+    if (semMudanca) {
+      fecharEdicao();
+      return;
+    }
+
+    if (!edicaoForm.encaixe && !slotsDisponiveisEdicao.includes(edicaoForm.horario)) {
+      alert(t('agendamentos.horarioIndisponivel'));
+      return;
+    }
+
+    if (edicaoForm.encaixe && conflitosEncaixeEdicao.length > 0) {
+      const resumoConflito = conflitosEncaixeEdicao
+        .map(c => `${c.hora} - ${c.cliente} (${c.servico})`)
+        .join('\n');
+      const confirmou = window.confirm(
+        t('agendamentos.confirmarEncaixe', { horario: edicaoForm.horario, prof: agendamentoEditando.profissional, resumo: resumoConflito })
+      );
+      if (!confirmou) return;
+    }
+
+    setSalvandoEdicao(true);
+    try {
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({ data_hora: `${edicaoForm.data}T${edicaoForm.horario}:00` })
+        .eq('id', agendamentoEditando.id);
+
+      if (error) throw error;
+
+      alert(t('agendamentos.alteracaoSalva'));
+      fecharEdicao();
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroSalvarAlteracao', { msg: error.message }));
+    } finally {
+      setSalvandoEdicao(false);
     }
   };
 
@@ -837,7 +946,13 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 {agendamentosFiltrados.map((agendamento) => (
                   <tr key={agendamento.id}>
                     <td style={{ fontWeight: 'bold' }}>
-                      {agendamento.cliente}
+                      <span
+                        onClick={() => abrirEdicao(agendamento)}
+                        title={t('agendamentos.editarTooltip')}
+                        style={{ cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: '3px' }}
+                      >
+                        {agendamento.cliente} ✏️
+                      </span>
                       {agendamento.encaixe && <span title={t('agendamentos.criadoComoEncaixe')} style={{ color: '#f97316', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}
                     </td>
                     <td style={{ fontSize: '12px', color: '#999' }}>{agendamento.email}</td>
@@ -986,7 +1101,13 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                         <div>
                           <strong style={{ color: '#d4af37', fontSize: '16px' }}>{a.hora}</strong>
                           {' — '}
-                          <strong style={{ color: '#e8e8e8' }}>{a.cliente}</strong>
+                          <strong
+                            onClick={() => { setDiaModal(null); abrirEdicao(a); }}
+                            title={t('agendamentos.editarTooltip')}
+                            style={{ color: '#e8e8e8', cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: '3px' }}
+                          >
+                            {a.cliente} ✏️
+                          </strong>
                           {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}
                         </div>
                         <button
@@ -1034,6 +1155,137 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           </div>
         );
       })()}
+
+      {/* MODAL DE EDIÇÃO DE AGENDAMENTO (data/hora) */}
+      {agendamentoEditando && (
+        <div
+          onClick={fecharEdicao}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#2d2d2d',
+              border: '1px solid #d4af37',
+              borderRadius: '10px',
+              padding: '24px',
+              maxWidth: '480px',
+              width: '100%',
+              maxHeight: '85vh',
+              overflowY: 'auto'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <h3 style={{ color: '#d4af37', margin: 0 }}>{t('agendamentos.editarAgendamento')}</h3>
+              <button
+                onClick={fecharEdicao}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #d4af37',
+                  color: '#d4af37',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                ✕ {t('comum.cancelar')}
+              </button>
+            </div>
+
+            <p style={{ color: '#999', fontSize: '13px', marginBottom: '18px' }}>
+              {t('agendamentos.editarAgendamentoAviso')}
+            </p>
+
+            <div style={{ marginBottom: '16px', fontSize: '14px', color: '#e8e8e8' }}>
+              <div><span style={{ color: '#666' }}>{t('comum.cliente')}: </span><strong>{agendamentoEditando.cliente}</strong></div>
+              <div><span style={{ color: '#666' }}>{t('comum.servico')}: </span><strong>{agendamentoEditando.servico}</strong></div>
+              <div><span style={{ color: '#666' }}>{t('comum.profissional')}: </span><strong>{agendamentoEditando.profissional}</strong></div>
+            </div>
+
+            <form onSubmit={handleSalvarEdicao}>
+              <input
+                type="date"
+                name="data"
+                value={edicaoForm.data}
+                onChange={(e) => { handleEdicaoInputChange(e); setEdicaoForm(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
+                required
+              />
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="encaixe"
+                  checked={edicaoForm.encaixe}
+                  onChange={(e) => { handleEdicaoInputChange(e); setEdicaoForm(prev => ({ ...prev, horario: '' })); }}
+                />
+                <strong style={{ color: edicaoForm.encaixe ? '#f97316' : undefined }}>
+                  {t('agendamentos.modoEncaixe')} {edicaoForm.encaixe ? t('agendamentos.modoEncaixeAtivado') : ''}
+                </strong>
+              </label>
+
+              {edicaoForm.encaixe ? (
+                <>
+                  <input
+                    type="time"
+                    name="horario"
+                    value={edicaoForm.horario}
+                    onChange={handleEdicaoInputChange}
+                    required
+                  />
+                  {edicaoForm.horario && conflitosEncaixeEdicao.length > 0 && (
+                    <div style={{ background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px', margin: '8px 0', fontSize: '13px' }}>
+                      <strong style={{ color: '#f97316' }}>{t('agendamentos.conflito')} </strong>
+                      {conflitosEncaixeEdicao.map(c => `${c.hora} - ${c.cliente} (${c.servico})`).join('; ')}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ margin: '8px 0' }}>
+                  {slotsDisponiveisEdicao.length === 0 ? (
+                    <p style={{ fontSize: '13px', color: '#f87171' }}>{t('agendamentos.nenhumHorarioLivre')}</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {slotsDisponiveisEdicao.map(h => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setEdicaoForm(prev => ({ ...prev, horario: h }))}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: '999px',
+                            border: '1px solid #4ade80',
+                            background: edicaoForm.horario === h ? '#4ade80' : 'transparent',
+                            color: edicaoForm.horario === h ? '#1a1a1a' : '#4ade80',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {h}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button type="submit" className="btn-primary" disabled={salvandoEdicao}>
+                {salvandoEdicao ? t('comum.carregando') : t('agendamentos.salvarAlteracao')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

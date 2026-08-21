@@ -188,6 +188,12 @@ const TEXTOS = {
     'agendamentos.diaTodo': 'Fechado (dia todo)',
     'agendamentos.bloqueioCriadoPeriodo': '{n} dias bloqueados com sucesso!',
     'agendamentos.dataFimAntesInicio': 'A data final deve ser depois (ou igual) da data inicial.',
+    'agendamentos.editarTooltip': 'Clique para editar data/horário',
+    'agendamentos.editarAgendamento': 'Editar Agendamento',
+    'agendamentos.editarAgendamentoAviso': 'Ao salvar, o cliente e o profissional recebem um e-mail automático avisando da mudança de horário.',
+    'agendamentos.salvarAlteracao': 'Salvar alteração',
+    'agendamentos.alteracaoSalva': 'Horário alterado! Cliente e profissional foram notificados por e-mail.',
+    'agendamentos.erroSalvarAlteracao': 'Erro ao salvar alteração: {msg}',
 
     // Clientes
     'clientes.titulo': '👥 Clientes',
@@ -530,6 +536,12 @@ const TEXTOS = {
     'agendamentos.diaTodo': 'Closed (all day)',
     'agendamentos.bloqueioCriadoPeriodo': '{n} days blocked successfully!',
     'agendamentos.dataFimAntesInicio': 'End date must be on or after the start date.',
+    'agendamentos.editarTooltip': 'Click to edit date/time',
+    'agendamentos.editarAgendamento': 'Edit Appointment',
+    'agendamentos.editarAgendamentoAviso': 'When saved, the client and the staff member automatically get an email about the time change.',
+    'agendamentos.salvarAlteracao': 'Save change',
+    'agendamentos.alteracaoSalva': 'Time updated! Client and staff member were notified by email.',
+    'agendamentos.erroSalvarAlteracao': 'Error saving change: {msg}',
 
     'clientes.titulo': '👥 Clients',
     'clientes.novoCliente': 'New Client',
@@ -866,6 +878,12 @@ const TEXTOS = {
     'agendamentos.diaTodo': '休業(終日)',
     'agendamentos.bloqueioCriadoPeriodo': '{n}日間をブロックしました!',
     'agendamentos.dataFimAntesInicio': '終了日は開始日以降にしてください。',
+    'agendamentos.editarTooltip': 'クリックして日時を編集',
+    'agendamentos.editarAgendamento': '予約を編集',
+    'agendamentos.editarAgendamentoAviso': '保存すると、お客様と担当スタッフに変更のお知らせメールが自動送信されます。',
+    'agendamentos.salvarAlteracao': '変更を保存',
+    'agendamentos.alteracaoSalva': '時間を変更しました!お客様とスタッフにメールで通知されました。',
+    'agendamentos.erroSalvarAlteracao': '変更の保存エラー: {msg}',
 
     'clientes.titulo': '👥 顧客',
     'clientes.novoCliente': '新規顧客',

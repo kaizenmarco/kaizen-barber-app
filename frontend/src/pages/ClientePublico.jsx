@@ -154,7 +154,15 @@ function ClientePublico() {
     }
   };
 
-  const [abaAtiva, setAbaAtiva] = useState('servicos');
+  // Permite abrir o site direto numa aba específica via link/QR code, ex:
+  // app.kaizenbarbershop.com/?aba=agendar — usado no QR code impresso na
+  // barbearia, pra cair direto na tela de agendar em vez da de serviços.
+  const ABAS_VALIDAS = ['servicos', 'agendar', 'endereco', 'profissionais', 'fidelidade', 'avaliacoes'];
+  const [abaAtiva, setAbaAtiva] = useState(() => {
+    if (typeof window === 'undefined') return 'servicos';
+    const abaUrl = new URLSearchParams(window.location.search).get('aba');
+    return ABAS_VALIDAS.includes(abaUrl) ? abaUrl : 'servicos';
+  });
   const [agendamentoConfirmado, setAgendamentoConfirmado] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [horariosOcupados, setHorariosOcupados] = useState({});
