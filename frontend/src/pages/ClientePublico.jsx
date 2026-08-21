@@ -57,6 +57,19 @@ const obterAgoraNoJapao = () => {
   };
 };
 
+// Converte uma data_hora "AAAA-MM-DDTHH:MM:SS" salva no banco (sempre no
+// horário civil do Japão, JST/UTC+9, sem sufixo de fuso) para o instante UTC
+// real em milissegundos — usado pra calcular quanto tempo falta pro
+// agendamento, corretamente não importa o fuso do aparelho do cliente.
+const dataHoraJstParaUtcMs = (dataHoraStr) => {
+  const comoSeFosseUtc = new Date(`${dataHoraStr}Z`);
+  return comoSeFosseUtc.getTime() - 9 * 60 * 60 * 1000;
+};
+
+// Cliente só cancela sozinho pelo site com 2h ou mais de antecedência. Com
+// menos que isso, precisa ligar/chamar no WhatsApp — combinado com o Marco.
+const LIMITE_CANCELAMENTO_MINUTOS = 120;
+
 const formatarPreco = (valor) => `¥${valor.toLocaleString('ja-JP')}`;
 
 const somarMinutos = (horaStr, minutos) => {
@@ -157,7 +170,7 @@ function ClientePublico() {
   // Permite abrir o site direto numa aba específica via link/QR code, ex:
   // app.kaizenbarbershop.com/?aba=agendar — usado no QR code impresso na
   // barbearia, pra cair direto na tela de agendar em vez da de serviços.
-  const ABAS_VALIDAS = ['servicos', 'agendar', 'endereco', 'profissionais', 'fidelidade', 'avaliacoes'];
+  const ABAS_VALIDAS = ['servicos', 'agendar', 'meusAgendamentos', 'endereco', 'profissionais', 'fidelidade', 'avaliacoes'];
   const [abaAtiva, setAbaAtiva] = useState(() => {
     if (typeof window === 'undefined') return 'servicos';
     const abaUrl = new URLSearchParams(window.location.search).get('aba');
@@ -195,6 +208,12 @@ function ClientePublico() {
 
   const [emailConsultaPontos, setEmailConsultaPontos] = useState('');
   const [consultaPontosFeita, setConsultaPontosFeita] = useState(false);
+
+  const [emailConsultaAgendamentos, setEmailConsultaAgendamentos] = useState('');
+  const [agendamentosDoCliente, setAgendamentosDoCliente] = useState([]);
+  const [consultandoAgendamentos, setConsultandoAgendamentos] = useState(false);
+  const [consultaAgendamentosFeita, setConsultaAgendamentosFeita] = useState(false);
+  const [cancelandoId, setCancelandoId] = useState(null);
 
   const [dadosAgendamento, setDadosAgendamento] = useState({
     nome: '',
@@ -367,6 +386,90 @@ function ClientePublico() {
       setPontosCliente(0);
     } finally {
       setCarregandoPontos(false);
+    }
+  };
+
+  // Busca os agendamentos futuros (ainda não cancelados) do cliente pelo
+  // e-mail, pra ele poder cancelar sozinho — mesmo padrão de consulta por
+  // e-mail já usado em Fidelidade, sem precisar de login.
+  const buscarAgendamentosCliente = async (emailParam) => {
+    const email = emailParam || emailConsultaAgendamentos;
+    if (!email) return;
+    setConsultandoAgendamentos(true);
+    try {
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('email', email);
+
+      if (!clientes || clientes.length === 0) {
+        setAgendamentosDoCliente([]);
+        return;
+      }
+
+      const clienteId = clientes[0].id;
+      const agoraMs = Date.now();
+
+      const { data, error } = await supabase
+        .from('agendamentos')
+        .select('id, data_hora, status, observacoes, servicos(nome), profissionais(nome)')
+        .eq('cliente_id', clienteId)
+        .neq('status', 'CANCELADO')
+        .order('data_hora', { ascending: true });
+
+      if (error) throw error;
+
+      const futuros = (data || [])
+        .filter(a => dataHoraJstParaUtcMs(a.data_hora) > agoraMs)
+        .map(a => {
+          const minutosRestantes = (dataHoraJstParaUtcMs(a.data_hora) - agoraMs) / 60000;
+          return {
+            id: a.id,
+            data: a.data_hora.split('T')[0],
+            hora: a.data_hora.split('T')[1]?.substring(0, 5) || '',
+            status: a.status,
+            observacoes: a.observacoes,
+            servico: a.servicos?.nome || '-',
+            profissional: a.profissionais?.nome || '-',
+            podeCancelar: minutosRestantes >= LIMITE_CANCELAMENTO_MINUTOS,
+          };
+        });
+
+      setAgendamentosDoCliente(futuros);
+    } catch (error) {
+      console.error('Erro ao buscar agendamentos do cliente:', error);
+      setAgendamentosDoCliente([]);
+    } finally {
+      setConsultandoAgendamentos(false);
+    }
+  };
+
+  // Cancela o agendamento (o profissional é avisado automaticamente por
+  // e-mail via trigger do banco — ver notificar-cancelamento). Marca a
+  // observação com [CANCELADO PELO CLIENTE] só pra diferenciar, no Admin, de
+  // um cancelamento feito pela própria equipe.
+  const handleCancelarAgendamento = async (agendamento) => {
+    if (!window.confirm(t('meusAgendamentos_confirmarCancelamento'))) return;
+
+    setCancelandoId(agendamento.id);
+    try {
+      const novaObs = agendamento.observacoes
+        ? `${agendamento.observacoes} [CANCELADO PELO CLIENTE]`
+        : '[CANCELADO PELO CLIENTE]';
+
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({ status: 'CANCELADO', observacoes: novaObs })
+        .eq('id', agendamento.id);
+
+      if (error) throw error;
+
+      alert(t('meusAgendamentos_cancelado_sucesso'));
+      setAgendamentosDoCliente(prev => prev.filter(a => a.id !== agendamento.id));
+    } catch (error) {
+      alert(t('meusAgendamentos_erro_cancelar') + error.message);
+    } finally {
+      setCancelandoId(null);
     }
   };
 
@@ -819,6 +922,7 @@ function ClientePublico() {
         {[
           { id: 'servicos', label: `💈 ${t('nav_servicos')}` },
           { id: 'agendar', label: `📅 ${t('nav_agendar')}` },
+          { id: 'meusAgendamentos', label: `📋 ${t('nav_meusAgendamentos')}` },
           { id: 'endereco', label: `📍 ${t('nav_endereco')}` },
           { id: 'profissionais', label: `👥 ${t('nav_profissionais')}` },
           { id: 'fidelidade', label: `🎁 ${t('nav_fidelidade')}` },
@@ -1131,6 +1235,84 @@ function ClientePublico() {
                 </div>
               )}
             </div>
+          </section>
+        )}
+
+        {abaAtiva === 'meusAgendamentos' && (
+          <section>
+            <h2 style={{ color: '#d4af37' }}>📋 {t('meusAgendamentos_titulo')}</h2>
+
+            <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <input
+                  type="email"
+                  placeholder={t('fidelidade_email_placeholder')}
+                  value={emailConsultaAgendamentos}
+                  onChange={(e) => setEmailConsultaAgendamentos(e.target.value)}
+                  style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
+                />
+                <button
+                  onClick={async () => { await buscarAgendamentosCliente(emailConsultaAgendamentos); setConsultaAgendamentosFeita(true); }}
+                  disabled={!emailConsultaAgendamentos.includes('@') || consultandoAgendamentos}
+                  style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: consultandoAgendamentos ? 'wait' : 'pointer' }}
+                >
+                  {consultandoAgendamentos ? '⏳' : t('fidelidade_consultar_botao')}
+                </button>
+              </div>
+            </div>
+
+            {consultaAgendamentosFeita && !consultandoAgendamentos && (
+              agendamentosDoCliente.length === 0 ? (
+                <p style={{ color: '#999', maxWidth: '600px' }}>{t('meusAgendamentos_nenhum')}</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '600px' }}>
+                  {agendamentosDoCliente.map(a => (
+                    <div
+                      key={a.id}
+                      style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '8px', padding: '16px' }}
+                    >
+                      <p style={{ margin: '0 0 4px', fontSize: '16px' }}>
+                        <strong style={{ color: '#d4af37' }}>{new Date(`${a.data}T00:00:00`).toLocaleDateString(localeAtual)}</strong>
+                        {' · '}
+                        <strong style={{ color: '#d4af37' }}>{a.hora}</strong>
+                      </p>
+                      <p style={{ margin: '0 0 4px', color: '#e8e8e8' }}>{a.servico} — {a.profissional}</p>
+
+                      {a.podeCancelar ? (
+                        <button
+                          onClick={() => handleCancelarAgendamento(a)}
+                          disabled={cancelandoId === a.id}
+                          style={{
+                            marginTop: '10px',
+                            background: 'transparent',
+                            color: '#f87171',
+                            border: '1px solid #f87171',
+                            padding: '8px 16px',
+                            borderRadius: '4px',
+                            fontWeight: 'bold',
+                            cursor: cancelandoId === a.id ? 'wait' : 'pointer'
+                          }}
+                        >
+                          {cancelandoId === a.id ? t('meusAgendamentos_cancelando') : t('meusAgendamentos_cancelar_botao')}
+                        </button>
+                      ) : (
+                        <div style={{ marginTop: '10px', background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px' }}>
+                          <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f97316' }}>{t('meusAgendamentos_menosDe2h')}</p>
+                          <a
+                            href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366', display: 'inline-flex' }}
+                          >
+                            <FaWhatsapp size={16} /> WhatsApp
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
           </section>
         )}
 

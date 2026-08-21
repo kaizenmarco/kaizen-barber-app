@@ -25,6 +25,7 @@ const TEXTOS = {
     nav_profissionais: 'Profissionais',
     nav_fidelidade: 'Fidelidade',
     nav_avaliacoes: 'Avaliações',
+    nav_meusAgendamentos: 'Meus Agendamentos',
 
     conf_titulo: 'Horário agendado com sucesso!',
     conf_profissional: 'Profissional:',
@@ -81,6 +82,15 @@ const TEXTOS = {
     profissionais_titulo: 'Profissionais',
     profissionais_contato: 'Contato',
 
+    meusAgendamentos_titulo: 'Meus Agendamentos',
+    meusAgendamentos_nenhum: 'Nenhum agendamento futuro encontrado para esse e-mail.',
+    meusAgendamentos_cancelar_botao: 'Cancelar agendamento',
+    meusAgendamentos_cancelando: 'Cancelando...',
+    meusAgendamentos_confirmarCancelamento: 'Tem certeza que deseja cancelar esse agendamento?',
+    meusAgendamentos_cancelado_sucesso: 'Agendamento cancelado.',
+    meusAgendamentos_erro_cancelar: 'Erro ao cancelar: ',
+    meusAgendamentos_menosDe2h: 'Esse horário é em menos de 2h. Ligue ou chame no WhatsApp para cancelar.',
+
     fidelidade_titulo: 'Fidelidade',
     fidelidade_regra1: '2 pontos por atendimento realizado',
     fidelidade_regra2: '10 pontos = ¥500 de desconto no próximo agendamento',
@@ -132,6 +142,7 @@ const TEXTOS = {
     nav_profissionais: 'Our Team',
     nav_fidelidade: 'Rewards',
     nav_avaliacoes: 'Reviews',
+    nav_meusAgendamentos: 'My Appointments',
 
     conf_titulo: 'Appointment booked successfully!',
     conf_profissional: 'Stylist:',
@@ -188,6 +199,15 @@ const TEXTOS = {
     profissionais_titulo: 'Our Team',
     profissionais_contato: 'Contact',
 
+    meusAgendamentos_titulo: 'My Appointments',
+    meusAgendamentos_nenhum: 'No upcoming appointments found for that email.',
+    meusAgendamentos_cancelar_botao: 'Cancel appointment',
+    meusAgendamentos_cancelando: 'Cancelling...',
+    meusAgendamentos_confirmarCancelamento: 'Are you sure you want to cancel this appointment?',
+    meusAgendamentos_cancelado_sucesso: 'Appointment cancelled.',
+    meusAgendamentos_erro_cancelar: 'Error cancelling: ',
+    meusAgendamentos_menosDe2h: "This appointment is less than 2h away. Please call or message us on WhatsApp to cancel.",
+
     fidelidade_titulo: 'Rewards',
     fidelidade_regra1: '2 points per completed appointment',
     fidelidade_regra2: '10 points = ¥500 off your next appointment',
@@ -239,6 +259,7 @@ const TEXTOS = {
     nav_profissionais: 'スタイリスト',
     nav_fidelidade: 'ポイント',
     nav_avaliacoes: '口コミ',
+    nav_meusAgendamentos: '予約管理',
 
     conf_titulo: 'ご予約が完了しました!',
     conf_profissional: '担当スタイリスト:',
@@ -295,6 +316,15 @@ const TEXTOS = {
     profissionais_titulo: 'スタイリスト紹介',
     profissionais_contato: '連絡先',
 
+    meusAgendamentos_titulo: '予約管理',
+    meusAgendamentos_nenhum: 'このメールアドレスの今後の予約は見つかりませんでした。',
+    meusAgendamentos_cancelar_botao: '予約をキャンセル',
+    meusAgendamentos_cancelando: 'キャンセル中...',
+    meusAgendamentos_confirmarCancelamento: 'この予約をキャンセルしてもよろしいですか?',
+    meusAgendamentos_cancelado_sucesso: '予約をキャンセルしました。',
+    meusAgendamentos_erro_cancelar: 'キャンセルエラー: ',
+    meusAgendamentos_menosDe2h: 'この予約は2時間を切っています。キャンセルはお電話かWhatsAppでご連絡ください。',
+
     fidelidade_titulo: 'ポイントプログラム',
     fidelidade_regra1: '施術1回につき2ポイント',
     fidelidade_regra2: '10ポイントで次回¥500割引',
@@ -346,6 +376,7 @@ const TEXTOS = {
     nav_profissionais: 'Equipo',
     nav_fidelidade: 'Puntos',
     nav_avaliacoes: 'Reseñas',
+    nav_meusAgendamentos: 'Mis Turnos',
 
     conf_titulo: '¡Turno reservado con éxito!',
     conf_profissional: 'Profesional:',
@@ -401,6 +432,15 @@ const TEXTOS = {
 
     profissionais_titulo: 'Equipo',
     profissionais_contato: 'Contacto',
+
+    meusAgendamentos_titulo: 'Mis Turnos',
+    meusAgendamentos_nenhum: 'No se encontraron turnos futuros para ese correo.',
+    meusAgendamentos_cancelar_botao: 'Cancelar turno',
+    meusAgendamentos_cancelando: 'Cancelando...',
+    meusAgendamentos_confirmarCancelamento: '¿Seguro que querés cancelar este turno?',
+    meusAgendamentos_cancelado_sucesso: 'Turno cancelado.',
+    meusAgendamentos_erro_cancelar: 'Error al cancelar: ',
+    meusAgendamentos_menosDe2h: 'Este turno es en menos de 2h. Llamá o escribinos por WhatsApp para cancelar.',
 
     fidelidade_titulo: 'Puntos',
     fidelidade_regra1: '2 puntos por servicio realizado',
