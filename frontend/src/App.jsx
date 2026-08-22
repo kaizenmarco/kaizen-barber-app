@@ -4,16 +4,26 @@ import './App.css';
 import ClientePublico from './pages/ClientePublico';
 import AdminLogin from './pages/AdminLogin';
 
-// Site público e Admin dividem o mesmo domínio/index.html, então por padrão
-// teriam o mesmo "ícone instalável" — quem adicionasse o Admin à tela de
-// início acabaria abrindo o site do cliente. Este componente troca o
-// manifest.json e o ícone/título do iPhone conforme a rota, pra cada um
-// virar um ícone independente que abre direto no lugar certo.
+// O subdomínio admin.kaizenbarbershop.com é dedicado só ao painel — nele,
+// a própria raiz "/" já deve abrir o Admin (não o site do cliente).
+// Isso existe porque instalar dois "ícones de app" a partir do MESMO
+// domínio (app.kaizenbarbershop.com e app.kaizenbarbershop.com/admin)
+// confundia o iPhone, que às vezes reaproveitava o ícone/sessão errada.
+// Com domínios diferentes, cada um vira um site totalmente separado pro
+// celular, sem essa ambiguidade.
+function ehSubdominioAdmin() {
+  return window.location.hostname.startsWith('admin.');
+}
+
+// Site público e Admin dividem o mesmo index.html, então por padrão
+// teriam o mesmo "ícone instalável". Este componente troca o
+// manifest.json e o ícone/título do iPhone conforme a rota/domínio, pra
+// cada um virar um ícone independente que abre direto no lugar certo.
 function AtualizarManifestPWA() {
   const location = useLocation();
 
   useEffect(() => {
-    const ehAdmin = location.pathname.startsWith('/admin');
+    const ehAdmin = ehSubdominioAdmin() || location.pathname.startsWith('/admin');
 
     const linkManifest = document.querySelector('link[rel="manifest"]');
     if (linkManifest) {
@@ -35,11 +45,13 @@ function AtualizarManifestPWA() {
 }
 
 function App() {
+  const raiz = ehSubdominioAdmin() ? <AdminLogin /> : <ClientePublico />;
+
   return (
     <Router>
       <AtualizarManifestPWA />
       <Routes>
-        <Route path="/" element={<ClientePublico />} />
+        <Route path="/" element={raiz} />
         <Route path="/admin" element={<AdminLogin />} />
       </Routes>
     </Router>
