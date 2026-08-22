@@ -16,6 +16,24 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Kaizen" />
+
+    <!-- Troca o manifest/ícone/título pro identidade do Admin quando a URL
+         é /admin, ANTES do React carregar — se deixar só pro React trocar
+         depois (via useEffect), existe uma brecha de alguns instantes em
+         que o Safari pode capturar o ícone/link errado (do site do
+         cliente) se a pessoa tocar em "Adicionar à Tela de Início" rápido
+         demais, antes do JS do app terminar de carregar. -->
+    <script>
+      (function () {
+        var ehAdmin = window.location.pathname.indexOf('/admin') === 0;
+        var linkManifest = document.querySelector('link[rel="manifest"]');
+        if (linkManifest) linkManifest.setAttribute('href', ehAdmin ? '/admin-manifest.json' : '/manifest.json');
+        var linkIcone = document.querySelector('link[rel="apple-touch-icon"]');
+        if (linkIcone) linkIcone.setAttribute('href', ehAdmin ? '/admin-apple-touch-icon.png' : '/apple-touch-icon.png');
+        var metaTitulo = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (metaTitulo) metaTitulo.setAttribute('content', ehAdmin ? 'Kaizen Admin' : 'Kaizen');
+      })();
+    </script>
   </head>
   <body>
     <noscript>Você precisa habilitar o JavaScript para rodar este app.</noscript>
