@@ -302,7 +302,11 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  /* padding-top extra = área segura do iPhone (notch / Dynamic Island /
+     câmera frontal). Sem isso, esse cabeçalho fixo no topo (position:
+     sticky, top: 0) ficava por baixo dessa área e a logo + "Kaizen Admin"
+     apareciam escondidos atrás dela. */
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
   border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
