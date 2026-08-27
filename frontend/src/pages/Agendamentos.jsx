@@ -63,12 +63,19 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const formatarHorarioBloqueio = (b) => ehBloqueioDiaInteiro(b) ? t('agendamentos.diaTodo') : `${b.horaInicio}–${b.horaFim}`;
 
   // Gera a lista de datas (YYYY-MM-DD) entre dataInicio e dataFim, inclusive.
+  // IMPORTANTE: usa os getters locais (getFullYear/getMonth/getDate), não
+  // toISOString() — toISOString() converte pra UTC, e no fuso do Japão
+  // (UTC+9) meia-noite local vira 15h do dia anterior em UTC, fazendo o
+  // bloqueio salvar sempre um dia antes do escolhido.
   const gerarIntervaloDatas = (dataInicioStr, dataFimStr) => {
     const datas = [];
     const cursor = new Date(`${dataInicioStr}T00:00:00`);
     const fim = new Date(`${dataFimStr || dataInicioStr}T00:00:00`);
     while (cursor <= fim) {
-      datas.push(cursor.toISOString().split('T')[0]);
+      const ano = cursor.getFullYear();
+      const mes = String(cursor.getMonth() + 1).padStart(2, '0');
+      const dia = String(cursor.getDate()).padStart(2, '0');
+      datas.push(`${ano}-${mes}-${dia}`);
       cursor.setDate(cursor.getDate() + 1);
     }
     return datas;
