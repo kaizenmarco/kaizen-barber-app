@@ -887,32 +887,36 @@ function ClientePublico() {
   return (
     <div style={{ background: '#1a1a1a', color: '#e8e8e8', minHeight: '100vh' }}>
       <header style={{ borderBottom: '3px solid #d4af37', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px', zIndex: 2 }}>
-          {IDIOMAS.map((op) => (
-            <button
-              key={op.codigo}
-              onClick={() => mudarIdioma(op.codigo)}
-              style={{
-                padding: '5px 10px',
-                borderRadius: '20px',
-                border: '1px solid #d4af37',
-                background: idioma === op.codigo ? '#d4af37' : 'rgba(26,26,26,0.75)',
-                color: idioma === op.codigo ? '#1a1a1a' : '#d4af37',
-                fontWeight: 'bold',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              {op.bandeira} {op.rotulo}
-            </button>
-          ))}
-        </div>
         <img
           src="/images/header_banner.jpg"
           alt="Kaizen Barber Shop"
           style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center' }}
         />
         <div style={{ padding: '20px', textAlign: 'center' }}>
+          {/* Seletor de idioma fica aqui embaixo, e não sobre a foto — no
+              iPhone, a área de cima da tela (câmera frontal / Dynamic
+              Island) cobria os botões quando eles ficavam por cima da
+              imagem, dificultando trocar de idioma. */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            {IDIOMAS.map((op) => (
+              <button
+                key={op.codigo}
+                onClick={() => mudarIdioma(op.codigo)}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '20px',
+                  border: '1px solid #d4af37',
+                  background: idioma === op.codigo ? '#d4af37' : 'transparent',
+                  color: idioma === op.codigo ? '#1a1a1a' : '#d4af37',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                {op.bandeira} {op.rotulo}
+              </button>
+            ))}
+          </div>
           <h1 style={{ color: '#d4af37', fontSize: '32px', margin: '0' }}>Kaizen Barber Shop</h1>
           <p style={{ color: '#999', margin: '0' }}>{t('header_subtitulo')}</p>
         </div>
