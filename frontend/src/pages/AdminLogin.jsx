@@ -10,6 +10,13 @@ import Caixa from './Caixa';
 import Comandas from './Comandas';
 import Fidelidade from './Fidelidade';
 import OrdemChegada from './OrdemChegada';
+import BottomNavigation from '../components/BottomNavigation';
+import MenuMais from '../components/MenuMais';
+
+// As 3 abas com espaço fixo no menu inferior. Tudo que não estiver aqui
+// (Dashboard, Profissionais, Comandas, Fidelidade, Ordem de Chegada) mora
+// dentro do botão "Mais" — ver components/BottomNavigation.jsx.
+const CHAVES_PRIMARIAS = ['agendamentos', 'caixa', 'clientes'];
 
 const CHAVE_IDIOMA_ADMIN_STORAGE = 'kaizen_admin_idioma';
 
@@ -77,6 +84,7 @@ function AdminLogin() {
   const [mensagem, setMensagem] = useState('');
 
   const [abaSelecionada, setAbaSelecionada] = useState(null);
+  const [mostrarMais, setMostrarMais] = useState(false);
 
   const [idioma, setIdioma] = useState(() => {
     try {
@@ -152,10 +160,15 @@ function AdminLogin() {
   }, [session]);
 
   const abasVisiveis = ABAS.filter(a => (perfil?.role === 'admin' ? a.admin : a.restrito));
+  const abasPrimariasVisiveis = abasVisiveis.filter(a => CHAVES_PRIMARIAS.includes(a.key));
+  const abasSecundariasVisiveis = abasVisiveis.filter(a => !CHAVES_PRIMARIAS.includes(a.key));
 
   useEffect(() => {
     if (abasVisiveis.length > 0 && !abasVisiveis.some(a => a.key === abaSelecionada)) {
-      setAbaSelecionada(abasVisiveis[0].key);
+      // Abre direto na Agenda (não no Dashboard) — é a tela que a barbearia
+      // olha assim que entra no app, sem precisar rolar nem navegar.
+      const padrao = abasVisiveis.find(a => a.key === 'agendamentos') || abasVisiveis[0];
+      setAbaSelecionada(padrao.key);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil]);
@@ -359,86 +372,63 @@ function AdminLogin() {
     );
   }
 
-  // Dashboard Admin
+  // Painel Admin: menu inferior fixo (Agenda / Caixa / Clientes / Mais) no
+  // lugar da barra lateral com 8 botões — ver components/BottomNavigation.jsx
+  // e components/MenuMais.jsx. "Mais" reúne Dashboard, Profissionais,
+  // Comandas, Fidelidade e Ordem de Chegada, que não precisam de espaço fixo.
+  const telaSecundariaAberta = !mostrarMais && !CHAVES_PRIMARIAS.includes(abaSelecionada);
+
   return (
-    <div className="admin-shell" style={{ minHeight: '100vh', background: '#1a1a1a' }}>
-      {/* Sidebar */}
-      <aside className="admin-sidebar" style={{
-        background: '#1a1a1a',
-        padding: '20px',
-        overflowY: 'auto'
-      }}>
-        <div style={{ marginBottom: '30px', textAlign: 'center' }}>
-          <img
-            src="/images/logo.jpg"
-            alt="Kaizen Barber Shop"
-            style={{ width: '72px', height: '72px', borderRadius: '50%', display: 'block', margin: '0 auto 10px', boxShadow: '0 0 0 1px #d4af37' }}
+    <div className="admin-shell-mobile">
+      <header className="admin-header-mobile">
+        <img src="/images/logo.jpg" alt="Kaizen Barber Shop" className="admin-header-logo" />
+        <span className="admin-header-titulo">Kaizen · {t('sidebar.adminPanel')}</span>
+        {telaSecundariaAberta && (
+          <button type="button" className="admin-header-voltar" onClick={() => setMostrarMais(true)}>
+            ← {t('menu.titulo')}
+          </button>
+        )}
+      </header>
+
+      <main className="admin-main-mobile">
+        {mostrarMais ? (
+          <MenuMais
+            itens={abasSecundariasVisiveis}
+            aoSelecionarItem={(chave) => { setAbaSelecionada(chave); setMostrarMais(false); }}
+            t={t}
+            SeletorIdioma={SeletorIdioma}
+            perfil={perfil}
+            sessionUser={session.user}
+            aoSair={() => { handleLogout(); navigate('/'); }}
           />
-          <h2 style={{ color: '#d4af37', marginBottom: '4px', fontSize: '18px' }}>Kaizen</h2>
-          <p style={{ color: '#999', fontSize: '12px', marginBottom: '10px' }}>{t('sidebar.adminPanel')}</p>
-          <SeletorIdioma estilo={{ marginBottom: 0 }} />
-        </div>
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {abasVisiveis.map(aba => (
-            <button
-              key={aba.key}
-              onClick={() => setAbaSelecionada(aba.key)}
-              style={{
-                padding: '12px',
-                background: abaSelecionada === aba.key ? '#d4af37' : '#2d2d2d',
-                color: abaSelecionada === aba.key ? '#1a1a1a' : '#d4af37',
-                border: '1px solid #d4af37',
-                borderRadius: '6px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              {aba.label}
-            </button>
-          ))}
-
-          <div style={{ borderTop: '1px solid #d4af37', marginTop: '20px', paddingTop: '20px' }}>
-            <p style={{ color: '#999', fontSize: '12px', marginBottom: '4px' }}>
-              {t('sidebar.logadoComo')} <strong>{perfil?.nome || session.user.email}</strong>
-            </p>
-            <p style={{ color: '#999', fontSize: '11px', marginBottom: '10px' }}>
-              {t('sidebar.acesso')} <strong>{perfil?.role === 'admin' ? t('sidebar.acessoCompleto') : t('sidebar.acessoRestrito')}</strong>
-            </p>
-            <button
-              onClick={() => {
-                handleLogout();
-                navigate('/');
-              }}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: '#f87171',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              {t('sidebar.logout')}
-            </button>
-          </div>
-        </nav>
-      </aside>
-
-      {/* Conteúdo Principal */}
-      <main className="admin-main" style={{ overflow: 'auto' }}>
-        {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={idioma} />}
-        {abaSelecionada === 'agendamentos' && <Agendamentos t={t} idioma={idioma} />}
-        {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} />}
-        {abaSelecionada === 'profissionais' && <Profissionais t={t} idioma={idioma} />}
-        {abaSelecionada === 'caixa' && <Caixa t={t} idioma={idioma} />}
-        {abaSelecionada === 'comandas' && <Comandas t={t} idioma={idioma} />}
-        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} />}
-        {abaSelecionada === 'ordem' && <OrdemChegada t={t} idioma={idioma} />}
+        ) : (
+          <>
+            {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={idioma} />}
+            {abaSelecionada === 'agendamentos' && <Agendamentos t={t} idioma={idioma} />}
+            {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} />}
+            {abaSelecionada === 'profissionais' && <Profissionais t={t} idioma={idioma} />}
+            {abaSelecionada === 'caixa' && <Caixa t={t} idioma={idioma} />}
+            {abaSelecionada === 'comandas' && <Comandas t={t} idioma={idioma} />}
+            {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} />}
+            {abaSelecionada === 'ordem' && <OrdemChegada t={t} idioma={idioma} />}
+          </>
+        )}
       </main>
+
+      <BottomNavigation
+        abaAtiva={mostrarMais ? 'mais' : abaSelecionada}
+        itemMaisEmDestaque={telaSecundariaAberta}
+        chavesVisiveis={abasPrimariasVisiveis.map(a => a.key)}
+        t={t}
+        aoSelecionar={(chave) => {
+          if (chave === 'mais') {
+            setMostrarMais(true);
+          } else {
+            setMostrarMais(false);
+            setAbaSelecionada(chave);
+          }
+        }}
+      />
     </div>
   );
 }

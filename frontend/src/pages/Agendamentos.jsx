@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
+import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
 import { SERVICOS } from '../config/servicos';
 import { LOCALE_POR_IDIOMA_ADMIN, DIAS_SEMANA_ABREV_ADMIN, DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
@@ -23,6 +23,16 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [agendamentoEditando, setAgendamentoEditando] = useState(null); // agendamento sendo editado (data/hora), ou null se fechado
   const [edicaoForm, setEdicaoForm] = useState({ data: '', horario: '', encaixe: false });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+
+  // ---- Tela principal reformulada: dia selecionado + sub-abas ----
+  // "dia" é a visão padrão ao abrir (grade horária de um único dia, sem
+  // rolagem longa); "mes"/"lista"/"bloqueios" são as telas antigas,
+  // preservadas do jeito que já funcionavam, só que atrás de sub-abas.
+  const hojeISO = new Date().toISOString().split('T')[0];
+  const [diaSelecionado, setDiaSelecionado] = useState(hojeISO);
+  const [semanaAncora, setSemanaAncora] = useState(() => new Date());
+  const [subView, setSubView] = useState('dia');
+  const [modalNovoAberto, setModalNovoAberto] = useState(false);
 
   const [novoAgendamento, setNovoAgendamento] = useState({
     cliente: '',
@@ -63,6 +73,34 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     }
     return datas;
   };
+
+  // Gera os 7 dias (domingo a sábado) da semana que contém `ancora`, para o
+  // carrossel de datas do topo da Agenda.
+  const obterDiasDaSemana = (ancora) => {
+    const inicioSemana = new Date(ancora);
+    inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
+    const dias = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(inicioSemana);
+      d.setDate(inicioSemana.getDate() + i);
+      dias.push(d);
+    }
+    return dias;
+  };
+
+  const mudarSemana = (deltaSemanas) => {
+    const novaAncora = new Date(semanaAncora);
+    novaAncora.setDate(novaAncora.getDate() + deltaSemanas * 7);
+    setSemanaAncora(novaAncora);
+  };
+
+  // Iniciais pro avatar circular do profissional (ex: "Marco Kaizen" -> "MK").
+  const obterIniciais = (nome) => nome
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(parte => parte[0].toUpperCase())
+    .join('');
 
   const statusOpcoes = ['AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO'];
 
@@ -393,6 +431,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       alert(t('agendamentos.criadoComSucesso'));
       setNovoAgendamento({ cliente: '', email: '', telefone: '', data: '', horario: '', servico: '', profissional: '' });
       setModoEncaixe(false);
+      setModalNovoAberto(false);
       buscarAgendamentos();
     } catch (error) {
       alert(t('agendamentos.erroAoCriar', { msg: error.message }));
@@ -597,135 +636,294 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     });
   };
 
+  // ---- Visão "Dia" (padrão ao abrir a tela) ----
+  const dataDiaSelecionadoObj = new Date(`${diaSelecionado}T00:00:00`);
+  const horarioDoDiaSelecionado = getHorarioDoDia(dataDiaSelecionadoObj, horarioEstendido);
+  const agendamentosDoDiaSelecionado = agendamentosFiltrados
+    .filter(a => a.data === diaSelecionado)
+    .sort((a, b) => a.hora.localeCompare(b.hora));
+  const bloqueiosDoDiaSelecionado = bloqueiosFiltrados
+    .filter(b => b.data === diaSelecionado)
+    .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+
+  const horasDaGradeDoDia = [];
+  if (horarioDoDiaSelecionado.aberto) {
+    const inicioMin = Math.floor(paraMinutos(horarioDoDiaSelecionado.abertura) / 60) * 60;
+    const fimMin = paraMinutos(horarioDoDiaSelecionado.fechamento);
+    for (let m = inicioMin; m < fimMin; m += 60) {
+      horasDaGradeDoDia.push(m);
+    }
+  }
+
+  const diasDaSemanaAtual = obterDiasDaSemana(semanaAncora);
+
   return (
     <div className="page-container">
       <h2>{t('agendamentos.titulo')}</h2>
 
-      <section className="form-section">
-        <h3>{t('agendamentos.novoAgendamento')}</h3>
-        <form onSubmit={handleAgendar}>
-          <input
-            type="text"
-            name="cliente"
-            placeholder={t('agendamentos.nomeCliente')}
-            value={novoAgendamento.cliente}
-            onChange={handleInputChange}
-            required
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder={t('agendamentos.emailCliente')}
-            value={novoAgendamento.email}
-            onChange={handleInputChange}
-            required
-          />
-          <input
-            type="tel"
-            name="telefone"
-            placeholder={t('agendamentos.telefoneOpcional')}
-            value={novoAgendamento.telefone}
-            onChange={handleInputChange}
-          />
-          <select
-            name="servico"
-            value={novoAgendamento.servico}
-            onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, servico: e.target.value, horario: '' })); }}
-            required
+      {/* FILTRO POR PROFISSIONAL — avatares circulares */}
+      <div className="agenda-avatares">
+        {profissionaisLista.map(prof => (
+          <button
+            key={prof.uuid}
+            type="button"
+            className={`agenda-avatar-btn${abaProfissional === prof.uuid ? ' ativo' : ''}`}
+            onClick={() => setAbaProfissional(prof.uuid)}
           >
-            <option value="">{t('comum.selecioneServico')}</option>
-            {servicosLista.map(s => (
-              <option key={s.id} value={s.nome}>{s.nome} ({s.duracao})</option>
-            ))}
-          </select>
-          <select
-            name="profissional"
-            value={novoAgendamento.profissional}
-            onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, profissional: e.target.value, horario: '' })); }}
-            required
-          >
-            <option value="">{t('comum.selecioneProfissional')}</option>
-            {profissionaisLista.map(p => (
-              <option key={p.id} value={p.nome}>{p.nome}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            name="data"
-            value={novoAgendamento.data}
-            onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
-            required
-          />
+            <span className="agenda-avatar-circulo">{obterIniciais(prof.nome)}</span>
+            <span className="agenda-avatar-nome">{prof.nome.split(' ')[0]}</span>
+          </button>
+        ))}
+      </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={modoEncaixe}
-              onChange={(e) => { setModoEncaixe(e.target.checked); setNovoAgendamento(prev => ({ ...prev, horario: '' })); }}
-            />
-            <strong style={{ color: modoEncaixe ? '#f97316' : undefined }}>
-              {t('agendamentos.modoEncaixe')} {modoEncaixe ? t('agendamentos.modoEncaixeAtivado') : ''}
-            </strong>
-          </label>
+      {/* SELETOR DE DATA — carrossel semanal */}
+      <div className="agenda-dias-semana">
+        <button type="button" className="agenda-seta-semana" onClick={() => mudarSemana(-1)} aria-label={t('agendamentos.anterior')}>‹</button>
+        {diasDaSemanaAtual.map(d => {
+          const dataStr = d.toISOString().split('T')[0];
+          return (
+            <button
+              key={dataStr}
+              type="button"
+              className={`agenda-dia-btn${diaSelecionado === dataStr ? ' ativo' : ''}${dataStr === hojeISO ? ' hoje' : ''}`}
+              onClick={() => { setDiaSelecionado(dataStr); setSubView('dia'); }}
+            >
+              <span className="agenda-dia-semana-label">{diasAbrev[d.getDay()]}</span>
+              <span className="agenda-dia-numero">{d.getDate()}</span>
+            </button>
+          );
+        })}
+        <button type="button" className="agenda-seta-semana" onClick={() => mudarSemana(1)} aria-label={t('agendamentos.proximo')}>›</button>
+      </div>
 
-          {!novoAgendamento.profissional || !novoAgendamento.servico || !novoAgendamento.data ? (
-            <p style={{ fontSize: '13px', color: '#999' }}>{t('agendamentos.selecioneParaVerHorarios')}</p>
-          ) : modoEncaixe ? (
+      {/* SUB-ABAS: Dia (padrão) | Mês | Lista | Bloqueios */}
+      <div className="agenda-subview-tabs">
+        <button type="button" className={subView === 'dia' ? 'ativo' : ''} onClick={() => setSubView('dia')}>{t('agendamentos.subDia')}</button>
+        <button type="button" className={subView === 'mes' ? 'ativo' : ''} onClick={() => setSubView('mes')}>{t('agendamentos.subMes')}</button>
+        <button type="button" className={subView === 'lista' ? 'ativo' : ''} onClick={() => setSubView('lista')}>{t('agendamentos.subLista')}</button>
+        <button type="button" className={subView === 'bloqueios' ? 'ativo' : ''} onClick={() => setSubView('bloqueios')}>{t('agendamentos.subBloqueios')}</button>
+      </div>
+
+      {/* VISÃO DIA: grade horária do dia selecionado, sem rolagem longa */}
+      {subView === 'dia' && (
+        <section className="agenda-dia-view">
+          {!horarioDoDiaSelecionado.aberto ? (
+            <p className="agenda-fechado-aviso">{t('agendamentos.salaoFechadoNesseDia')}</p>
+          ) : (
             <>
+              {agendamentosDoDiaSelecionado.length === 0 && bloqueiosDoDiaSelecionado.length === 0 && (
+                <p className="agenda-dia-vazio">{t('agendamentos.nenhumAgendamentoNoDia')}</p>
+              )}
+
+              {bloqueiosDoDiaSelecionado.map(b => (
+                <div key={`bloq-${b.id}`} className="agenda-card agenda-card-bloqueio">
+                  <span style={{ color: '#f87171', fontWeight: 'bold' }}>
+                    🚫 {formatarHorarioBloqueio(b)}
+                    {b.motivo && <span style={{ color: '#999', fontWeight: 'normal' }}> — {b.motivo}</span>}
+                  </span>
+                  <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
+                </div>
+              ))}
+
+              {horasDaGradeDoDia.map(minutoHora => {
+                const horaLabel = paraHHMM(minutoHora);
+                const agendamentosNaHora = agendamentosDoDiaSelecionado.filter(a => {
+                  const m = paraMinutos(a.hora);
+                  return m >= minutoHora && m < minutoHora + 60;
+                });
+
+                return (
+                  <div key={minutoHora} className="agenda-linha-hora">
+                    <div className="agenda-linha-hora-label">{horaLabel}</div>
+                    <div className="agenda-linha-hora-conteudo">
+                      {agendamentosNaHora.length === 0 ? (
+                        <span className="agenda-linha-livre">{t('agendamentos.livre')}</span>
+                      ) : (
+                        agendamentosNaHora.map(a => (
+                          <div key={a.id} className="agenda-card" style={{ borderLeftColor: getCorStatus(a.status) }}>
+                            <div className="agenda-card-topo">
+                              <strong onClick={() => abrirEdicao(a)} title={t('agendamentos.editarTooltip')} className="agenda-card-cliente">
+                                {a.hora} · {a.cliente} ✏️
+                              </strong>
+                              <button className="btn-delete" onClick={() => handleDeletar(a.id)}>🗑️</button>
+                            </div>
+                            <div className="agenda-card-servico">
+                              {a.servico}
+                              {a.encaixe && <span className="agenda-card-encaixe"> {t('agendamentos.encaixeTag')}</span>}
+                            </div>
+                            <div className="agenda-card-rodape">
+                              <select
+                                value={a.status}
+                                onChange={(e) => handleAlterarStatus(a.id, e.target.value)}
+                                style={{ background: getCorStatus(a.status), color: '#1a1a1a', border: 'none', borderRadius: '4px', padding: '4px 8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}
+                              >
+                                {statusOpcoes.map(s => <option key={s} value={s}>{t(`statusAg.${s}`)}</option>)}
+                              </select>
+                              <span className="agenda-card-preco">{a.preco ? `¥${a.preco.toLocaleString('ja-JP')}` : '-'}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </section>
+      )}
+
+      {/* BOTÃO FLUTUANTE — abre o modal de Novo Agendamento */}
+      <button
+        type="button"
+        className="agenda-fab"
+        onClick={() => setModalNovoAberto(true)}
+        aria-label={t('agendamentos.novoBtnFlutuante')}
+        title={t('agendamentos.novoBtnFlutuante')}
+      >
+        +
+      </button>
+
+      {/* MODAL: NOVO AGENDAMENTO (mesmo formulário de antes, agora dentro de um modal) */}
+      {modalNovoAberto && (
+        <div className="agenda-modal-overlay" onClick={() => setModalNovoAberto(false)}>
+          <div className="agenda-modal-conteudo" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0 }}>{t('agendamentos.novoAgendamento')}</h3>
+              <button
+                type="button"
+                onClick={() => setModalNovoAberto(false)}
+                style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                ✕ {t('comum.cancelar')}
+              </button>
+            </div>
+            <form onSubmit={handleAgendar}>
               <input
-                type="time"
-                name="horario"
-                value={novoAgendamento.horario}
+                type="text"
+                name="cliente"
+                placeholder={t('agendamentos.nomeCliente')}
+                value={novoAgendamento.cliente}
                 onChange={handleInputChange}
                 required
               />
-              {novoAgendamento.horario && conflitosEncaixe.length > 0 && (
-                <div style={{ background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px', margin: '8px 0', fontSize: '13px' }}>
-                  <strong style={{ color: '#f97316' }}>{t('agendamentos.conflito')} </strong>
-                  {conflitosEncaixe.map(c => `${c.hora} - ${c.cliente} (${c.servico})`).join('; ')}
-                </div>
-              )}
-              {intervalosOcupadosNoDia.length > 0 && (
-                <p style={{ fontSize: '12px', color: '#999', margin: '4px 0' }}>
-                  {t('agendamentos.jaOcupadoNesseDia', { lista: intervalosOcupadosNoDia.map(o => o.hora).join(', ') })}
-                </p>
-              )}
-            </>
-          ) : (
-            <div style={{ margin: '8px 0' }}>
-              {slotsDisponiveisNovoAgendamento.length === 0 ? (
-                <p style={{ fontSize: '13px', color: '#f87171' }}>{t('agendamentos.nenhumHorarioLivre')}</p>
+              <input
+                type="email"
+                name="email"
+                placeholder={t('agendamentos.emailCliente')}
+                value={novoAgendamento.email}
+                onChange={handleInputChange}
+                required
+              />
+              <input
+                type="tel"
+                name="telefone"
+                placeholder={t('agendamentos.telefoneOpcional')}
+                value={novoAgendamento.telefone}
+                onChange={handleInputChange}
+              />
+              <select
+                name="servico"
+                value={novoAgendamento.servico}
+                onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, servico: e.target.value, horario: '' })); }}
+                required
+              >
+                <option value="">{t('comum.selecioneServico')}</option>
+                {servicosLista.map(s => (
+                  <option key={s.id} value={s.nome}>{s.nome} ({s.duracao})</option>
+                ))}
+              </select>
+              <select
+                name="profissional"
+                value={novoAgendamento.profissional}
+                onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, profissional: e.target.value, horario: '' })); }}
+                required
+              >
+                <option value="">{t('comum.selecioneProfissional')}</option>
+                {profissionaisLista.map(p => (
+                  <option key={p.id} value={p.nome}>{p.nome}</option>
+                ))}
+              </select>
+              <input
+                type="date"
+                name="data"
+                value={novoAgendamento.data}
+                onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
+                required
+              />
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={modoEncaixe}
+                  onChange={(e) => { setModoEncaixe(e.target.checked); setNovoAgendamento(prev => ({ ...prev, horario: '' })); }}
+                />
+                <strong style={{ color: modoEncaixe ? '#f97316' : undefined }}>
+                  {t('agendamentos.modoEncaixe')} {modoEncaixe ? t('agendamentos.modoEncaixeAtivado') : ''}
+                </strong>
+              </label>
+
+              {!novoAgendamento.profissional || !novoAgendamento.servico || !novoAgendamento.data ? (
+                <p style={{ fontSize: '13px', color: '#999' }}>{t('agendamentos.selecioneParaVerHorarios')}</p>
+              ) : modoEncaixe ? (
+                <>
+                  <input
+                    type="time"
+                    name="horario"
+                    value={novoAgendamento.horario}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  {novoAgendamento.horario && conflitosEncaixe.length > 0 && (
+                    <div style={{ background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px', margin: '8px 0', fontSize: '13px' }}>
+                      <strong style={{ color: '#f97316' }}>{t('agendamentos.conflito')} </strong>
+                      {conflitosEncaixe.map(c => `${c.hora} - ${c.cliente} (${c.servico})`).join('; ')}
+                    </div>
+                  )}
+                  {intervalosOcupadosNoDia.length > 0 && (
+                    <p style={{ fontSize: '12px', color: '#999', margin: '4px 0' }}>
+                      {t('agendamentos.jaOcupadoNesseDia', { lista: intervalosOcupadosNoDia.map(o => o.hora).join(', ') })}
+                    </p>
+                  )}
+                </>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {slotsDisponiveisNovoAgendamento.map(h => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => setNovoAgendamento(prev => ({ ...prev, horario: h }))}
-                      style={{
-                        padding: '7px 12px',
-                        borderRadius: '999px',
-                        border: '1px solid #4ade80',
-                        background: novoAgendamento.horario === h ? '#4ade80' : 'transparent',
-                        color: novoAgendamento.horario === h ? '#1a1a1a' : '#4ade80',
-                        fontWeight: 'bold',
-                        fontSize: '13px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {h}
-                    </button>
-                  ))}
+                <div style={{ margin: '8px 0' }}>
+                  {slotsDisponiveisNovoAgendamento.length === 0 ? (
+                    <p style={{ fontSize: '13px', color: '#f87171' }}>{t('agendamentos.nenhumHorarioLivre')}</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {slotsDisponiveisNovoAgendamento.map(h => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setNovoAgendamento(prev => ({ ...prev, horario: h }))}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: '999px',
+                            border: '1px solid #4ade80',
+                            background: novoAgendamento.horario === h ? '#4ade80' : 'transparent',
+                            color: novoAgendamento.horario === h ? '#1a1a1a' : '#4ade80',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {h}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          <button type="submit" className="btn-primary">{t('agendamentos.agendar')}</button>
-        </form>
-      </section>
+              <button type="submit" className="btn-primary">{t('agendamentos.agendar')}</button>
+            </form>
+          </div>
+        </div>
+      )}
 
-      {/* BLOQUEIO DE HORÁRIO (folga, consulta médica etc.) */}
+      {/* SUB-ABA BLOQUEIOS: bloqueio de horário (folga, consulta médica etc.) */}
+      {subView === 'bloqueios' && (
       <section className="form-section">
         <h3>{t('agendamentos.bloquearHorario')}</h3>
         <p style={{ fontSize: '13px', color: '#999', marginTop: '-6px', marginBottom: '10px' }}>
@@ -840,8 +1038,10 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           </div>
         )}
       </section>
+      )}
 
-      {/* CALENDÁRIO VISUAL */}
+      {/* SUB-ABA MÊS: calendário visual do mês (profissional já filtrado pelos avatares do topo) */}
+      {subView === 'mes' && (
       <section className="list-section">
         <h3>{t('agendamentos.calendario', { nome: profissionaisLista.find(p => p.uuid === abaProfissional)?.nome })}</h3>
 
@@ -863,28 +1063,6 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           </button>
         </div>
 
-        {/* ABAS DOS PROFISSIONAIS */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '2px solid #d4af37', paddingBottom: '10px', overflowX: 'auto' }}>
-          {profissionaisLista.map(prof => (
-            <button
-              key={prof.uuid}
-              onClick={() => setAbaProfissional(prof.uuid)}
-              style={{
-                padding: '10px 20px',
-                background: abaProfissional === prof.uuid ? '#d4af37' : '#2d2d2d',
-                color: abaProfissional === prof.uuid ? '#1a1a1a' : '#d4af37',
-                border: '1px solid #d4af37',
-                borderRadius: '6px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {prof.nome}
-            </button>
-          ))}
-        </div>
-
         {/* GRID DO CALENDÁRIO */}
         <div style={{
           display: 'grid',
@@ -900,8 +1078,10 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           {gerarCalendario()}
         </div>
       </section>
+      )}
 
-      {/* TABELA COM DIA DA SEMANA */}
+      {/* SUB-ABA LISTA: tabela detalhada com dia da semana */}
+      {subView === 'lista' && (
       <section className="list-section">
         <h3>{t('agendamentos.listaDetalhada')}</h3>
 
@@ -997,6 +1177,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           </div>
         )}
       </section>
+      )}
 
       {/* MODAL DE AGENDAMENTOS DO DIA */}
       {diaModal && (() => {

@@ -285,6 +285,444 @@ body {
   min-width: 0;
 }
 
+/* ============================================================================
+   Painel Admin mobile-first: header simples + conteúdo + menu inferior fixo,
+   no lugar da barra lateral longa. min-height: 100vh + padding-bottom no
+   main garante que o conteúdo nunca fique escondido atrás do menu fixo.
+   ============================================================================ */
+.admin-shell-mobile {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--primary-dark);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-header-mobile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  background: var(--primary-dark);
+  z-index: 20;
+}
+
+.admin-header-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--accent-gold);
+  flex-shrink: 0;
+}
+
+.admin-header-titulo {
+  color: var(--accent-gold);
+  font-weight: bold;
+  font-size: 14px;
+  flex: 1;
+}
+
+.admin-header-voltar {
+  background: transparent;
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.admin-main-mobile {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 16px calc(90px + env(safe-area-inset-bottom));
+}
+
+/* ---- Menu inferior fixo (BottomNavigation.jsx) ---- */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--secondary-dark);
+  border-top: 1px solid var(--accent-gold);
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  z-index: 30;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 4px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.bottom-nav-item.ativo {
+  color: var(--accent-gold);
+}
+
+.bottom-nav-icone {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.bottom-nav-label {
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* ---- Menu "Mais" (MenuMais.jsx) ---- */
+.menu-mais-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.menu-mais-card {
+  background: var(--secondary-dark);
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  border-radius: 8px;
+  padding: 20px 12px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.menu-mais-card:hover {
+  background: rgba(212, 175, 55, 0.12);
+}
+
+.menu-mais-rodape {
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+/* ============================================================================
+   Tela de Agenda (dia) — seletor de dias, avatares de profissional e grade
+   horária. Ver pages/Agendamentos.jsx.
+   ============================================================================ */
+.agenda-avatares {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 14px;
+}
+
+.agenda-avatar-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 2px;
+}
+
+.agenda-avatar-circulo {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--secondary-dark);
+  border: 2px solid var(--border-color);
+  color: var(--text-light);
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.agenda-avatar-btn.ativo .agenda-avatar-circulo {
+  border-color: var(--accent-gold);
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--accent-gold);
+}
+
+.agenda-avatar-nome {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-avatar-btn.ativo .agenda-avatar-nome {
+  color: var(--accent-gold);
+  font-weight: bold;
+}
+
+.agenda-dias-semana {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+}
+
+.agenda-dia-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 42px;
+  background: var(--secondary-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 4px;
+  cursor: pointer;
+  color: var(--text-light);
+  flex-shrink: 0;
+}
+
+.agenda-dia-btn.hoje {
+  border-color: var(--accent-gold);
+}
+
+.agenda-dia-btn.ativo {
+  background: var(--accent-gold);
+  color: var(--primary-dark);
+  border-color: var(--accent-gold);
+}
+
+.agenda-dia-semana-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.agenda-dia-numero {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.agenda-seta-semana {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--accent-gold);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.agenda-subview-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.agenda-subview-tabs button {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.agenda-subview-tabs button.ativo {
+  background: var(--accent-gold);
+  color: var(--primary-dark);
+  border-color: var(--accent-gold);
+}
+
+.agenda-dia-vazio,
+.agenda-fechado-aviso {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 30px 0;
+}
+
+.agenda-linha-hora {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.agenda-linha-hora-label {
+  width: 46px;
+  flex-shrink: 0;
+  color: var(--accent-gold);
+  font-weight: bold;
+  font-size: 13px;
+  padding-top: 8px;
+}
+
+.agenda-linha-hora-conteudo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agenda-linha-livre {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.agenda-card {
+  background: var(--secondary-dark);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--accent-gold);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.agenda-card-bloqueio {
+  border-left-color: #f87171;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.agenda-card-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agenda-card-cliente {
+  color: var(--text-light);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  font-size: 14px;
+}
+
+.agenda-card-servico {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.agenda-card-encaixe {
+  color: #f97316;
+  font-weight: bold;
+}
+
+.agenda-card-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.agenda-card-preco {
+  color: var(--accent-gold);
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.agenda-fab {
+  position: fixed;
+  right: 18px;
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  color: var(--primary-dark);
+  border: none;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  z-index: 25;
+  line-height: 1;
+}
+
+.agenda-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.agenda-modal-conteudo {
+  background: var(--secondary-dark);
+  border: 1px solid var(--accent-gold);
+  border-radius: 14px 14px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.agenda-modal-conteudo form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agenda-modal-conteudo input,
+.agenda-modal-conteudo select {
+  padding: 12px;
+  background: var(--primary-dark);
+  color: var(--text-light);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.agenda-modal-conteudo button[type='submit'] {
+  padding: 12px;
+  background: var(--accent-gold);
+  color: var(--primary-dark);
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .agenda-modal-overlay {
+    align-items: center;
+  }
+
+  .agenda-modal-conteudo {
+    border-radius: 12px;
+  }
+}
+
 .page-container h2 {
   color: var(--accent-gold);
   font-size: 24px;
