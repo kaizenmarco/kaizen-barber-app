@@ -219,6 +219,7 @@ function ClientePublico() {
     nome: '',
     email: '',
     telefone: '',
+    dataNascimento: '',
     profissional: '',
     hora: '',
     servico: '',
@@ -617,6 +618,17 @@ function ClientePublico() {
 
       if (clientesExistentes && clientesExistentes.length > 0) {
         clienteId = clientesExistentes[0].id;
+        // Cliente já cadastrado — se faltava telefone ou data de nascimento,
+        // aproveita o que a pessoa preencheu agora pra completar o cadastro
+        // (sem sobrescrever o que já existia).
+        await supabase
+          .from('clientes')
+          .update({
+            telefone: dadosAgendamento.telefone || undefined,
+            data_nascimento: dadosAgendamento.dataNascimento || undefined
+          })
+          .eq('id', clienteId)
+          .or('telefone.is.null,data_nascimento.is.null');
       } else {
         const { data: novoCliente, error: erroClienteInsert } = await supabase
           .from('clientes')
@@ -624,7 +636,8 @@ function ClientePublico() {
             {
               nome: dadosAgendamento.nome,
               email: dadosAgendamento.email,
-              telefone: dadosAgendamento.telefone || null
+              telefone: dadosAgendamento.telefone || null,
+              data_nascimento: dadosAgendamento.dataNascimento || null
             }
           ])
           .select('id')
@@ -682,7 +695,7 @@ function ClientePublico() {
 
       setPresencaConfirmada(false);
       setModalAberto(false);
-      setDadosAgendamento({ nome: '', email: '', telefone: '', profissional: '', hora: '', servico: '', data: '' });
+      setDadosAgendamento({ nome: '', email: '', telefone: '', dataNascimento: '', profissional: '', hora: '', servico: '', data: '' });
       setUsarPontos(false);
       setObservacoesCliente('');
       setPontosCliente(0);
@@ -1586,6 +1599,10 @@ function ClientePublico() {
             <input type="text" placeholder={t('modal_nome_placeholder')} value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <input type="email" placeholder={t('modal_email_placeholder')} value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <input type="tel" placeholder={t('modal_telefone_placeholder')} value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <label style={{ display: 'block', fontSize: '12px', color: '#d4af37', marginBottom: '4px' }}>
+              {t('modal_data_nascimento_placeholder')}
+            </label>
+            <input type="date" value={dadosAgendamento.dataNascimento} onChange={(e) => setDadosAgendamento({...dadosAgendamento, dataNascimento: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <textarea
               placeholder={t('modal_obs_placeholder')}
               value={observacoesCliente}

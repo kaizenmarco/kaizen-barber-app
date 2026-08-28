@@ -12,6 +12,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     nome: '',
     telefone: '',
     email: '',
+    data_nascimento: '',
     data_primeira_visita: ''
   });
 
@@ -65,7 +66,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
   const handleAdicionarCliente = async (e) => {
     e.preventDefault();
 
-    if (!novoCliente.nome || !novoCliente.email) {
+    if (!novoCliente.nome || !novoCliente.email || !novoCliente.telefone) {
       alert(t('clientes.nomeEmailObrigatorios'));
       return;
     }
@@ -78,6 +79,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
             nome: novoCliente.nome,
             telefone: novoCliente.telefone || null,
             email: novoCliente.email,
+            data_nascimento: novoCliente.data_nascimento || null,
             data_primeiro_atendimento: novoCliente.data_primeira_visita || new Date().toISOString().split('T')[0]
           }
         ]);
@@ -85,7 +87,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
       if (error) throw error;
 
       alert(t('clientes.adicionadoComSucesso'));
-      setNovoCliente({ nome: '', telefone: '', email: '', data_primeira_visita: '' });
+      setNovoCliente({ nome: '', telefone: '', email: '', data_nascimento: '', data_primeira_visita: '' });
       buscarClientes();
     } catch (error) {
       alert(t('clientes.erroAdicionar', { msg: error.message }));
@@ -148,7 +150,17 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
             placeholder={t('comum.telefone')}
             value={novoCliente.telefone}
             onChange={handleInputChange}
+            required
           />
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
+            {t('clientes.dataNascimento')}
+            <input
+              type="date"
+              name="data_nascimento"
+              value={novoCliente.data_nascimento}
+              onChange={handleInputChange}
+            />
+          </label>
           <input
             type="date"
             name="data_primeira_visita"

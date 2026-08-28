@@ -38,6 +38,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     cliente: '',
     email: '',
     telefone: '',
+    dataNascimento: '',
     data: '',
     horario: '',
     servico: '',
@@ -365,7 +366,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const handleAgendar = async (e) => {
     e.preventDefault();
 
-    if (!novoAgendamento.cliente || !novoAgendamento.email || !novoAgendamento.data || !novoAgendamento.horario || !novoAgendamento.servico || !novoAgendamento.profissional) {
+    if (!novoAgendamento.cliente || !novoAgendamento.email || !novoAgendamento.telefone || !novoAgendamento.data || !novoAgendamento.horario || !novoAgendamento.servico || !novoAgendamento.profissional) {
       alert(t('agendamentos.preencherObrigatorios'));
       return;
     }
@@ -399,13 +400,25 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
       if (clienteExistente) {
         clienteId = clienteExistente.id;
+        // Cliente já existia — se ele não tinha telefone/data de nascimento
+        // salvos ainda, aproveita os dados digitados agora pra completar o
+        // cadastro (sem sobrescrever o que já tinha).
+        await supabase
+          .from('clientes')
+          .update({
+            telefone: novoAgendamento.telefone || undefined,
+            data_nascimento: novoAgendamento.dataNascimento || undefined
+          })
+          .eq('id', clienteId)
+          .or('telefone.is.null,data_nascimento.is.null');
       } else {
         const { data: novoCliente, error: erroCliente } = await supabase
           .from('clientes')
           .insert([{
             nome: novoAgendamento.cliente,
             email: novoAgendamento.email,
-            telefone: novoAgendamento.telefone || null
+            telefone: novoAgendamento.telefone || null,
+            data_nascimento: novoAgendamento.dataNascimento || null
           }])
           .select('id')
           .single();
@@ -436,7 +449,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       if (erroAgendamento) throw erroAgendamento;
 
       alert(t('agendamentos.criadoComSucesso'));
-      setNovoAgendamento({ cliente: '', email: '', telefone: '', data: '', horario: '', servico: '', profissional: '' });
+      setNovoAgendamento({ cliente: '', email: '', telefone: '', dataNascimento: '', data: '', horario: '', servico: '', profissional: '' });
       setModoEncaixe(false);
       setModalNovoAberto(false);
       buscarAgendamentos();
@@ -828,7 +841,17 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 placeholder={t('agendamentos.telefoneOpcional')}
                 value={novoAgendamento.telefone}
                 onChange={handleInputChange}
+                required
               />
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
+                {t('agendamentos.dataNascimento')}
+                <input
+                  type="date"
+                  name="dataNascimento"
+                  value={novoAgendamento.dataNascimento}
+                  onChange={handleInputChange}
+                />
+              </label>
               <select
                 name="servico"
                 value={novoAgendamento.servico}
