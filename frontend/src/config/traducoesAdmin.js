@@ -204,6 +204,7 @@ const TEXTOS = {
     'agendamentos.livre': 'Livre',
     'agendamentos.salaoFechadoNesseDia': 'O salão está fechado nesse dia.',
     'agendamentos.novoBtnFlutuante': 'Novo agendamento',
+    'agendamentos.escolhaData': 'Escolha a data',
     'menu.titulo': 'Menu',
 
     // Clientes
@@ -563,6 +564,7 @@ const TEXTOS = {
     'agendamentos.livre': 'Free',
     'agendamentos.salaoFechadoNesseDia': 'The shop is closed that day.',
     'agendamentos.novoBtnFlutuante': 'New appointment',
+    'agendamentos.escolhaData': 'Choose the date',
     'menu.titulo': 'Menu',
 
     'clientes.titulo': '👥 Clients',
@@ -916,6 +918,7 @@ const TEXTOS = {
     'agendamentos.livre': '空き',
     'agendamentos.salaoFechadoNesseDia': 'この日は休業日です。',
     'agendamentos.novoBtnFlutuante': '新規予約',
+    'agendamentos.escolhaData': '日付を選択',
     'menu.titulo': 'メニュー',
 
     'clientes.titulo': '👥 顧客',

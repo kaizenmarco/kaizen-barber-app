@@ -851,13 +851,16 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                   <option key={p.id} value={p.nome}>{p.nome}</option>
                 ))}
               </select>
-              <input
-                type="date"
-                name="data"
-                value={novoAgendamento.data}
-                onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
-                required
-              />
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
+                {t('agendamentos.escolhaData')}
+                <input
+                  type="date"
+                  name="data"
+                  value={novoAgendamento.data}
+                  onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
+                  required
+                />
+              </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
                 <input
@@ -1401,13 +1404,16 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
             </div>
 
             <form onSubmit={handleSalvarEdicao}>
-              <input
-                type="date"
-                name="data"
-                value={edicaoForm.data}
-                onChange={(e) => { handleEdicaoInputChange(e); setEdicaoForm(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
-                required
-              />
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
+                {t('agendamentos.escolhaData')}
+                <input
+                  type="date"
+                  name="data"
+                  value={edicaoForm.data}
+                  onChange={(e) => { handleEdicaoInputChange(e); setEdicaoForm(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
+                  required
+                />
+              </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
                 <input
