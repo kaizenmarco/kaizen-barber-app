@@ -206,7 +206,7 @@ function ClientePublico() {
   const [lembreteMinutos, setLembreteMinutos] = useState(30);
   const [presencaConfirmada, setPresencaConfirmada] = useState(false);
 
-  const [emailConsultaPontos, setEmailConsultaPontos] = useState('');
+  const [telefoneConsultaPontos, setTelefoneConsultaPontos] = useState('');
   const [consultaPontosFeita, setConsultaPontosFeita] = useState(false);
 
   const [emailConsultaAgendamentos, setEmailConsultaAgendamentos] = useState('');
@@ -338,6 +338,36 @@ function ClientePublico() {
     ) ? prev : novoMes);
   }, [dataSelecionada]);
 
+  // Calcula e grava no estado o saldo de pontos de fidelidade de um cliente
+  // já identificado (por e-mail, na tela de agendamento, ou por telefone, na
+  // consulta pública de pontos) — a partir daqui a lógica é a mesma pros dois.
+  const calcularESetarPontosDoCliente = async (clienteId) => {
+    const { data: realizados, error: erroRealizados } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('cliente_id', clienteId)
+      .eq('status', 'REALIZADO');
+
+    if (erroRealizados) throw erroRealizados;
+
+    // Conta quantos agendamentos já usaram desconto de pontos, para saber quanto ja foi resgatado
+    const { data: resgates, error: erroResgates } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('cliente_id', clienteId)
+      .ilike('observacoes', '%Desconto de pontos%');
+
+    if (erroResgates) throw erroResgates;
+
+    const totalGanho = (realizados?.length || 0) * 2;
+    const totalResgatado = (resgates?.length || 0) * 10;
+    const saldo = Math.max(0, totalGanho - totalResgatado);
+
+    setAtendimentosRealizados(realizados?.length || 0);
+    setPontosJaResgatados(totalResgatado);
+    setPontosCliente(saldo);
+  };
+
   const buscarPontosCliente = async (emailParam) => {
     const email = emailParam || dadosAgendamento.email;
     if (!email) return;
@@ -352,36 +382,49 @@ function ClientePublico() {
         setPontosCliente(0);
         setAtendimentosRealizados(0);
         setPontosJaResgatados(0);
-        setCarregandoPontos(false);
         return;
       }
 
-      const cliente = clientes[0];
+      await calcularESetarPontosDoCliente(clientes[0].id);
+    } catch (error) {
+      console.error('Erro ao buscar pontos:', error);
+      setPontosCliente(0);
+    } finally {
+      setCarregandoPontos(false);
+    }
+  };
 
-      const { data: realizados, error: erroRealizados } = await supabase
-        .from('agendamentos')
-        .select('id')
-        .eq('cliente_id', cliente.id)
-        .eq('status', 'REALIZADO');
+  // Compara só os últimos 9 dígitos do telefone (ignorando espaços, traços,
+  // parênteses e se a pessoa digitou com "0" na frente ou com "+81" no
+  // lugar dele) — assim "080-9724-2512" e "+81 80 9724 2512" batem com o
+  // mesmo cliente, sem exigir que a pessoa digite exatamente igual ao que
+  // está cadastrado.
+  const normalizarTelefoneParaComparar = (str) => (str || '').replace(/\D/g, '').slice(-9);
 
-      if (erroRealizados) throw erroRealizados;
+  // Consulta pública de saldo de pontos, por telefone (a pedido do Marco —
+  // mais fácil do cliente lembrar o telefone do que qual e-mail usou).
+  const buscarPontosClientePorTelefone = async (telefoneParam) => {
+    const alvo = normalizarTelefoneParaComparar(telefoneParam);
+    if (!alvo) return;
+    setCarregandoPontos(true);
+    try {
+      const { data: clientes, error } = await supabase
+        .from('clientes')
+        .select('id, telefone')
+        .not('telefone', 'is', null);
 
-      // Conta quantos agendamentos já usaram desconto de pontos, para saber quanto ja foi resgatado
-      const { data: resgates, error: erroResgates } = await supabase
-        .from('agendamentos')
-        .select('id')
-        .eq('cliente_id', cliente.id)
-        .ilike('observacoes', '%Desconto de pontos%');
+      if (error) throw error;
 
-      if (erroResgates) throw erroResgates;
+      const encontrado = (clientes || []).find(c => normalizarTelefoneParaComparar(c.telefone) === alvo);
 
-      const totalGanho = (realizados?.length || 0) * 2;
-      const totalResgatado = (resgates?.length || 0) * 10;
-      const saldo = Math.max(0, totalGanho - totalResgatado);
+      if (!encontrado) {
+        setPontosCliente(0);
+        setAtendimentosRealizados(0);
+        setPontosJaResgatados(0);
+        return;
+      }
 
-      setAtendimentosRealizados(realizados?.length || 0);
-      setPontosJaResgatados(totalResgatado);
-      setPontosCliente(saldo);
+      await calcularESetarPontosDoCliente(encontrado.id);
     } catch (error) {
       console.error('Erro ao buscar pontos:', error);
       setPontosCliente(0);
@@ -1463,15 +1506,15 @@ function ClientePublico() {
               <h3 style={{ color: '#d4af37', marginTop: 0 }}>{t('fidelidade_consultar_titulo')}</h3>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <input
-                  type="email"
-                  placeholder={t('fidelidade_email_placeholder')}
-                  value={emailConsultaPontos}
-                  onChange={(e) => setEmailConsultaPontos(e.target.value)}
+                  type="tel"
+                  placeholder={t('fidelidade_telefone_placeholder')}
+                  value={telefoneConsultaPontos}
+                  onChange={(e) => setTelefoneConsultaPontos(e.target.value)}
                   style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
                 />
                 <button
-                  onClick={async () => { await buscarPontosCliente(emailConsultaPontos); setConsultaPontosFeita(true); }}
-                  disabled={!emailConsultaPontos.includes('@') || carregandoPontos}
+                  onClick={async () => { await buscarPontosClientePorTelefone(telefoneConsultaPontos); setConsultaPontosFeita(true); }}
+                  disabled={telefoneConsultaPontos.replace(/\D/g, '').length < 8 || carregandoPontos}
                   style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: carregandoPontos ? 'wait' : 'pointer' }}
                 >
                   {carregandoPontos ? '⏳' : t('fidelidade_consultar_botao')}
