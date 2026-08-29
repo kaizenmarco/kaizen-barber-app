@@ -704,7 +704,8 @@ body {
   position: absolute;
   overflow: hidden;
   box-sizing: border-box;
-  padding: 4px 8px;
+  padding: 3px 6px;
+  line-height: 1.15;
 }
 
 .agenda-timeline-evento .agenda-card-topo {
@@ -712,15 +713,37 @@ body {
 }
 
 .agenda-timeline-evento .agenda-card-cliente {
-  font-size: 12px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agenda-timeline-evento .agenda-card-servico,
+.agenda-timeline-evento .agenda-card-topo .btn-delete {
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.agenda-timeline-evento .agenda-card-servico {
+  font-size: 10px;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agenda-timeline-evento .agenda-card-rodape {
-  margin-top: 2px;
+  margin-top: 1px;
+}
+
+.agenda-timeline-evento .agenda-card-rodape select {
+  padding: 2px 5px;
+  font-size: 10px;
+}
+
+.agenda-timeline-evento .agenda-card-preco {
+  font-size: 11px;
 }
 
 .agenda-timeline-bloqueio {
@@ -745,6 +768,14 @@ body {
   flex-shrink: 0;
   padding: 2px 6px;
   font-size: 10px;
+}
+
+/* Espaço extra no fim da página só nas telas com o botão flutuante (+),
+   pra ele nunca ficar em cima do último card/lixeira quando rola até o
+   final — sem isso, como o botão é "fixed", ele flutuava por cima dos
+   últimos ~56px de conteúdo real ao chegar no fim da rolagem. */
+.agenda-espaco-fab {
+  padding-bottom: 76px;
 }
 
 .agenda-fab {

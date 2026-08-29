@@ -672,7 +672,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   // deriva desse único número, pra manter tudo proporcional e "encaixado"
   // na grade de 15 min (nunca solto/flutuando entre marcas).
   const SLOT_MINUTOS = 15;
-  const SLOT_ALTURA_PX = 22;
+  const SLOT_ALTURA_PX = 26;
 
   const arredondarParaBaixo15 = (min) => Math.floor(min / SLOT_MINUTOS) * SLOT_MINUTOS;
   const arredondarParaCima15 = (min) => Math.ceil(min / SLOT_MINUTOS) * SLOT_MINUTOS;
@@ -730,7 +730,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const diasDaSemanaAtual = obterDiasDaSemana(semanaAncora);
 
   return (
-    <div className="page-container">
+    <div className="page-container agenda-espaco-fab">
       <h2>{t('agendamentos.titulo')}</h2>
 
       {/* FILTRO POR PROFISSIONAL — avatares circulares */}
