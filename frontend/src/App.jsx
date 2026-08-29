@@ -3,6 +3,11 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import './App.css';
 import ClientePublico from './pages/ClientePublico';
 import AdminLogin from './pages/AdminLogin';
+import SuperAdmin from './pages/SuperAdmin';
+import Cadastro from './pages/Cadastro';
+import CadastroSucesso from './pages/CadastroSucesso';
+import CadastroCancelado from './pages/CadastroCancelado';
+import PainelEmpresa from './pages/PainelEmpresa';
 
 // O subdomínio admin.kaizenbarbershop.com é dedicado só ao painel — nele,
 // a própria raiz "/" já deve abrir o Admin (não o site do cliente).
@@ -53,6 +58,11 @@ function App() {
       <Routes>
         <Route path="/" element={raiz} />
         <Route path="/admin" element={<AdminLogin />} />
+        <Route path="/super-admin" element={<SuperAdmin />} />
+        <Route path="/cadastro" element={<Cadastro />} />
+        <Route path="/cadastro/sucesso" element={<CadastroSucesso />} />
+        <Route path="/cadastro/cancelado" element={<CadastroCancelado />} />
+        <Route path="/painel" element={<PainelEmpresa />} />
       </Routes>
     </Router>
   );
