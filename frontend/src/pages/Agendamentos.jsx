@@ -666,14 +666,66 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     .filter(b => b.data === diaSelecionado)
     .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
 
-  const horasDaGradeDoDia = [];
+  // ---- Timeline vertical de 15 em 15 minutos ----
+  // SLOT_ALTURA_PX = quantos pixels representam 15 minutos na tela. Todo o
+  // resto (posição e altura dos blocos, linhas de grade, marcas de hora)
+  // deriva desse único número, pra manter tudo proporcional e "encaixado"
+  // na grade de 15 min (nunca solto/flutuando entre marcas).
+  const SLOT_MINUTOS = 15;
+  const SLOT_ALTURA_PX = 22;
+
+  const arredondarParaBaixo15 = (min) => Math.floor(min / SLOT_MINUTOS) * SLOT_MINUTOS;
+  const arredondarParaCima15 = (min) => Math.ceil(min / SLOT_MINUTOS) * SLOT_MINUTOS;
+
+  const aberturaMinDia = horarioDoDiaSelecionado.aberto ? paraMinutos(horarioDoDiaSelecionado.abertura) : 0;
+  const fechamentoMinDia = horarioDoDiaSelecionado.aberto ? paraMinutos(horarioDoDiaSelecionado.fechamento) : 0;
+  const totalSlotsDia = horarioDoDiaSelecionado.aberto ? Math.round((fechamentoMinDia - aberturaMinDia) / SLOT_MINUTOS) : 0;
+  const alturaTimelinePx = totalSlotsDia * SLOT_ALTURA_PX;
+
+  const marcasDeHoraDia = [];
   if (horarioDoDiaSelecionado.aberto) {
-    const inicioMin = Math.floor(paraMinutos(horarioDoDiaSelecionado.abertura) / 60) * 60;
-    const fimMin = paraMinutos(horarioDoDiaSelecionado.fechamento);
-    for (let m = inicioMin; m < fimMin; m += 60) {
-      horasDaGradeDoDia.push(m);
+    for (let m = aberturaMinDia; m <= fechamentoMinDia; m += 60) {
+      marcasDeHoraDia.push(m);
     }
   }
+
+  // Atribui uma "coluna" pra cada agendamento/bloqueio que se sobrepõe no
+  // tempo (ex: um encaixe colidindo com outro atendimento), pra desenhar
+  // lado a lado em vez de um por cima do outro.
+  const atribuirColunasTimeline = (itens) => {
+    const ordenados = [...itens].sort((x, y) => x.inicioMin - y.inicioMin || x.fimMin - y.fimMin);
+    const fimOcupadoPorColuna = [];
+    const comColuna = ordenados.map(item => {
+      let coluna = fimOcupadoPorColuna.findIndex(fim => fim <= item.inicioMin);
+      if (coluna === -1) {
+        coluna = fimOcupadoPorColuna.length;
+        fimOcupadoPorColuna.push(item.fimMin);
+      } else {
+        fimOcupadoPorColuna[coluna] = item.fimMin;
+      }
+      return { ...item, coluna };
+    });
+    const totalColunas = Math.max(1, fimOcupadoPorColuna.length);
+    return comColuna.map(item => ({ ...item, totalColunas }));
+  };
+
+  const itensTimeline = !horarioDoDiaSelecionado.aberto ? [] : atribuirColunasTimeline([
+    ...agendamentosDoDiaSelecionado.map(a => {
+      const duracaoReal = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+      const inicioReal = paraMinutos(a.hora);
+      const fimReal = inicioReal + duracaoReal;
+      const inicioMin = Math.max(aberturaMinDia, arredondarParaBaixo15(inicioReal));
+      const fimMin = Math.min(fechamentoMinDia, Math.max(inicioMin + SLOT_MINUTOS, arredondarParaCima15(fimReal)));
+      return { tipo: 'agendamento', id: `ag-${a.id}`, inicioMin, fimMin, dado: a };
+    }),
+    ...bloqueiosDoDiaSelecionado.map(b => {
+      const inicioReal = Math.max(aberturaMinDia, paraMinutos(b.horaInicio));
+      const fimReal = Math.min(fechamentoMinDia, paraMinutos(b.horaFim));
+      const inicioMin = arredondarParaBaixo15(inicioReal);
+      const fimMin = Math.min(fechamentoMinDia, Math.max(inicioMin + SLOT_MINUTOS, arredondarParaCima15(fimReal)));
+      return { tipo: 'bloqueio', id: `bl-${b.id}`, inicioMin, fimMin, dado: b };
+    }),
+  ].filter(item => item.fimMin > item.inicioMin && item.inicioMin < fechamentoMinDia));
 
   const diasDaSemanaAtual = obterDiasDaSemana(semanaAncora);
 
@@ -735,59 +787,71 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 <p className="agenda-dia-vazio">{t('agendamentos.nenhumAgendamentoNoDia')}</p>
               )}
 
-              {(() => {
-                // Cada bloqueio só mostra o card completo (motivo + botão de
-                // apagar) na PRIMEIRA linha de horário em que ele aparece —
-                // se o bloqueio cobrir várias horas (ou o dia inteiro), as
-                // linhas seguintes só mostram uma faixa "Fechado", sem
-                // repetir o mesmo card várias vezes.
-                const bloqueiosJaDetalhados = new Set();
+              <div className="agenda-timeline-wrapper" style={{ height: `${alturaTimelinePx}px` }}>
+                {/* Marcas de hora (coluna fixa à esquerda) */}
+                <div className="agenda-timeline-marcas">
+                  {marcasDeHoraDia.map(m => (
+                    <div
+                      key={`marca-${m}`}
+                      className="agenda-timeline-marca-hora"
+                      style={{ top: `${((m - aberturaMinDia) / SLOT_MINUTOS) * SLOT_ALTURA_PX}px` }}
+                    >
+                      {paraHHMM(m)}
+                    </div>
+                  ))}
+                </div>
 
-                return horasDaGradeDoDia.map(minutoHora => {
-                  const horaLabel = paraHHMM(minutoHora);
-                  const agendamentosNaHora = agendamentosDoDiaSelecionado.filter(a => {
-                    const m = paraMinutos(a.hora);
-                    return m >= minutoHora && m < minutoHora + 60;
-                  });
-                  const bloqueiosNaHora = bloqueiosDoDiaSelecionado.filter(b => {
-                    const inicioMin = paraMinutos(b.horaInicio);
-                    const fimMin = paraMinutos(b.horaFim);
-                    return inicioMin < minutoHora + 60 && fimMin > minutoHora;
-                  });
+                {/* Grade com linhas a cada 15min (finas) e a cada hora (mais fortes) */}
+                <div
+                  className="agenda-timeline-grade"
+                  style={{
+                    backgroundImage:
+                      `repeating-linear-gradient(to bottom, rgba(212,175,55,0.35) 0, rgba(212,175,55,0.35) 1px, transparent 1px, transparent ${SLOT_ALTURA_PX * 4}px),` +
+                      `repeating-linear-gradient(to bottom, var(--border-color) 0, var(--border-color) 1px, transparent 1px, transparent ${SLOT_ALTURA_PX}px)`
+                  }}
+                >
+                  {itensTimeline.map(item => {
+                    const top = ((item.inicioMin - aberturaMinDia) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
+                    const altura = ((item.fimMin - item.inicioMin) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
+                    const larguraPercentual = 100 / item.totalColunas;
+                    const estiloPosicao = {
+                      top: `${top}px`,
+                      height: `${altura - 2}px`,
+                      left: `calc(${item.coluna * larguraPercentual}% + 2px)`,
+                      width: `calc(${larguraPercentual}% - 4px)`
+                    };
 
-                return (
-                  <div key={minutoHora} className="agenda-linha-hora">
-                    <div className="agenda-linha-hora-label">{horaLabel}</div>
-                    <div className="agenda-linha-hora-conteudo">
-                      {bloqueiosNaHora.map(b => {
-                        const jaDetalhado = bloqueiosJaDetalhados.has(b.id);
-                        if (!jaDetalhado) bloqueiosJaDetalhados.add(b.id);
+                    if (item.tipo === 'bloqueio') {
+                      const b = item.dado;
+                      return (
+                        <div key={item.id} className="agenda-timeline-evento agenda-timeline-bloqueio" style={estiloPosicao}>
+                          <span>
+                            🚫 {formatarHorarioBloqueio(b)}
+                            {b.motivo && altura >= 40 && <span className="agenda-timeline-bloqueio-motivo"> — {b.motivo}</span>}
+                          </span>
+                          {altura >= 28 && (
+                            <button className="btn-delete agenda-timeline-del" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
+                          )}
+                        </div>
+                      );
+                    }
 
-                        return jaDetalhado ? (
-                          <div key={`bloq-cont-${b.id}-${minutoHora}`} className="agenda-linha-bloqueada">
-                            🚫 {t('agendamentos.bloqueioTag')}
-                          </div>
-                        ) : (
-                          <div key={`bloq-${b.id}`} className="agenda-card agenda-card-bloqueio">
-                            <span style={{ color: '#f87171', fontWeight: 'bold' }}>
-                              🚫 {formatarHorarioBloqueio(b)}
-                              {b.motivo && <span style={{ color: '#999', fontWeight: 'normal' }}> — {b.motivo}</span>}
-                            </span>
-                            <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
-                          </div>
-                        );
-                      })}
-                      {agendamentosNaHora.length === 0 && bloqueiosNaHora.length === 0 ? (
-                        <span className="agenda-linha-livre">{t('agendamentos.livre')}</span>
-                      ) : (
-                        agendamentosNaHora.map(a => (
-                          <div key={a.id} className="agenda-card" style={{ borderLeftColor: getCorStatus(a.status) }}>
-                            <div className="agenda-card-topo">
-                              <strong onClick={() => abrirEdicao(a)} title={t('agendamentos.editarTooltip')} className="agenda-card-cliente">
-                                {a.hora} · {a.cliente} ✏️
-                              </strong>
-                              <button className="btn-delete" onClick={() => handleDeletar(a.id)}>🗑️</button>
-                            </div>
+                    const a = item.dado;
+                    const compacto = altura < 56;
+                    return (
+                      <div
+                        key={item.id}
+                        className="agenda-timeline-evento agenda-card"
+                        style={{ ...estiloPosicao, borderLeftColor: getCorStatus(a.status) }}
+                      >
+                        <div className="agenda-card-topo">
+                          <strong onClick={() => abrirEdicao(a)} title={t('agendamentos.editarTooltip')} className="agenda-card-cliente">
+                            {a.hora} · {a.cliente} ✏️
+                          </strong>
+                          {!compacto && <button className="btn-delete" onClick={() => handleDeletar(a.id)}>🗑️</button>}
+                        </div>
+                        {!compacto && (
+                          <>
                             <div className="agenda-card-servico">
                               {a.servico}
                               {a.encaixe && <span className="agenda-card-encaixe"> {t('agendamentos.encaixeTag')}</span>}
@@ -802,14 +866,13 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                               </select>
                               <span className="agenda-card-preco">{a.preco ? `¥${a.preco.toLocaleString('ja-JP')}` : '-'}</span>
                             </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                );
-                });
-              })()}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </>
           )}
         </section>

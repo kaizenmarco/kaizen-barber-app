@@ -663,6 +663,90 @@ body {
   font-size: 13px;
 }
 
+/* ============================================================================
+   Timeline vertical da Agenda (visão "Dia") — eixo Y = tempo, com marcas
+   fixas de 15 em 15 minutos. A altura de cada evento é estritamente
+   proporcional à duração (ver SLOT_ALTURA_PX em Agendamentos.jsx: esse é o
+   "X pixels" de 15 minutos citado no pedido — todo o resto escala a partir
+   dele), e início/tamanho ficam sempre "encaixados" nessa grade de 15min.
+   ============================================================================ */
+.agenda-timeline-wrapper {
+  position: relative;
+  display: flex;
+  margin-top: 8px;
+}
+
+.agenda-timeline-marcas {
+  position: relative;
+  width: 46px;
+  flex-shrink: 0;
+}
+
+.agenda-timeline-marca-hora {
+  position: absolute;
+  left: 0;
+  right: 6px;
+  transform: translateY(-50%);
+  color: var(--accent-gold);
+  font-weight: bold;
+  font-size: 11px;
+  text-align: right;
+}
+
+.agenda-timeline-grade {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid var(--border-color);
+}
+
+.agenda-timeline-evento {
+  position: absolute;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 4px 8px;
+}
+
+.agenda-timeline-evento .agenda-card-topo {
+  gap: 4px;
+}
+
+.agenda-timeline-evento .agenda-card-cliente {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-timeline-evento .agenda-card-servico,
+.agenda-timeline-evento .agenda-card-rodape {
+  margin-top: 2px;
+}
+
+.agenda-timeline-bloqueio {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px dashed rgba(248, 113, 113, 0.5);
+  border-radius: 6px;
+  color: #f87171;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.agenda-timeline-bloqueio-motivo {
+  color: #999;
+  font-weight: normal;
+}
+
+.agenda-timeline-del {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
 .agenda-fab {
   position: fixed;
   right: 18px;
