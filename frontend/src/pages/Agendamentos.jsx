@@ -735,28 +735,49 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 <p className="agenda-dia-vazio">{t('agendamentos.nenhumAgendamentoNoDia')}</p>
               )}
 
-              {bloqueiosDoDiaSelecionado.map(b => (
-                <div key={`bloq-${b.id}`} className="agenda-card agenda-card-bloqueio">
-                  <span style={{ color: '#f87171', fontWeight: 'bold' }}>
-                    🚫 {formatarHorarioBloqueio(b)}
-                    {b.motivo && <span style={{ color: '#999', fontWeight: 'normal' }}> — {b.motivo}</span>}
-                  </span>
-                  <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
-                </div>
-              ))}
+              {(() => {
+                // Cada bloqueio só mostra o card completo (motivo + botão de
+                // apagar) na PRIMEIRA linha de horário em que ele aparece —
+                // se o bloqueio cobrir várias horas (ou o dia inteiro), as
+                // linhas seguintes só mostram uma faixa "Fechado", sem
+                // repetir o mesmo card várias vezes.
+                const bloqueiosJaDetalhados = new Set();
 
-              {horasDaGradeDoDia.map(minutoHora => {
-                const horaLabel = paraHHMM(minutoHora);
-                const agendamentosNaHora = agendamentosDoDiaSelecionado.filter(a => {
-                  const m = paraMinutos(a.hora);
-                  return m >= minutoHora && m < minutoHora + 60;
-                });
+                return horasDaGradeDoDia.map(minutoHora => {
+                  const horaLabel = paraHHMM(minutoHora);
+                  const agendamentosNaHora = agendamentosDoDiaSelecionado.filter(a => {
+                    const m = paraMinutos(a.hora);
+                    return m >= minutoHora && m < minutoHora + 60;
+                  });
+                  const bloqueiosNaHora = bloqueiosDoDiaSelecionado.filter(b => {
+                    const inicioMin = paraMinutos(b.horaInicio);
+                    const fimMin = paraMinutos(b.horaFim);
+                    return inicioMin < minutoHora + 60 && fimMin > minutoHora;
+                  });
 
                 return (
                   <div key={minutoHora} className="agenda-linha-hora">
                     <div className="agenda-linha-hora-label">{horaLabel}</div>
                     <div className="agenda-linha-hora-conteudo">
-                      {agendamentosNaHora.length === 0 ? (
+                      {bloqueiosNaHora.map(b => {
+                        const jaDetalhado = bloqueiosJaDetalhados.has(b.id);
+                        if (!jaDetalhado) bloqueiosJaDetalhados.add(b.id);
+
+                        return jaDetalhado ? (
+                          <div key={`bloq-cont-${b.id}-${minutoHora}`} className="agenda-linha-bloqueada">
+                            🚫 {t('agendamentos.bloqueioTag')}
+                          </div>
+                        ) : (
+                          <div key={`bloq-${b.id}`} className="agenda-card agenda-card-bloqueio">
+                            <span style={{ color: '#f87171', fontWeight: 'bold' }}>
+                              🚫 {formatarHorarioBloqueio(b)}
+                              {b.motivo && <span style={{ color: '#999', fontWeight: 'normal' }}> — {b.motivo}</span>}
+                            </span>
+                            <button className="btn-delete" onClick={() => handleDeletarBloqueio(b.id)}>🗑️</button>
+                          </div>
+                        );
+                      })}
+                      {agendamentosNaHora.length === 0 && bloqueiosNaHora.length === 0 ? (
                         <span className="agenda-linha-livre">{t('agendamentos.livre')}</span>
                       ) : (
                         agendamentosNaHora.map(a => (
@@ -787,7 +808,8 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                     </div>
                   </div>
                 );
-              })}
+                });
+              })()}
             </>
           )}
         </section>
