@@ -268,6 +268,7 @@ const TEXTOS = {
     'clientes.editarCliente': 'Editar Cliente',
     'clientes.editadoComSucesso': '✅ Cliente atualizado com sucesso!',
     'clientes.erroEditar': '❌ Erro ao atualizar cliente: {msg}',
+    'clientes.mensagemWhatsapp': 'Olá {nome}! Tudo bem? Aqui é do Kaizen Barber Shop. 💈',
 
     // Profissionais
     'profissionais.horarioSalao': '🕒 Horário do Salão',
@@ -685,6 +686,7 @@ const TEXTOS = {
     'clientes.editarCliente': 'Edit Client',
     'clientes.editadoComSucesso': '✅ Client updated successfully!',
     'clientes.erroEditar': '❌ Error updating client: {msg}',
+    'clientes.mensagemWhatsapp': 'Hi {nome}! How are you? This is Kaizen Barber Shop. 💈',
 
     'profissionais.horarioSalao': '🕒 Shop Hours',
     'profissionais.horarioSalaoDesc': 'All staff follow this schedule by default. It is the single source used here and in the clients\' public booking page.',
@@ -1097,6 +1099,7 @@ const TEXTOS = {
     'clientes.editarCliente': '顧客を編集',
     'clientes.editadoComSucesso': '✅ 顧客情報を更新しました！',
     'clientes.erroEditar': '❌ 顧客の更新エラー: {msg}',
+    'clientes.mensagemWhatsapp': '{nome}様、お元気ですか？Kaizen Barber Shopです。💈',
 
     'profissionais.horarioSalao': '🕒 店舗営業時間',
     'profissionais.horarioSalaoDesc': '全スタッフはデフォルトでこの営業時間に従います。ここと公開予約ページで使われる唯一の情報源です。',

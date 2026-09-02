@@ -42,6 +42,17 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
   const [edicaoClienteForm, setEdicaoClienteForm] = useState({ nome: '', telefone: '', email: '', data_nascimento: '' });
   const [salvandoEdicaoCliente, setSalvandoEdicaoCliente] = useState(false);
 
+  // Prontuário, Anamnese e lembrete via WhatsApp — mesmas ações que já
+  // existem na Tela de Detalhes do Agendamento, disponíveis também aqui
+  // direto no cadastro do cliente (sem precisar achar um agendamento dele).
+  const [prontuarioAberto, setProntuarioAberto] = useState(false);
+  const [carregandoProntuario, setCarregandoProntuario] = useState(false);
+  const [prontuarioItens, setProntuarioItens] = useState([]);
+  const [anamneseAberta, setAnamneseAberta] = useState(false);
+  const [carregandoAnamnese, setCarregandoAnamnese] = useState(false);
+  const [anamneseTexto, setAnamneseTexto] = useState('');
+  const [salvandoAnamnese, setSalvandoAnamnese] = useState(false);
+
   // Buscar clientes do Supabase
   useEffect(() => {
     buscarClientes();
@@ -161,6 +172,94 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
 
   const fecharEdicaoCliente = () => {
     setClienteEditando(null);
+    setProntuarioAberto(false);
+    setProntuarioItens([]);
+    setAnamneseAberta(false);
+    setAnamneseTexto('');
+  };
+
+  const abrirProntuario = async () => {
+    if (!clienteEditando) return;
+    setProntuarioAberto(true);
+    setCarregandoProntuario(true);
+    try {
+      const { data, error } = await supabase
+        .from('agendamentos')
+        .select('id, data_hora, preco_final, servicos:servico_id(nome), profissionais:profissional_id(nome)')
+        .eq('cliente_id', clienteEditando.id)
+        .eq('status', 'REALIZADO')
+        .order('data_hora', { ascending: false });
+      if (error) throw error;
+      setProntuarioItens((data || []).map(item => ({
+        id: item.id,
+        data: item.data_hora,
+        servico: item.servicos?.nome || 'N/A',
+        profissional: item.profissionais?.nome || 'N/A',
+        preco: item.preco_final
+      })));
+    } catch (error) {
+      alert(t('clientes.erroBuscar', { msg: error.message }));
+    } finally {
+      setCarregandoProntuario(false);
+    }
+  };
+
+  const fecharProntuario = () => {
+    setProntuarioAberto(false);
+    setProntuarioItens([]);
+  };
+
+  const abrirAnamnese = async () => {
+    if (!clienteEditando) return;
+    setAnamneseAberta(true);
+    setCarregandoAnamnese(true);
+    try {
+      const { data, error } = await supabase.from('clientes').select('anamnese').eq('id', clienteEditando.id).single();
+      if (error) throw error;
+      setAnamneseTexto(data?.anamnese || '');
+    } catch (error) {
+      alert(t('clientes.erroBuscar', { msg: error.message }));
+    } finally {
+      setCarregandoAnamnese(false);
+    }
+  };
+
+  const fecharAnamnese = () => {
+    setAnamneseAberta(false);
+    setAnamneseTexto('');
+  };
+
+  const handleSalvarAnamnese = async () => {
+    if (!clienteEditando) return;
+    setSalvandoAnamnese(true);
+    try {
+      const { error } = await supabase.from('clientes').update({ anamnese: anamneseTexto || null }).eq('id', clienteEditando.id);
+      if (error) throw error;
+      alert(t('agendamentos.anamneseSalva'));
+    } catch (error) {
+      alert(t('clientes.erroEditar', { msg: error.message }));
+    } finally {
+      setSalvandoAnamnese(false);
+    }
+  };
+
+  const normalizarTelefoneParaWhatsapp = (telefone) => {
+    const digitos = (telefone || '').replace(/\D/g, '');
+    if (!digitos) return '';
+    if (digitos.startsWith('81')) return digitos;
+    if (digitos.startsWith('0')) return `81${digitos.slice(1)}`;
+    return `81${digitos}`;
+  };
+
+  const abrirWhatsappCliente = () => {
+    if (!clienteEditando) return;
+    const numero = normalizarTelefoneParaWhatsapp(edicaoClienteForm.telefone || clienteEditando.telefone);
+    if (!numero) {
+      alert(t('agendamentos.semTelefoneParaLembrete'));
+      return;
+    }
+    const mensagem = t('clientes.mensagemWhatsapp', { nome: edicaoClienteForm.nome || clienteEditando.nome });
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`, '_blank');
   };
 
   const handleEdicaoClienteInputChange = (e) => {
@@ -415,6 +514,96 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
                 {salvandoEdicaoCliente ? t('comum.salvando') : t('comum.salvar')}
               </button>
             </form>
+
+            <div style={{ marginTop: '18px' }}>
+              <button className="detalhe-acao-btn whatsapp" onClick={abrirWhatsappCliente}>
+                <span>{t('agendamentos.enviarLembrete')}</span>
+              </button>
+              <button className="detalhe-acao-btn" onClick={abrirProntuario}>
+                <span>{t('agendamentos.prontuario')}</span>
+                <span>›</span>
+              </button>
+              <button className="detalhe-acao-btn" onClick={abrirAnamnese}>
+                <span>{t('agendamentos.anamnese')}</span>
+                <span>›</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Prontuário (histórico de atendimentos REALIZADO) ==================== */}
+      {prontuarioAberto && (
+        <div
+          onClick={fecharProntuario}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1100, padding: '20px', paddingTop: 'calc(20px + env(safe-area-inset-top))', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '10px', padding: '22px', maxWidth: '440px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ color: '#d4af37', margin: 0 }}>{t('agendamentos.prontuarioTitulo')}</h3>
+              <button onClick={fecharProntuario} style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}>
+                ✕ {t('comum.cancelar')}
+              </button>
+            </div>
+            {carregandoProntuario ? (
+              <p style={{ color: '#d4af37', textAlign: 'center' }}>{t('comum.carregando')}</p>
+            ) : prontuarioItens.length === 0 ? (
+              <p style={{ color: '#999', textAlign: 'center' }}>{t('agendamentos.prontuarioVazio')}</p>
+            ) : (
+              prontuarioItens.map(item => (
+                <div key={item.id} className="prontuario-item">
+                  <strong>{new Date(item.data).toLocaleDateString('pt-BR')}</strong> — {item.servico} ({item.profissional})
+                  {item.preco ? <span style={{ float: 'right', color: '#d4af37' }}>¥{item.preco.toLocaleString('ja-JP')}</span> : null}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Anamnese (formulário simples do cliente) ==================== */}
+      {anamneseAberta && (
+        <div
+          onClick={fecharAnamnese}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1100, padding: '20px', paddingTop: 'calc(20px + env(safe-area-inset-top))', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '10px', padding: '22px', maxWidth: '440px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ color: '#d4af37', margin: 0 }}>{t('agendamentos.anamneseTitulo')}</h3>
+              <button onClick={fecharAnamnese} style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}>
+                ✕ {t('comum.cancelar')}
+              </button>
+            </div>
+            {carregandoAnamnese ? (
+              <p style={{ color: '#d4af37', textAlign: 'center' }}>{t('comum.carregando')}</p>
+            ) : (
+              <>
+                <textarea
+                  className="detalhe-notas-textarea"
+                  style={{ minHeight: '140px' }}
+                  value={anamneseTexto}
+                  onChange={(e) => setAnamneseTexto(e.target.value)}
+                  placeholder={t('agendamentos.anamnesePlaceholder')}
+                />
+                <button className="btn-primary" style={{ marginTop: '10px', width: '100%' }} onClick={handleSalvarAnamnese} disabled={salvandoAnamnese}>
+                  {salvandoAnamnese ? t('comum.salvando') : t('agendamentos.salvarAnamnese')}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
