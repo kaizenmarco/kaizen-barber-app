@@ -20,6 +20,7 @@ const TEXTOS = {
     header_subtitulo: 'Premium Barbershop - Anjo, Aichi',
 
     nav_servicos: 'Serviços',
+    nav_pacotes: 'Pacotes',
     nav_agendar: 'Agendar',
     nav_endereco: 'Endereço',
     nav_profissionais: 'Profissionais',
@@ -46,6 +47,14 @@ const TEXTOS = {
     servicos_ver_mais: 'Ver mais',
     servicos_ver_menos: 'Ver menos',
     servicos_agendar: 'Agendar',
+
+    pacotes_titulo: 'Nossos Pacotes',
+    pacotes_nenhum: 'Nenhum pacote disponível no momento.',
+    pacotes_sessoesIlimitadas: 'Sessões ilimitadas',
+    pacotes_sessoes: '{n} sessões',
+    pacotes_validade: 'válido por {n} dias',
+    pacotes_tenhoInteresse: 'Tenho interesse',
+    pacotes_mensagemWhatsapp: 'Olá! Tenho interesse no pacote "{nome}".',
 
     agendar_titulo: 'Agendar horário',
     agendar_servico_label: 'Serviço:',
@@ -139,6 +148,7 @@ const TEXTOS = {
     header_subtitulo: 'Premium Barbershop - Anjo, Aichi',
 
     nav_servicos: 'Services',
+    nav_pacotes: 'Packages',
     nav_agendar: 'Book',
     nav_endereco: 'Location',
     nav_profissionais: 'Our Team',
@@ -165,6 +175,14 @@ const TEXTOS = {
     servicos_ver_mais: 'See more',
     servicos_ver_menos: 'See less',
     servicos_agendar: 'Book',
+
+    pacotes_titulo: 'Our Packages',
+    pacotes_nenhum: 'No packages available right now.',
+    pacotes_sessoesIlimitadas: 'Unlimited sessions',
+    pacotes_sessoes: '{n} sessions',
+    pacotes_validade: 'valid for {n} days',
+    pacotes_tenhoInteresse: "I'm interested",
+    pacotes_mensagemWhatsapp: 'Hi! I\'m interested in the "{nome}" package.',
 
     agendar_titulo: 'Book an appointment',
     agendar_servico_label: 'Service:',
@@ -258,6 +276,7 @@ const TEXTOS = {
     header_subtitulo: 'プレミアム理容室 - 愛知県安城市',
 
     nav_servicos: 'サービス',
+    nav_pacotes: 'パッケージ',
     nav_agendar: '予約する',
     nav_endereco: 'アクセス',
     nav_profissionais: 'スタイリスト',
@@ -284,6 +303,14 @@ const TEXTOS = {
     servicos_ver_mais: '続きを見る',
     servicos_ver_menos: '閉じる',
     servicos_agendar: '予約する',
+
+    pacotes_titulo: 'パッケージ',
+    pacotes_nenhum: '現在ご利用いただけるパッケージはありません。',
+    pacotes_sessoesIlimitadas: '回数無制限',
+    pacotes_sessoes: '{n}回',
+    pacotes_validade: '有効期限{n}日',
+    pacotes_tenhoInteresse: '興味があります',
+    pacotes_mensagemWhatsapp: 'こんにちは！「{nome}」パッケージに興味があります。',
 
     agendar_titulo: '予約する',
     agendar_servico_label: 'サービス:',
@@ -377,6 +404,7 @@ const TEXTOS = {
     header_subtitulo: 'Barbería Premium - Anjo, Aichi',
 
     nav_servicos: 'Servicios',
+    nav_pacotes: 'Paquetes',
     nav_agendar: 'Reservar',
     nav_endereco: 'Ubicación',
     nav_profissionais: 'Equipo',
@@ -403,6 +431,14 @@ const TEXTOS = {
     servicos_ver_mais: 'Ver más',
     servicos_ver_menos: 'Ver menos',
     servicos_agendar: 'Reservar',
+
+    pacotes_titulo: 'Nuestros Paquetes',
+    pacotes_nenhum: 'No hay paquetes disponibles por el momento.',
+    pacotes_sessoesIlimitadas: 'Sesiones ilimitadas',
+    pacotes_sessoes: '{n} sesiones',
+    pacotes_validade: 'válido por {n} días',
+    pacotes_tenhoInteresse: 'Estoy interesado',
+    pacotes_mensagemWhatsapp: '¡Hola! Estoy interesado en el paquete "{nome}".',
 
     agendar_titulo: 'Reservar turno',
     agendar_servico_label: 'Servicio:',

@@ -43,10 +43,13 @@ export const buscarServicosCompletos = async () => {
     // import feito aqui dentro (não no topo do arquivo) só pra evitar
     // import circular, já que supabaseClient não depende deste arquivo.
     const { supabase } = await import('../supabaseClient');
+    // eh_pacote = false: pacotes moram na mesma tabela mas não entram na
+    // lista de serviços agendáveis (ver buscarPacotesAtivos, mais abaixo).
     const { data, error } = await supabase
       .from('servicos')
       .select('id, nome, descricao, preco, duracao_minutos, imagem_url, ativo')
-      .eq('ativo', true);
+      .eq('ativo', true)
+      .eq('eh_pacote', false);
 
     if (error || !data) return SERVICOS;
 
@@ -95,6 +98,36 @@ export const buscarServicosCompletos = async () => {
     return [...mesclados, ...faltantes];
   } catch {
     return SERVICOS;
+  }
+};
+
+// Pacotes vivem na mesma tabela "servicos" (coluna eh_pacote = true) —
+// mesmo catálogo editável pelo Admin em Cadastros > Pacotes > Meus Pacotes,
+// com sessões/validade em vez de duração. Usado pelo site público (aba
+// Pacotes) pra mostrar só os pacotes ativos.
+export const buscarPacotesAtivos = async () => {
+  try {
+    const { supabase } = await import('../supabaseClient');
+    const { data, error } = await supabase
+      .from('servicos')
+      .select('id, nome, descricao, preco, quantidade_sessoes, validade_dias, imagem_url')
+      .eq('ativo', true)
+      .eq('eh_pacote', true)
+      .order('nome');
+
+    if (error || !data) return [];
+
+    return data.map(row => ({
+      id: row.id,
+      nome: row.nome,
+      descricao: row.descricao || '',
+      preco: row.preco != null ? Number(row.preco) : 0,
+      quantidadeSessoes: row.quantidade_sessoes,
+      validadeDias: row.validade_dias,
+      imagem: row.imagem_url || null,
+    }));
+  } catch {
+    return [];
   }
 };
 

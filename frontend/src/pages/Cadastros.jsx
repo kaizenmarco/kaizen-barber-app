@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
-import { PRODUTOS_MOCK, MEUS_PACOTES_MOCK, VENDAS_PACOTES_MOCK } from '../data/cadastrosMockData';
+import { VENDAS_PACOTES_MOCK } from '../data/cadastrosMockData';
 
 // ============================================================================
 // Módulo de Cadastros — Menu principal (Serviços / Produtos / Pacotes) que
@@ -84,17 +84,25 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
   const [tela, setTela] = useState('menu');
   const [busca, setBusca] = useState('');
 
-  // Serviços são os únicos, por enquanto, ligados de verdade ao Supabase —
-  // a mesma tabela "servicos" que a Agenda e o site público usam. Criar,
-  // editar, desativar ou trocar a imagem aqui reflete automaticamente nos
-  // dois (ver config/servicos.js > buscarServicosCompletos). Produtos e
-  // Pacotes continuam mockados/locais por enquanto.
+  // Serviços, Produtos e Meus Pacotes são ligados de verdade ao Supabase.
+  // Serviços e Pacotes moram na mesma tabela "servicos" (coluna eh_pacote),
+  // que a Agenda e o site público também leem — criar, editar, desativar ou
+  // trocar a imagem aqui reflete automaticamente nos dois (ver
+  // config/servicos.js > buscarServicosCompletos / buscarPacotesAtivos).
+  // Produtos tem sua própria tabela. Venda de Pacotes continua mockada/local
+  // por enquanto (histórico de vendas, não catálogo).
   const [servicos, setServicos] = useState([]);
   const [carregandoServicos, setCarregandoServicos] = useState(true);
   const [salvandoServico, setSalvandoServico] = useState(false);
 
-  const [produtos, setProdutos] = useState(PRODUTOS_MOCK);
-  const [meusPacotes, setMeusPacotes] = useState(MEUS_PACOTES_MOCK);
+  const [produtos, setProdutos] = useState([]);
+  const [carregandoProdutos, setCarregandoProdutos] = useState(true);
+  const [salvandoProduto, setSalvandoProduto] = useState(false);
+
+  const [meusPacotes, setMeusPacotes] = useState([]);
+  const [carregandoMeusPacotes, setCarregandoMeusPacotes] = useState(true);
+  const [salvandoPacote, setSalvandoPacote] = useState(false);
+
   const [vendasPacotes, setVendasPacotes] = useState(VENDAS_PACOTES_MOCK);
 
   const [modalAberto, setModalAberto] = useState(false);
@@ -107,6 +115,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
       const { data, error } = await supabase
         .from('servicos')
         .select('id, nome, descricao, preco, duracao_minutos, imagem_url, ativo')
+        .eq('eh_pacote', false)
         .order('nome');
       if (error) throw error;
       setServicos((data || []).map(row => ({
@@ -125,8 +134,60 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     }
   };
 
+  const buscarProdutosAdmin = async () => {
+    setCarregandoProdutos(true);
+    try {
+      const { data, error } = await supabase
+        .from('produtos')
+        .select('id, nome, descricao, preco, estoque, imagem_url, ativo')
+        .order('nome');
+      if (error) throw error;
+      setProdutos((data || []).map(row => ({
+        id: row.id,
+        nome: row.nome,
+        descricao: row.descricao || '',
+        preco: row.preco != null ? Number(row.preco) : 0,
+        estoque: row.estoque || 0,
+        imagemUrl: row.imagem_url || '',
+        ativo: row.ativo !== false
+      })));
+    } catch (error) {
+      alert(t('cadastros.erroCarregarProdutos', { msg: error.message }));
+    } finally {
+      setCarregandoProdutos(false);
+    }
+  };
+
+  const buscarMeusPacotesAdmin = async () => {
+    setCarregandoMeusPacotes(true);
+    try {
+      const { data, error } = await supabase
+        .from('servicos')
+        .select('id, nome, descricao, preco, quantidade_sessoes, validade_dias, imagem_url, ativo')
+        .eq('eh_pacote', true)
+        .order('nome');
+      if (error) throw error;
+      setMeusPacotes((data || []).map(row => ({
+        id: row.id,
+        nome: row.nome,
+        descricao: row.descricao || '',
+        preco: row.preco != null ? Number(row.preco) : 0,
+        quantidadeSessoes: row.quantidade_sessoes,
+        validadeDias: row.validade_dias || 0,
+        imagemUrl: row.imagem_url || '',
+        ativo: row.ativo !== false
+      })));
+    } catch (error) {
+      alert(t('cadastros.erroCarregarPacotes', { msg: error.message }));
+    } finally {
+      setCarregandoMeusPacotes(false);
+    }
+  };
+
   useEffect(() => {
     buscarServicosAdmin();
+    buscarProdutosAdmin();
+    buscarMeusPacotesAdmin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -141,26 +202,33 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     setFormModal({});
   };
 
+  const TELAS_COM_IMAGEM = ['servicos', 'produtos', 'meusPacotes'];
+
   const abrirNovo = () => {
     setItemEditando(null);
     if (tela === 'servicos') {
       setFormModal({ nome: '', descricao: '', preco: '', duracaoMinutos: '', ativo: true, imagemUrl: '', imagemArquivo: null, imagemPreview: '' });
+    } else if (tela === 'produtos') {
+      setFormModal({ nome: '', descricao: '', preco: '', estoque: '', ativo: true, imagemUrl: '', imagemArquivo: null, imagemPreview: '' });
+    } else if (tela === 'meusPacotes') {
+      setFormModal({ nome: '', descricao: '', preco: '', quantidadeSessoes: '', validadeDias: '', ativo: true, imagemUrl: '', imagemArquivo: null, imagemPreview: '' });
     } else if (tela === 'vendaPacotes') {
       setFormModal({ cliente: '', pacote: meusPacotes[0]?.nome || '', dataVenda: new Date().toISOString().split('T')[0], sessoesRestantes: '' });
-    } else {
-      setFormModal({ nome: '', descricao: '', preco: '', duracaoMinutos: '', estoque: '', quantidadeSessoes: '', validadeDias: '', ativo: true });
     }
     setModalAberto(true);
   };
 
   const abrirEditar = (item) => {
     setItemEditando(item);
-    if (tela === 'servicos') {
+    if (TELAS_COM_IMAGEM.includes(tela)) {
       setFormModal({
         nome: item.nome,
         descricao: item.descricao || '',
         preco: item.preco != null ? String(item.preco) : '',
         duracaoMinutos: item.duracaoMinutos != null ? String(item.duracaoMinutos) : '',
+        estoque: item.estoque != null ? String(item.estoque) : '',
+        quantidadeSessoes: item.quantidadeSessoes == null ? '' : String(item.quantidadeSessoes),
+        validadeDias: item.validadeDias != null ? String(item.validadeDias) : '',
         ativo: item.ativo !== false,
         imagemUrl: item.imagemUrl || '',
         imagemArquivo: null,
@@ -169,21 +237,31 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     } else {
       setFormModal({
         ...item,
-        preco: item.preco != null ? String(item.preco) : '',
-        duracaoMinutos: item.duracaoMinutos != null ? String(item.duracaoMinutos) : '',
-        estoque: item.estoque != null ? String(item.estoque) : '',
-        quantidadeSessoes: item.quantidadeSessoes == null ? '' : String(item.quantidadeSessoes),
-        validadeDias: item.validadeDias != null ? String(item.validadeDias) : '',
         sessoesRestantes: item.sessoesRestantes == null ? '' : String(item.sessoesRestantes)
       });
     }
     setModalAberto(true);
   };
 
-  const handleSelecionarImagemServico = (e) => {
+  const handleSelecionarImagem = (e) => {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
     setFormModal(prev => ({ ...prev, imagemArquivo: arquivo, imagemPreview: URL.createObjectURL(arquivo) }));
+  };
+
+  // Faz upload da imagem (se uma nova foi escolhida) pro bucket indicado e
+  // devolve a URL pública a usar no registro — ou a URL que já existia, se
+  // nenhuma imagem nova foi selecionada.
+  const enviarImagemSeHouver = async (bucket, prefixo) => {
+    if (!formModal.imagemArquivo) return formModal.imagemUrl || null;
+    const extensao = formModal.imagemArquivo.name.split('.').pop();
+    const caminho = `${prefixo}-${itemEditando?.id || 'novo'}-${Date.now()}.${extensao}`;
+    const { error: erroUpload } = await supabase.storage
+      .from(bucket)
+      .upload(caminho, formModal.imagemArquivo, { upsert: true });
+    if (erroUpload) throw erroUpload;
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(caminho);
+    return urlData.publicUrl;
   };
 
   const salvarModalServico = async () => {
@@ -193,19 +271,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     }
     setSalvandoServico(true);
     try {
-      let imagemUrl = formModal.imagemUrl || null;
-
-      if (formModal.imagemArquivo) {
-        const extensao = formModal.imagemArquivo.name.split('.').pop();
-        const caminho = `servico-${itemEditando?.id || 'novo'}-${Date.now()}.${extensao}`;
-        const { error: erroUpload } = await supabase.storage
-          .from('servicos-imagens')
-          .upload(caminho, formModal.imagemArquivo, { upsert: true });
-        if (erroUpload) throw erroUpload;
-        const { data: urlData } = supabase.storage.from('servicos-imagens').getPublicUrl(caminho);
-        imagemUrl = urlData.publicUrl;
-      }
-
+      const imagemUrl = await enviarImagemSeHouver('servicos-imagens', 'servico');
       const payload = {
         nome: formModal.nome.trim(),
         descricao: formModal.descricao || null,
@@ -219,7 +285,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
         const { error } = await supabase.from('servicos').update(payload).eq('id', itemEditando.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('servicos').insert([payload]);
+        const { error } = await supabase.from('servicos').insert([{ ...payload, eh_pacote: false, preco_minimo: payload.preco }]);
         if (error) throw error;
       }
 
@@ -230,6 +296,77 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
       alert(t('cadastros.erroSalvarServico', { msg: error.message }));
     } finally {
       setSalvandoServico(false);
+    }
+  };
+
+  const salvarModalProduto = async () => {
+    if (!formModal.nome?.trim()) {
+      alert(t('cadastros.nomeObrigatorio'));
+      return;
+    }
+    setSalvandoProduto(true);
+    try {
+      const imagemUrl = await enviarImagemSeHouver('produtos-imagens', 'produto');
+      const payload = {
+        nome: formModal.nome.trim(),
+        descricao: formModal.descricao || null,
+        preco: Number(formModal.preco) || 0,
+        estoque: Number(formModal.estoque) || 0,
+        imagem_url: imagemUrl,
+        ativo: formModal.ativo !== false
+      };
+
+      if (itemEditando) {
+        const { error } = await supabase.from('produtos').update(payload).eq('id', itemEditando.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('produtos').insert([payload]);
+        if (error) throw error;
+      }
+
+      alert(t('cadastros.produtoSalvo'));
+      fecharModal();
+      buscarProdutosAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarProduto', { msg: error.message }));
+    } finally {
+      setSalvandoProduto(false);
+    }
+  };
+
+  const salvarModalPacote = async () => {
+    if (!formModal.nome?.trim()) {
+      alert(t('cadastros.nomeObrigatorio'));
+      return;
+    }
+    setSalvandoPacote(true);
+    try {
+      const imagemUrl = await enviarImagemSeHouver('servicos-imagens', 'pacote');
+      const payload = {
+        nome: formModal.nome.trim(),
+        descricao: formModal.descricao || null,
+        preco: Number(formModal.preco) || 0,
+        quantidade_sessoes: formModal.quantidadeSessoes === '' ? null : Number(formModal.quantidadeSessoes),
+        validade_dias: Number(formModal.validadeDias) || 0,
+        imagem_url: imagemUrl,
+        ativo: formModal.ativo !== false
+      };
+
+      if (itemEditando) {
+        const { error } = await supabase.from('servicos').update(payload).eq('id', itemEditando.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('servicos').insert([{ ...payload, eh_pacote: true, preco_minimo: payload.preco }]);
+        if (error) throw error;
+      }
+
+      alert(t('cadastros.pacoteSalvo'));
+      fecharModal();
+      buscarMeusPacotesAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarPacote', { msg: error.message }));
+    } finally {
+      setSalvandoPacote(false);
     }
   };
 
@@ -245,11 +382,34 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     }
   };
 
-  const salvarModal = () => {
-    if (tela === 'servicos') {
-      salvarModalServico();
-      return;
+  const toggleAtivoProduto = async (produto) => {
+    const novoValor = !produto.ativo;
+    if (!window.confirm(novoValor ? t('cadastros.confirmarReativarProduto') : t('cadastros.confirmarDesativarProduto'))) return;
+    try {
+      const { error } = await supabase.from('produtos').update({ ativo: novoValor }).eq('id', produto.id);
+      if (error) throw error;
+      buscarProdutosAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarProduto', { msg: error.message }));
     }
+  };
+
+  const toggleAtivoPacote = async (pacote) => {
+    const novoValor = !pacote.ativo;
+    if (!window.confirm(novoValor ? t('cadastros.confirmarReativarPacote') : t('cadastros.confirmarDesativarPacote'))) return;
+    try {
+      const { error } = await supabase.from('servicos').update({ ativo: novoValor }).eq('id', pacote.id);
+      if (error) throw error;
+      buscarMeusPacotesAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarPacote', { msg: error.message }));
+    }
+  };
+
+  const salvarModal = () => {
+    if (tela === 'servicos') { salvarModalServico(); return; }
+    if (tela === 'produtos') { salvarModalProduto(); return; }
+    if (tela === 'meusPacotes') { salvarModalPacote(); return; }
 
     if (tela === 'vendaPacotes') {
       if (!formModal.cliente?.trim() || !formModal.pacote) {
@@ -265,46 +425,15 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
       };
       setVendasPacotes(prev => itemEditando ? prev.map(v => (v.id === item.id ? item : v)) : [item, ...prev]);
       fecharModal();
-      return;
     }
-
-    if (!formModal.nome?.trim()) {
-      alert(t('cadastros.nomeObrigatorio'));
-      return;
-    }
-
-    if (tela === 'produtos') {
-      const item = {
-        id: itemEditando?.id || `p${Date.now()}`,
-        nome: formModal.nome.trim(),
-        descricao: formModal.descricao || '',
-        preco: Number(formModal.preco) || 0,
-        estoque: Number(formModal.estoque) || 0
-      };
-      setProdutos(prev => itemEditando ? prev.map(p => (p.id === item.id ? item : p)) : [item, ...prev]);
-    } else if (tela === 'meusPacotes') {
-      const item = {
-        id: itemEditando?.id || `pk${Date.now()}`,
-        nome: formModal.nome.trim(),
-        descricao: formModal.descricao || '',
-        preco: Number(formModal.preco) || 0,
-        quantidadeSessoes: formModal.quantidadeSessoes === '' ? null : Number(formModal.quantidadeSessoes),
-        validadeDias: Number(formModal.validadeDias) || 0,
-        ativo: formModal.ativo !== false
-      };
-      setMeusPacotes(prev => itemEditando ? prev.map(p => (p.id === item.id ? item : p)) : [item, ...prev]);
-    }
-
-    fecharModal();
   };
 
-  // Serviços não são removidos de verdade daqui (ver toggleAtivoServico) —
-  // isso só se aplica a Produtos/Pacotes, que ainda são mockados/locais.
+  // Serviços, Produtos e Meus Pacotes não são removidos de verdade daqui
+  // (ver toggleAtivoServico/Produto/Pacote) — isso só se aplica a Venda de
+  // Pacotes, que ainda é mockada/local.
   const deletarItem = (id) => {
     if (!window.confirm(t('cadastros.confirmarRemover'))) return;
-    if (tela === 'produtos') setProdutos(prev => prev.filter(p => p.id !== id));
-    else if (tela === 'meusPacotes') setMeusPacotes(prev => prev.filter(p => p.id !== id));
-    else if (tela === 'vendaPacotes') setVendasPacotes(prev => prev.filter(v => v.id !== id));
+    if (tela === 'vendaPacotes') setVendasPacotes(prev => prev.filter(v => v.id !== id));
   };
 
   const buscaLower = busca.trim().toLowerCase();
@@ -388,21 +517,25 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
           <CabecalhoLista titulo={t('cadastros.produtos.titulo')} aoVoltar={() => irPara('menu')} aoAdicionar={abrirNovo} labelAdicionar={t('cadastros.novoProduto')} />
           <BarraBusca valor={busca} onChange={setBusca} placeholder={t('cadastros.buscarPlaceholder')} />
           <div className="cadastros-lista-corpo">
-            {produtosFiltrados.length === 0 ? (
+            {carregandoProdutos ? (
+              <p className="cadastros-vazio">{t('comum.carregando')}</p>
+            ) : produtosFiltrados.length === 0 ? (
               <p className="cadastros-vazio">{t('cadastros.nenhumEncontrado')}</p>
             ) : produtosFiltrados.map(p => (
               <ItemLista
                 key={p.id}
                 titulo={p.nome}
-                linha2={p.descricao}
+                linha2={`${p.descricao}${!p.ativo ? `${p.descricao ? ' · ' : ''}${t('cadastros.inativo')}` : ''}`}
                 badge={
                   <span className={`cadastros-badge-estoque${p.estoque === 0 ? ' zero' : ''}`}>
                     {p.estoque === 0 ? t('cadastros.semEstoque') : t('cadastros.estoqueUnidades', { n: p.estoque })}
                   </span>
                 }
                 preco={p.preco}
+                imagemUrl={p.imagemUrl}
                 onEditar={() => abrirEditar(p)}
-                onDeletar={() => deletarItem(p.id)}
+                onDeletar={() => toggleAtivoProduto(p)}
+                iconeAcao={p.ativo ? '🚫' : '♻️'}
               />
             ))}
           </div>
@@ -414,7 +547,9 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
           <CabecalhoLista titulo={t('cadastros.pacotes.meusPacotes')} aoVoltar={() => irPara('pacotesMenu')} aoAdicionar={abrirNovo} labelAdicionar={t('cadastros.novoPacote')} />
           <BarraBusca valor={busca} onChange={setBusca} placeholder={t('cadastros.buscarPlaceholder')} />
           <div className="cadastros-lista-corpo">
-            {meusPacotesFiltrados.length === 0 ? (
+            {carregandoMeusPacotes ? (
+              <p className="cadastros-vazio">{t('comum.carregando')}</p>
+            ) : meusPacotesFiltrados.length === 0 ? (
               <p className="cadastros-vazio">{t('cadastros.nenhumEncontrado')}</p>
             ) : meusPacotesFiltrados.map(p => (
               <ItemLista
@@ -422,8 +557,10 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                 titulo={p.nome}
                 linha2={`${p.descricao}${p.descricao ? ' · ' : ''}${p.quantidadeSessoes == null ? t('cadastros.sessoesIlimitadas') : t('cadastros.sessoesRestantesLabel', { n: p.quantidadeSessoes })} · ${t('cadastros.validadeDiasLabel', { n: p.validadeDias })}${!p.ativo ? ` · ${t('cadastros.inativo')}` : ''}`}
                 preco={p.preco}
+                imagemUrl={p.imagemUrl}
                 onEditar={() => abrirEditar(p)}
-                onDeletar={() => deletarItem(p.id)}
+                onDeletar={() => toggleAtivoPacote(p)}
+                iconeAcao={p.ativo ? '🚫' : '♻️'}
               />
             ))}
           </div>
@@ -521,7 +658,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                     value={formModal.descricao || ''} onChange={(e) => setFormModal(prev => ({ ...prev, descricao: e.target.value }))}
                     style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px', minHeight: '60px', fontFamily: 'inherit', resize: 'vertical' }}
                   />
-                  {tela === 'servicos' && (
+                  {TELAS_COM_IMAGEM.includes(tela) && (
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '6px' }}>
                         {t('cadastros.imagemCampo')}
@@ -536,7 +673,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={handleSelecionarImagemServico}
+                        onChange={handleSelecionarImagem}
                         style={{ width: '100%', padding: '8px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '13px' }}
                       />
                     </div>
@@ -574,7 +711,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                       />
                     </>
                   )}
-                  {(tela === 'servicos' || tela === 'meusPacotes') && (
+                  {TELAS_COM_IMAGEM.includes(tela) && (
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#999', fontSize: '13px', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
@@ -589,9 +726,9 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
 
               <button
                 type="button" className="btn-primary" onClick={salvarModal} style={{ marginTop: '4px' }}
-                disabled={tela === 'servicos' && salvandoServico}
+                disabled={salvandoServico || salvandoProduto || salvandoPacote}
               >
-                {tela === 'servicos' && salvandoServico ? t('comum.salvando') : t('comum.salvar')}
+                {(salvandoServico || salvandoProduto || salvandoPacote) ? t('comum.salvando') : t('comum.salvar')}
               </button>
             </div>
           </div>

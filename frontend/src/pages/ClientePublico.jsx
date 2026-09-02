@@ -10,7 +10,7 @@ import {
   HORARIO_ALMOCO,
   getDiaSemana,
 } from '../config/horarios';
-import { SERVICOS, getNomeServico, buscarServicosCompletos } from '../config/servicos';
+import { SERVICOS, getNomeServico, buscarServicosCompletos, buscarPacotesAtivos } from '../config/servicos';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
@@ -242,6 +242,12 @@ function ClientePublico() {
   const [servicos, setServicos] = useState(SERVICOS);
   useEffect(() => {
     buscarServicosCompletos().then(setServicos);
+  }, []);
+
+  // Pacotes cadastrados pelo Admin em Cadastros > Pacotes > Meus Pacotes.
+  const [pacotes, setPacotes] = useState([]);
+  useEffect(() => {
+    buscarPacotesAtivos().then(setPacotes);
   }, []);
 
   const profissionais = [
@@ -987,6 +993,7 @@ function ClientePublico() {
       <nav style={{ display: 'flex', gap: '10px', padding: '20px', borderBottom: '1px solid #404040', overflowX: 'auto' }}>
         {[
           { id: 'servicos', label: `💈 ${t('nav_servicos')}` },
+          { id: 'pacotes', label: `🎁 ${t('nav_pacotes')}` },
           { id: 'agendar', label: `📅 ${t('nav_agendar')}` },
           { id: 'meusAgendamentos', label: `📋 ${t('nav_meusAgendamentos')}` },
           { id: 'endereco', label: `📍 ${t('nav_endereco')}` },
@@ -1071,6 +1078,79 @@ function ClientePublico() {
                 );
               })}
             </div>
+          </section>
+        )}
+
+        {abaAtiva === 'pacotes' && (
+          <section>
+            <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>🎁 {t('pacotes_titulo')}</h2>
+            {pacotes.length === 0 ? (
+              <p style={{ color: '#999' }}>{t('pacotes_nenhum')}</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {pacotes.map((pacote) => (
+                  <div
+                    key={pacote.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      border: '1px solid #d4af37',
+                      borderRadius: '10px',
+                      background: '#2d2d2d',
+                      padding: '14px',
+                      flexWrap: 'wrap'
+                    }}
+                  >
+                    <img
+                      src={pacote.imagem || '/images/servico_corte.jpg'}
+                      alt={pacote.nome}
+                      style={{ width: '92px', height: '92px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }}
+                    />
+
+                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                      <h3 style={{ color: '#d4af37', margin: '0 0 6px 0', fontSize: '16px', letterSpacing: '0.3px' }}>
+                        {pacote.nome.toUpperCase()}
+                      </h3>
+                      {pacote.descricao && (
+                        <p style={{ color: '#ccc', fontSize: '13px', margin: '0 0 6px 0' }}>{pacote.descricao}</p>
+                      )}
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>{formatarPreco(pacote.preco)}</span>
+                        <span style={{ color: '#999', fontSize: '13px' }}>
+                          {pacote.quantidadeSessoes == null
+                            ? `♾️ ${t('pacotes_sessoesIlimitadas')}`
+                            : `🔁 ${t('pacotes_sessoes', { n: pacote.quantidadeSessoes })}`}
+                        </span>
+                        <span style={{ color: '#999', fontSize: '13px' }}>⏳ {t('pacotes_validade', { n: pacote.validadeDias })}</span>
+                      </div>
+                    </div>
+
+                    <a
+                      href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('pacotes_mensagemWhatsapp', { nome: pacote.nome }))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        background: '#25D366',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '12px 22px',
+                        borderRadius: '6px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <FaWhatsapp /> {t('pacotes_tenhoInteresse')}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
