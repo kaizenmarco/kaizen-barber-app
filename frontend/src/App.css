@@ -1206,6 +1206,179 @@ body {
   padding: 6px;
 }
 
+/* Módulo de Cadastros (Serviços / Produtos / Pacotes) */
+.cadastros-menu-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cadastros-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--secondary-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.cadastros-menu-item:hover {
+  border-color: var(--accent-gold);
+}
+
+.cadastros-menu-icone-circulo {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.cadastros-menu-corpo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cadastros-menu-titulo {
+  color: var(--text-light);
+  font-weight: bold;
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+
+.cadastros-menu-subtitulo {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.cadastros-menu-chevron {
+  color: var(--accent-gold);
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.cadastros-lista-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cadastros-lista-header-titulo {
+  flex: 1;
+  color: var(--accent-gold);
+  font-size: 19px;
+  margin: 0;
+  text-align: center;
+}
+
+.cadastros-header-btn-voltar,
+.cadastros-header-btn-add {
+  background: transparent;
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cadastros-header-espaco {
+  width: 34px;
+  flex-shrink: 0;
+}
+
+.cadastros-busca-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--primary-dark);
+  padding: 8px 0;
+}
+
+.cadastros-lista-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cadastros-item-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--secondary-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.cadastros-item-corpo {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.cadastros-item-titulo {
+  color: var(--text-light);
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.cadastros-item-subtitulo {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.cadastros-item-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.cadastros-item-preco {
+  color: var(--accent-gold);
+  font-weight: bold;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.cadastros-badge-estoque {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: bold;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+}
+
+.cadastros-badge-estoque.zero {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.cadastros-vazio {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px 0;
+}
+
 .list-section {
   background-color: var(--secondary-dark);
   border: 1px solid var(--border-color);
