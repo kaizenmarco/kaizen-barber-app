@@ -28,6 +28,76 @@ export const SERVICOS = [
 export const getServicoPorNome = (nome) => SERVICOS.find(s => s.nome === nome);
 export const getServicoPorUuid = (uuid) => SERVICOS.find(s => s.uuid === uuid);
 
+// ----------------------------------------------------------------------------
+// Catálogo "vivo": parte do array estático acima (que tem as traduções
+// EN/JA/ES) e sobrepõe com o que estiver cadastrado no Supabase — preço,
+// duração, descrição (pt-BR), imagem e se está ativo passam a vir do banco,
+// editável pelo Admin em Cadastros > Serviços. Um serviço novo criado só
+// pelo Admin (sem entrada aqui no array estático) entra com um fallback
+// simples: mesmo texto pt-BR nas 3 traduções, disponível pra todos os
+// profissionais. Se a busca falhar (offline etc.), volta pro array estático puro
+// — o app nunca fica sem catálogo.
+// ----------------------------------------------------------------------------
+export const buscarServicosCompletos = async () => {
+  try {
+    // import feito aqui dentro (não no topo do arquivo) só pra evitar
+    // import circular, já que supabaseClient não depende deste arquivo.
+    const { supabase } = await import('../supabaseClient');
+    const { data, error } = await supabase
+      .from('servicos')
+      .select('id, nome, descricao, preco, duracao_minutos, imagem_url, ativo')
+      .eq('ativo', true);
+
+    if (error || !data) return SERVICOS;
+
+    const porUuid = new Map(SERVICOS.map(s => [s.uuid, s]));
+
+    const mesclados = data.map(row => {
+      const estatico = porUuid.get(row.id);
+      const duracaoMinutos = row.duracao_minutos || estatico?.duracaoMinutos || 60;
+
+      if (estatico) {
+        return {
+          ...estatico,
+          nome: row.nome,
+          preco: row.preco != null ? Number(row.preco) : estatico.preco,
+          duracaoMinutos,
+          duracao: `${duracaoMinutos} min`,
+          descricao: row.descricao || estatico.descricao,
+          imagem: row.imagem_url || estatico.imagem,
+        };
+      }
+
+      return {
+        id: row.id,
+        uuid: row.id,
+        nome: row.nome,
+        nomeEn: row.nome,
+        nomeJa: row.nome,
+        nomeEs: row.nome,
+        preco: row.preco != null ? Number(row.preco) : 0,
+        duracao: `${duracaoMinutos} min`,
+        duracaoMinutos,
+        descricao: row.descricao || '',
+        descricaoEn: row.descricao || '',
+        descricaoJa: row.descricao || '',
+        descricaoEs: row.descricao || '',
+        imagem: row.imagem_url || '/images/servico_corte.jpg',
+        profissionaisIds: [1, 2, 3],
+      };
+    });
+
+    // Serviços estáticos que por algum motivo sumiram do banco: mantém como
+    // estavam, pra nunca quebrar duração/preço de agendamentos já feitos.
+    const idsNoBanco = new Set(data.map(r => r.id));
+    const faltantes = SERVICOS.filter(s => !idsNoBanco.has(s.uuid));
+
+    return [...mesclados, ...faltantes];
+  } catch {
+    return SERVICOS;
+  }
+};
+
 // Nome/descrição exibidos no App Público, no idioma atual (o campo `nome`
 // pt-BR continua sendo o valor real gravado no banco e usado para casar
 // seleções — isto aqui é só para o texto que o cliente vê).

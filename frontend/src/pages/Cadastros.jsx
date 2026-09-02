@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
-import { SERVICOS_MOCK, PRODUTOS_MOCK, MEUS_PACOTES_MOCK, VENDAS_PACOTES_MOCK } from '../data/cadastrosMockData';
+import { PRODUTOS_MOCK, MEUS_PACOTES_MOCK, VENDAS_PACOTES_MOCK } from '../data/cadastrosMockData';
 
 // ============================================================================
 // Módulo de Cadastros — Menu principal (Serviços / Produtos / Pacotes) que
@@ -58,9 +59,10 @@ function BarraBusca({ valor, onChange, placeholder }) {
   );
 }
 
-function ItemLista({ titulo, linha2, badge, preco, onEditar, onDeletar }) {
+function ItemLista({ titulo, linha2, badge, preco, imagemUrl, onEditar, onDeletar, iconeAcao }) {
   return (
     <div className="cadastros-item-linha">
+      {imagemUrl && <img src={imagemUrl} alt="" className="cadastros-item-thumb" />}
       <div className="cadastros-item-corpo" onClick={onEditar}>
         <div className="cadastros-item-titulo">{titulo}</div>
         {linha2 && <div className="cadastros-item-subtitulo">{linha2}</div>}
@@ -68,7 +70,7 @@ function ItemLista({ titulo, linha2, badge, preco, onEditar, onDeletar }) {
       </div>
       <div className="cadastros-item-acoes">
         {preco != null && <span className="cadastros-item-preco">¥{Number(preco).toLocaleString('ja-JP')}</span>}
-        <button type="button" className="btn-delete" onClick={(e) => { e.stopPropagation(); onDeletar(); }}>🗑️</button>
+        <button type="button" className="btn-delete" onClick={(e) => { e.stopPropagation(); onDeletar(); }}>{iconeAcao || '🗑️'}</button>
       </div>
     </div>
   );
@@ -82,7 +84,15 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
   const [tela, setTela] = useState('menu');
   const [busca, setBusca] = useState('');
 
-  const [servicos, setServicos] = useState(SERVICOS_MOCK);
+  // Serviços são os únicos, por enquanto, ligados de verdade ao Supabase —
+  // a mesma tabela "servicos" que a Agenda e o site público usam. Criar,
+  // editar, desativar ou trocar a imagem aqui reflete automaticamente nos
+  // dois (ver config/servicos.js > buscarServicosCompletos). Produtos e
+  // Pacotes continuam mockados/locais por enquanto.
+  const [servicos, setServicos] = useState([]);
+  const [carregandoServicos, setCarregandoServicos] = useState(true);
+  const [salvandoServico, setSalvandoServico] = useState(false);
+
   const [produtos, setProdutos] = useState(PRODUTOS_MOCK);
   const [meusPacotes, setMeusPacotes] = useState(MEUS_PACOTES_MOCK);
   const [vendasPacotes, setVendasPacotes] = useState(VENDAS_PACOTES_MOCK);
@@ -90,6 +100,35 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
   const [modalAberto, setModalAberto] = useState(false);
   const [itemEditando, setItemEditando] = useState(null); // null = criando novo
   const [formModal, setFormModal] = useState({});
+
+  const buscarServicosAdmin = async () => {
+    setCarregandoServicos(true);
+    try {
+      const { data, error } = await supabase
+        .from('servicos')
+        .select('id, nome, descricao, preco, duracao_minutos, imagem_url, ativo')
+        .order('nome');
+      if (error) throw error;
+      setServicos((data || []).map(row => ({
+        id: row.id,
+        nome: row.nome,
+        descricao: row.descricao || '',
+        preco: row.preco != null ? Number(row.preco) : 0,
+        duracaoMinutos: row.duracao_minutos || 0,
+        imagemUrl: row.imagem_url || '',
+        ativo: row.ativo !== false
+      })));
+    } catch (error) {
+      alert(t('cadastros.erroCarregarServicos', { msg: error.message }));
+    } finally {
+      setCarregandoServicos(false);
+    }
+  };
+
+  useEffect(() => {
+    buscarServicosAdmin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const irPara = (novaTela) => {
     setTela(novaTela);
@@ -104,29 +143,114 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
 
   const abrirNovo = () => {
     setItemEditando(null);
-    setFormModal(
-      tela === 'vendaPacotes'
-        ? { cliente: '', pacote: meusPacotes[0]?.nome || '', dataVenda: new Date().toISOString().split('T')[0], sessoesRestantes: '' }
-        : { nome: '', descricao: '', preco: '', duracaoMinutos: '', estoque: '', quantidadeSessoes: '', validadeDias: '', ativo: true }
-    );
+    if (tela === 'servicos') {
+      setFormModal({ nome: '', descricao: '', preco: '', duracaoMinutos: '', ativo: true, imagemUrl: '', imagemArquivo: null, imagemPreview: '' });
+    } else if (tela === 'vendaPacotes') {
+      setFormModal({ cliente: '', pacote: meusPacotes[0]?.nome || '', dataVenda: new Date().toISOString().split('T')[0], sessoesRestantes: '' });
+    } else {
+      setFormModal({ nome: '', descricao: '', preco: '', duracaoMinutos: '', estoque: '', quantidadeSessoes: '', validadeDias: '', ativo: true });
+    }
     setModalAberto(true);
   };
 
   const abrirEditar = (item) => {
     setItemEditando(item);
-    setFormModal({
-      ...item,
-      preco: item.preco != null ? String(item.preco) : '',
-      duracaoMinutos: item.duracaoMinutos != null ? String(item.duracaoMinutos) : '',
-      estoque: item.estoque != null ? String(item.estoque) : '',
-      quantidadeSessoes: item.quantidadeSessoes == null ? '' : String(item.quantidadeSessoes),
-      validadeDias: item.validadeDias != null ? String(item.validadeDias) : '',
-      sessoesRestantes: item.sessoesRestantes == null ? '' : String(item.sessoesRestantes)
-    });
+    if (tela === 'servicos') {
+      setFormModal({
+        nome: item.nome,
+        descricao: item.descricao || '',
+        preco: item.preco != null ? String(item.preco) : '',
+        duracaoMinutos: item.duracaoMinutos != null ? String(item.duracaoMinutos) : '',
+        ativo: item.ativo !== false,
+        imagemUrl: item.imagemUrl || '',
+        imagemArquivo: null,
+        imagemPreview: ''
+      });
+    } else {
+      setFormModal({
+        ...item,
+        preco: item.preco != null ? String(item.preco) : '',
+        duracaoMinutos: item.duracaoMinutos != null ? String(item.duracaoMinutos) : '',
+        estoque: item.estoque != null ? String(item.estoque) : '',
+        quantidadeSessoes: item.quantidadeSessoes == null ? '' : String(item.quantidadeSessoes),
+        validadeDias: item.validadeDias != null ? String(item.validadeDias) : '',
+        sessoesRestantes: item.sessoesRestantes == null ? '' : String(item.sessoesRestantes)
+      });
+    }
     setModalAberto(true);
   };
 
+  const handleSelecionarImagemServico = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setFormModal(prev => ({ ...prev, imagemArquivo: arquivo, imagemPreview: URL.createObjectURL(arquivo) }));
+  };
+
+  const salvarModalServico = async () => {
+    if (!formModal.nome?.trim()) {
+      alert(t('cadastros.nomeObrigatorio'));
+      return;
+    }
+    setSalvandoServico(true);
+    try {
+      let imagemUrl = formModal.imagemUrl || null;
+
+      if (formModal.imagemArquivo) {
+        const extensao = formModal.imagemArquivo.name.split('.').pop();
+        const caminho = `servico-${itemEditando?.id || 'novo'}-${Date.now()}.${extensao}`;
+        const { error: erroUpload } = await supabase.storage
+          .from('servicos-imagens')
+          .upload(caminho, formModal.imagemArquivo, { upsert: true });
+        if (erroUpload) throw erroUpload;
+        const { data: urlData } = supabase.storage.from('servicos-imagens').getPublicUrl(caminho);
+        imagemUrl = urlData.publicUrl;
+      }
+
+      const payload = {
+        nome: formModal.nome.trim(),
+        descricao: formModal.descricao || null,
+        preco: Number(formModal.preco) || 0,
+        duracao_minutos: Number(formModal.duracaoMinutos) || null,
+        imagem_url: imagemUrl,
+        ativo: formModal.ativo !== false
+      };
+
+      if (itemEditando) {
+        const { error } = await supabase.from('servicos').update(payload).eq('id', itemEditando.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('servicos').insert([payload]);
+        if (error) throw error;
+      }
+
+      alert(t('cadastros.servicoSalvo'));
+      fecharModal();
+      buscarServicosAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarServico', { msg: error.message }));
+    } finally {
+      setSalvandoServico(false);
+    }
+  };
+
+  const toggleAtivoServico = async (servico) => {
+    const novoValor = !servico.ativo;
+    if (!window.confirm(novoValor ? t('cadastros.confirmarReativarServico') : t('cadastros.confirmarDesativarServico'))) return;
+    try {
+      const { error } = await supabase.from('servicos').update({ ativo: novoValor }).eq('id', servico.id);
+      if (error) throw error;
+      buscarServicosAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarServico', { msg: error.message }));
+    }
+  };
+
   const salvarModal = () => {
+    if (tela === 'servicos') {
+      salvarModalServico();
+      return;
+    }
+
     if (tela === 'vendaPacotes') {
       if (!formModal.cliente?.trim() || !formModal.pacote) {
         alert(t('cadastros.nomeObrigatorio'));
@@ -149,17 +273,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
       return;
     }
 
-    if (tela === 'servicos') {
-      const item = {
-        id: itemEditando?.id || `s${Date.now()}`,
-        nome: formModal.nome.trim(),
-        descricao: formModal.descricao || '',
-        preco: Number(formModal.preco) || 0,
-        duracaoMinutos: Number(formModal.duracaoMinutos) || 0,
-        ativo: formModal.ativo !== false
-      };
-      setServicos(prev => itemEditando ? prev.map(s => (s.id === item.id ? item : s)) : [item, ...prev]);
-    } else if (tela === 'produtos') {
+    if (tela === 'produtos') {
       const item = {
         id: itemEditando?.id || `p${Date.now()}`,
         nome: formModal.nome.trim(),
@@ -184,10 +298,11 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     fecharModal();
   };
 
+  // Serviços não são removidos de verdade daqui (ver toggleAtivoServico) —
+  // isso só se aplica a Produtos/Pacotes, que ainda são mockados/locais.
   const deletarItem = (id) => {
     if (!window.confirm(t('cadastros.confirmarRemover'))) return;
-    if (tela === 'servicos') setServicos(prev => prev.filter(s => s.id !== id));
-    else if (tela === 'produtos') setProdutos(prev => prev.filter(p => p.id !== id));
+    if (tela === 'produtos') setProdutos(prev => prev.filter(p => p.id !== id));
     else if (tela === 'meusPacotes') setMeusPacotes(prev => prev.filter(p => p.id !== id));
     else if (tela === 'vendaPacotes') setVendasPacotes(prev => prev.filter(v => v.id !== id));
   };
@@ -248,7 +363,9 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
           <CabecalhoLista titulo={t('cadastros.servicos.titulo')} aoVoltar={() => irPara('menu')} aoAdicionar={abrirNovo} labelAdicionar={t('cadastros.novoServico')} />
           <BarraBusca valor={busca} onChange={setBusca} placeholder={t('cadastros.buscarPlaceholder')} />
           <div className="cadastros-lista-corpo">
-            {servicosFiltrados.length === 0 ? (
+            {carregandoServicos ? (
+              <p className="cadastros-vazio">{t('comum.carregando')}</p>
+            ) : servicosFiltrados.length === 0 ? (
               <p className="cadastros-vazio">{t('cadastros.nenhumEncontrado')}</p>
             ) : servicosFiltrados.map(s => (
               <ItemLista
@@ -256,8 +373,10 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                 titulo={s.nome}
                 linha2={`${s.descricao}${s.descricao ? ' · ' : ''}${s.duracaoMinutos} min${!s.ativo ? ` · ${t('cadastros.inativo')}` : ''}`}
                 preco={s.preco}
+                imagemUrl={s.imagemUrl}
                 onEditar={() => abrirEditar(s)}
-                onDeletar={() => deletarItem(s.id)}
+                onDeletar={() => toggleAtivoServico(s)}
+                iconeAcao={s.ativo ? '🚫' : '♻️'}
               />
             ))}
           </div>
@@ -402,6 +521,26 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                     value={formModal.descricao || ''} onChange={(e) => setFormModal(prev => ({ ...prev, descricao: e.target.value }))}
                     style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px', minHeight: '60px', fontFamily: 'inherit', resize: 'vertical' }}
                   />
+                  {tela === 'servicos' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '6px' }}>
+                        {t('cadastros.imagemCampo')}
+                      </label>
+                      {(formModal.imagemPreview || formModal.imagemUrl) && (
+                        <img
+                          src={formModal.imagemPreview || formModal.imagemUrl}
+                          alt=""
+                          style={{ width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }}
+                        />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSelecionarImagemServico}
+                        style={{ width: '100%', padding: '8px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '13px' }}
+                      />
+                    </div>
+                  )}
                   <input
                     type="number" placeholder={t('cadastros.precoCampo')}
                     value={formModal.preco ?? ''} onChange={(e) => setFormModal(prev => ({ ...prev, preco: e.target.value }))}
@@ -448,8 +587,11 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                 </>
               )}
 
-              <button type="button" className="btn-primary" onClick={salvarModal} style={{ marginTop: '4px' }}>
-                {t('comum.salvar')}
+              <button
+                type="button" className="btn-primary" onClick={salvarModal} style={{ marginTop: '4px' }}
+                disabled={tela === 'servicos' && salvandoServico}
+              >
+                {tela === 'servicos' && salvandoServico ? t('comum.salvando') : t('comum.salvar')}
               </button>
             </div>
           </div>

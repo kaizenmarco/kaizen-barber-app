@@ -500,6 +500,12 @@ const TEXTOS = {
     'cadastros.sessoesIlimitadas': 'Ilimitado',
     'cadastros.sessoesRestantesLabel': '{n} sessões',
     'cadastros.validadeDiasLabel': 'validade {n} dias',
+    'cadastros.imagemCampo': 'Imagem do serviço',
+    'cadastros.erroCarregarServicos': '❌ Erro ao carregar serviços: {msg}',
+    'cadastros.servicoSalvo': '✅ Serviço salvo! Já aparece no site público e na Agenda.',
+    'cadastros.erroSalvarServico': '❌ Erro ao salvar serviço: {msg}',
+    'cadastros.confirmarDesativarServico': 'Desativar este serviço? Ele deixa de aparecer no site público e no Admin, mas o histórico de agendamentos já feitos com ele é mantido.',
+    'cadastros.confirmarReativarServico': 'Reativar este serviço? Ele volta a aparecer no site público e no Admin.',
   },
 
   en: {
@@ -955,6 +961,12 @@ const TEXTOS = {
     'cadastros.sessoesIlimitadas': 'Unlimited',
     'cadastros.sessoesRestantesLabel': '{n} sessions',
     'cadastros.validadeDiasLabel': 'valid {n} days',
+    'cadastros.imagemCampo': 'Service image',
+    'cadastros.erroCarregarServicos': '❌ Error loading services: {msg}',
+    'cadastros.servicoSalvo': '✅ Service saved! It already shows on the public site and the Agenda.',
+    'cadastros.erroSalvarServico': '❌ Error saving service: {msg}',
+    'cadastros.confirmarDesativarServico': "Deactivate this service? It stops showing on the public site and Admin, but the history of appointments already made with it is kept.",
+    'cadastros.confirmarReativarServico': 'Reactivate this service? It shows again on the public site and Admin.',
   },
 
   ja: {
@@ -1410,6 +1422,12 @@ const TEXTOS = {
     'cadastros.sessoesIlimitadas': '無制限',
     'cadastros.sessoesRestantesLabel': '残り{n}回',
     'cadastros.validadeDiasLabel': '有効期限{n}日',
+    'cadastros.imagemCampo': 'サービス画像',
+    'cadastros.erroCarregarServicos': '❌ サービスの読み込みエラー: {msg}',
+    'cadastros.servicoSalvo': '✅ サービスを保存しました！公開サイトと予約画面にすぐに反映されます。',
+    'cadastros.erroSalvarServico': '❌ サービスの保存エラー: {msg}',
+    'cadastros.confirmarDesativarServico': 'このサービスを無効にしますか？公開サイトと管理画面には表示されなくなりますが、過去の予約履歴は保持されます。',
+    'cadastros.confirmarReativarServico': 'このサービスを再度有効にしますか？公開サイトと管理画面に再表示されます。',
   },
 };
 

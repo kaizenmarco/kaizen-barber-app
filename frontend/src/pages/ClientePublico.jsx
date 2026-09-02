@@ -10,7 +10,7 @@ import {
   HORARIO_ALMOCO,
   getDiaSemana,
 } from '../config/horarios';
-import { SERVICOS, getNomeServico } from '../config/servicos';
+import { SERVICOS, getNomeServico, buscarServicosCompletos } from '../config/servicos';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
@@ -236,7 +236,13 @@ function ClientePublico() {
     texto: ''
   });
 
-  const servicos = SERVICOS;
+  // Começa com o catálogo estático e, assim que a busca no Supabase volta,
+  // passa a refletir o que o Admin cadastrou em Cadastros > Serviços —
+  // inclui serviços novos, criados só pelo Admin, automaticamente.
+  const [servicos, setServicos] = useState(SERVICOS);
+  useEffect(() => {
+    buscarServicosCompletos().then(setServicos);
+  }, []);
 
   const profissionais = [
     {

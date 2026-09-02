@@ -1325,6 +1325,14 @@ body {
   padding: 12px 14px;
 }
 
+.cadastros-item-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .cadastros-item-corpo {
   flex: 1;
   min-width: 0;

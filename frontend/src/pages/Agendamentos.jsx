@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
-import { SERVICOS } from '../config/servicos';
+import { SERVICOS, buscarServicosCompletos } from '../config/servicos';
 import { LOCALE_POR_IDIOMA_ADMIN, DIAS_SEMANA_ABREV_ADMIN, DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
 function Agendamentos({ t: tProp, idioma: idiomaProp }) {
@@ -214,9 +214,15 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     { id: 3, uuid: 'ad232428-9872-46db-82b3-27819ab353ff', nome: 'Neia' },
   ];
 
-  // Serviços (nome, duração, preço) vêm de config/servicos.js — mesma fonte
-  // usada pelo site público, para nunca mais ficarem dessincronizados.
-  const servicosLista = SERVICOS;
+  // Serviços (nome, duração, preço) começam do array estático de
+  // config/servicos.js e, assim que a busca no Supabase volta, passam a
+  // refletir o catálogo cadastrado pelo Admin em Cadastros > Serviços —
+  // mesma fonte usada pelo site público, pra nunca mais ficarem
+  // dessincronizados (nem entre si, nem com o que foi editado no Admin).
+  const [servicosLista, setServicosLista] = useState(SERVICOS);
+  useEffect(() => {
+    buscarServicosCompletos().then(setServicosLista);
+  }, []);
 
   useEffect(() => {
     buscarHorarioEstendido().then(setHorarioEstendido);
