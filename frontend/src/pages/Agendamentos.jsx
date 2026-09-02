@@ -23,6 +23,21 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [edicaoForm, setEdicaoForm] = useState({ data: '', horario: '', encaixe: false });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
+  // ---- Tela de Detalhes do Agendamento (modal ao tocar num bloco da timeline) ----
+  const [detalhesAgendamento, setDetalhesAgendamento] = useState(null); // agendamento aberto nos detalhes, ou null se fechado
+  const [campoRapidoEditando, setCampoRapidoEditando] = useState(null); // 'servico' | 'profissional' | 'duracao' | null
+  const [valorCampoRapido, setValorCampoRapido] = useState('');
+  const [salvandoCampoRapido, setSalvandoCampoRapido] = useState(false);
+  const [notasDetalhes, setNotasDetalhes] = useState('');
+  const [salvandoNotas, setSalvandoNotas] = useState(false);
+  const [prontuarioAberto, setProntuarioAberto] = useState(false);
+  const [carregandoProntuario, setCarregandoProntuario] = useState(false);
+  const [prontuarioItens, setProntuarioItens] = useState([]);
+  const [anamneseAberta, setAnamneseAberta] = useState(false);
+  const [carregandoAnamnese, setCarregandoAnamnese] = useState(false);
+  const [anamneseTexto, setAnamneseTexto] = useState('');
+  const [salvandoAnamnese, setSalvandoAnamnese] = useState(false);
+
   // ---- Tela principal reformulada: dia selecionado + sub-abas ----
   // "dia" é a visão padrão ao abrir (grade horária de um único dia, sem
   // rolagem longa); "mes"/"lista"/"bloqueios" são as telas antigas,
@@ -288,6 +303,9 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           status,
           preco_final,
           observacoes,
+          criado_em,
+          preferencia_profissional,
+          duracao_minutos_manual,
           clientes(id, nome, email, telefone),
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
@@ -301,6 +319,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
         return {
           id: agendamento.id,
+          clienteId: agendamento.cliente_id,
           cliente: agendamento.clientes?.nome || t('agendamentos.desconhecido'),
           email: agendamento.clientes?.email || '',
           telefone: agendamento.clientes?.telefone || '',
@@ -308,11 +327,16 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           hora: agendamento.data_hora?.split('T')[1]?.substring(0, 5) || '',
           diaSemanaIndex: dataHora.getDay(),
           servico: agendamento.servicos?.nome || 'N/A',
+          servicoId: agendamento.servico_id,
           profissional: agendamento.profissionais?.nome || 'N/A',
           profissionalId: agendamento.profissional_id,
           status: agendamento.status,
           preco: agendamento.preco_final,
-          encaixe: !!agendamento.observacoes?.startsWith('[ENCAIXE]')
+          observacoesCompletas: agendamento.observacoes || '',
+          encaixe: !!agendamento.observacoes?.startsWith('[ENCAIXE]'),
+          criadoEm: agendamento.criado_em,
+          preferenciaProfissional: !!agendamento.preferencia_profissional,
+          duracaoMinutosManual: agendamento.duracao_minutos_manual || null
         };
       });
 
@@ -590,6 +614,291 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     setEdicaoForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  // ==========================================================================
+  // Tela de Detalhes do Agendamento — abre ao tocar num bloco da timeline.
+  // Funciona como painel de controle daquele atendimento: edição rápida,
+  // observações, toggles de status, lembrete via WhatsApp, prontuário e
+  // anamnese simplificados do cliente.
+  // ==========================================================================
+
+  // observacoes guarda um possível marcador de sistema "[ENCAIXE] ..." na
+  // primeira linha — separa esse marcador das notas livres do Admin, pra não
+  // perder a tag ao salvar novas anotações.
+  const separarObservacoes = (obs) => {
+    if (!obs) return { tag: '', notas: '' };
+    if (obs.startsWith('[ENCAIXE]')) {
+      const linhas = obs.split('\n');
+      return { tag: linhas[0], notas: linhas.slice(1).join('\n') };
+    }
+    return { tag: '', notas: obs };
+  };
+
+  const abrirDetalhesAgendamento = (agendamento) => {
+    setDetalhesAgendamento(agendamento);
+    setNotasDetalhes(separarObservacoes(agendamento.observacoesCompletas).notas);
+    setCampoRapidoEditando(null);
+    setValorCampoRapido('');
+    setProntuarioAberto(false);
+    setProntuarioItens([]);
+    setAnamneseAberta(false);
+    setAnamneseTexto('');
+  };
+
+  const fecharDetalhesAgendamento = () => {
+    setDetalhesAgendamento(null);
+    setCampoRapidoEditando(null);
+    setValorCampoRapido('');
+    setNotasDetalhes('');
+    setProntuarioAberto(false);
+    setProntuarioItens([]);
+    setAnamneseAberta(false);
+    setAnamneseTexto('');
+  };
+
+  const handleToggleConfirmadoDetalhes = async () => {
+    if (!detalhesAgendamento) return;
+    const statusAnterior = detalhesAgendamento.status;
+    const novoStatus = statusAnterior === 'CONFIRMADO' ? 'AGENDADO' : 'CONFIRMADO';
+    setDetalhesAgendamento(prev => ({ ...prev, status: novoStatus }));
+    try {
+      const { error } = await supabase.from('agendamentos').update({ status: novoStatus }).eq('id', detalhesAgendamento.id);
+      if (error) throw error;
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroAtualizarStatus', { msg: error.message }));
+      setDetalhesAgendamento(prev => ({ ...prev, status: statusAnterior }));
+    }
+  };
+
+  const handleToggleAusenteDetalhes = async () => {
+    if (!detalhesAgendamento) return;
+    const statusAnterior = detalhesAgendamento.status;
+    const novoStatus = statusAnterior === 'NÃO_COMPARECEU' ? 'AGENDADO' : 'NÃO_COMPARECEU';
+    setDetalhesAgendamento(prev => ({ ...prev, status: novoStatus }));
+    try {
+      const { error } = await supabase.from('agendamentos').update({ status: novoStatus }).eq('id', detalhesAgendamento.id);
+      if (error) throw error;
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroAtualizarStatus', { msg: error.message }));
+      setDetalhesAgendamento(prev => ({ ...prev, status: statusAnterior }));
+    }
+  };
+
+  const handleTogglePreferenciaDetalhes = async () => {
+    if (!detalhesAgendamento) return;
+    const anterior = detalhesAgendamento.preferenciaProfissional;
+    const novoValor = !anterior;
+    setDetalhesAgendamento(prev => ({ ...prev, preferenciaProfissional: novoValor }));
+    try {
+      const { error } = await supabase.from('agendamentos').update({ preferencia_profissional: novoValor }).eq('id', detalhesAgendamento.id);
+      if (error) throw error;
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroAtualizarStatus', { msg: error.message }));
+      setDetalhesAgendamento(prev => ({ ...prev, preferenciaProfissional: anterior }));
+    }
+  };
+
+  const handleSalvarNotasDetalhes = async () => {
+    if (!detalhesAgendamento) return;
+    const { tag } = separarObservacoes(detalhesAgendamento.observacoesCompletas);
+    const novaObservacao = tag
+      ? `${tag}${notasDetalhes ? `\n${notasDetalhes}` : ''}`
+      : (notasDetalhes || null);
+    setSalvandoNotas(true);
+    try {
+      const { error } = await supabase.from('agendamentos').update({ observacoes: novaObservacao }).eq('id', detalhesAgendamento.id);
+      if (error) throw error;
+      setDetalhesAgendamento(prev => ({ ...prev, observacoesCompletas: novaObservacao || '' }));
+      buscarAgendamentos();
+      alert(t('agendamentos.notasSalvas'));
+    } catch (error) {
+      alert(t('agendamentos.erroSalvarCampo', { msg: error.message }));
+    } finally {
+      setSalvandoNotas(false);
+    }
+  };
+
+  const handleAlterarParaEncaixeDetalhes = async () => {
+    if (!detalhesAgendamento || detalhesAgendamento.encaixe) return;
+    if (!window.confirm(t('agendamentos.confirmarAlterarEncaixe'))) return;
+    const { notas } = separarObservacoes(detalhesAgendamento.observacoesCompletas);
+    const novaObservacao = `[ENCAIXE] ${t('agendamentos.encaixeConvertidoTag')}${notas ? `\n${notas}` : ''}`;
+    try {
+      const { error } = await supabase.from('agendamentos').update({ observacoes: novaObservacao }).eq('id', detalhesAgendamento.id);
+      if (error) throw error;
+      setDetalhesAgendamento(prev => ({ ...prev, observacoesCompletas: novaObservacao, encaixe: true }));
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroSalvarCampo', { msg: error.message }));
+    }
+  };
+
+  const abrirCampoRapido = (campo) => {
+    if (!detalhesAgendamento) return;
+    setCampoRapidoEditando(campo);
+    if (campo === 'servico') setValorCampoRapido(detalhesAgendamento.servico);
+    else if (campo === 'profissional') setValorCampoRapido(detalhesAgendamento.profissional);
+    else if (campo === 'duracao') {
+      const duracaoAtual = detalhesAgendamento.duracaoMinutosManual || servicosLista.find(s => s.nome === detalhesAgendamento.servico)?.duracaoMinutos || 60;
+      setValorCampoRapido(String(duracaoAtual));
+    }
+  };
+
+  const cancelarCampoRapido = () => {
+    setCampoRapidoEditando(null);
+    setValorCampoRapido('');
+  };
+
+  const handleSalvarCampoRapido = async () => {
+    if (!detalhesAgendamento || !campoRapidoEditando) return;
+    setSalvandoCampoRapido(true);
+    try {
+      let updatePayload = {};
+      let atualizacaoLocal = {};
+
+      if (campoRapidoEditando === 'servico') {
+        const servicoObj = servicosLista.find(s => s.nome === valorCampoRapido);
+        if (!servicoObj) throw new Error(t('comum.selecioneServico'));
+        updatePayload = { servico_id: servicoObj.uuid };
+        atualizacaoLocal = { servico: servicoObj.nome, servicoId: servicoObj.uuid };
+      } else if (campoRapidoEditando === 'profissional') {
+        const profObj = profissionaisLista.find(p => p.nome === valorCampoRapido);
+        if (!profObj) throw new Error(t('comum.selecioneProfissional'));
+        updatePayload = { profissional_id: profObj.uuid };
+        atualizacaoLocal = { profissional: profObj.nome, profissionalId: profObj.uuid };
+      } else if (campoRapidoEditando === 'duracao') {
+        const minutos = parseInt(valorCampoRapido, 10);
+        if (!minutos || minutos <= 0) throw new Error(t('agendamentos.duracaoInvalida'));
+        updatePayload = { duracao_minutos_manual: minutos };
+        atualizacaoLocal = { duracaoMinutosManual: minutos };
+      }
+
+      const { error } = await supabase.from('agendamentos').update(updatePayload).eq('id', detalhesAgendamento.id);
+      if (error) throw error;
+
+      setDetalhesAgendamento(prev => ({ ...prev, ...atualizacaoLocal }));
+      setCampoRapidoEditando(null);
+      setValorCampoRapido('');
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroSalvarCampo', { msg: error.message }));
+    } finally {
+      setSalvandoCampoRapido(false);
+    }
+  };
+
+  const abrirEdicaoDataHoraDeDetalhes = () => {
+    if (!detalhesAgendamento) return;
+    abrirEdicao(detalhesAgendamento);
+    fecharDetalhesAgendamento();
+  };
+
+  const normalizarTelefoneParaWhatsapp = (telefone) => {
+    const digitos = (telefone || '').replace(/\D/g, '');
+    if (!digitos) return '';
+    if (digitos.startsWith('81')) return digitos;
+    if (digitos.startsWith('0')) return `81${digitos.slice(1)}`;
+    return `81${digitos}`;
+  };
+
+  const abrirLembreteWhatsapp = () => {
+    if (!detalhesAgendamento) return;
+    const numero = normalizarTelefoneParaWhatsapp(detalhesAgendamento.telefone);
+    if (!numero) {
+      alert(t('agendamentos.semTelefoneParaLembrete'));
+      return;
+    }
+    const dataFormatada = new Date(`${detalhesAgendamento.data}T00:00:00`).toLocaleDateString(locale);
+    const mensagem = t('agendamentos.mensagemLembrete', {
+      nome: detalhesAgendamento.cliente,
+      data: dataFormatada,
+      hora: detalhesAgendamento.hora,
+      servico: detalhesAgendamento.servico
+    });
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`, '_blank');
+  };
+
+  const abrirProntuario = async () => {
+    if (!detalhesAgendamento?.clienteId) return;
+    setProntuarioAberto(true);
+    setCarregandoProntuario(true);
+    try {
+      const { data, error } = await supabase
+        .from('agendamentos')
+        .select('id, data_hora, preco_final, servicos:servico_id(nome), profissionais:profissional_id(nome)')
+        .eq('cliente_id', detalhesAgendamento.clienteId)
+        .eq('status', 'REALIZADO')
+        .order('data_hora', { ascending: false });
+      if (error) throw error;
+      setProntuarioItens((data || []).map(item => ({
+        id: item.id,
+        data: item.data_hora,
+        servico: item.servicos?.nome || 'N/A',
+        profissional: item.profissionais?.nome || 'N/A',
+        preco: item.preco_final
+      })));
+    } catch (error) {
+      alert(t('agendamentos.erroSalvarCampo', { msg: error.message }));
+    } finally {
+      setCarregandoProntuario(false);
+    }
+  };
+
+  const fecharProntuario = () => {
+    setProntuarioAberto(false);
+    setProntuarioItens([]);
+  };
+
+  const abrirAnamnese = async () => {
+    if (!detalhesAgendamento?.clienteId) return;
+    setAnamneseAberta(true);
+    setCarregandoAnamnese(true);
+    try {
+      const { data, error } = await supabase.from('clientes').select('anamnese').eq('id', detalhesAgendamento.clienteId).single();
+      if (error) throw error;
+      setAnamneseTexto(data?.anamnese || '');
+    } catch (error) {
+      alert(t('agendamentos.erroSalvarCampo', { msg: error.message }));
+    } finally {
+      setCarregandoAnamnese(false);
+    }
+  };
+
+  const fecharAnamnese = () => {
+    setAnamneseAberta(false);
+    setAnamneseTexto('');
+  };
+
+  const handleSalvarAnamnese = async () => {
+    if (!detalhesAgendamento?.clienteId) return;
+    setSalvandoAnamnese(true);
+    try {
+      const { error } = await supabase.from('clientes').update({ anamnese: anamneseTexto || null }).eq('id', detalhesAgendamento.clienteId);
+      if (error) throw error;
+      alert(t('agendamentos.anamneseSalva'));
+    } catch (error) {
+      alert(t('agendamentos.erroSalvarCampo', { msg: error.message }));
+    } finally {
+      setSalvandoAnamnese(false);
+    }
+  };
+
+  const handleDeletarDetalhes = async () => {
+    if (!detalhesAgendamento) return;
+    if (!window.confirm(t('agendamentos.confirmarDeletar'))) return;
+    try {
+      const { error } = await supabase.from('agendamentos').delete().eq('id', detalhesAgendamento.id);
+      if (error) throw error;
+      alert(t('agendamentos.deletado'));
+      fecharDetalhesAgendamento();
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroDeletar', { msg: error.message }));
+    }
+  };
+
   // Altera a data/hora do agendamento. O e-mail para o cliente e para o
   // profissional é disparado automaticamente pelo trigger do banco (ver
   // migração trg_notificar_reagendamento) assim que o UPDATE abaixo mudar
@@ -794,7 +1103,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const itensTimeline = !horarioDoDiaSelecionado.aberto ? [] : atribuirColunasTimeline([
     ...agendamentosDoDiaSelecionado.map(a => {
-      const duracaoReal = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+      const duracaoReal = a.duracaoMinutosManual || servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
       const inicioReal = paraMinutos(a.hora);
       const fimReal = inicioReal + duracaoReal;
       const inicioMin = Math.max(aberturaMinDia, arredondarParaBaixo15(inicioReal));
@@ -925,13 +1234,14 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                       <div
                         key={item.id}
                         className="agenda-timeline-evento agenda-card"
-                        style={{ ...estiloPosicao, borderLeftColor: getCorStatus(a.status) }}
+                        style={{ ...estiloPosicao, borderLeftColor: getCorStatus(a.status), cursor: 'pointer' }}
+                        onClick={() => abrirDetalhesAgendamento(a)}
                       >
                         <div className="agenda-card-topo">
-                          <strong onClick={() => abrirEdicao(a)} title={t('agendamentos.editarTooltip')} className="agenda-card-cliente">
-                            {a.hora} · {a.cliente} ✏️
+                          <strong title={t('agendamentos.verDetalhesTooltip')} className="agenda-card-cliente">
+                            {a.hora} · {a.cliente}
                           </strong>
-                          {!compacto && <button className="btn-delete" onClick={() => handleDeletar(a.id)}>🗑️</button>}
+                          {!compacto && <button className="btn-delete" onClick={(e) => { e.stopPropagation(); handleDeletar(a.id); }}>🗑️</button>}
                         </div>
                         {!compacto && (
                           <>
@@ -942,6 +1252,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                             <div className="agenda-card-rodape">
                               <select
                                 value={a.status}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => handleAlterarStatus(a.id, e.target.value)}
                                 style={{ background: getCorStatus(a.status), color: '#1a1a1a', border: 'none', borderRadius: '4px', padding: '4px 8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}
                               >
@@ -1678,6 +1989,259 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 {salvandoEdicao ? t('comum.carregando') : t('agendamentos.salvarAlteracao')}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Tela de Detalhes do Agendamento ==================== */}
+      {detalhesAgendamento && (
+        <div
+          onClick={fecharDetalhesAgendamento}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1000, padding: '20px', paddingTop: 'calc(20px + env(safe-area-inset-top))', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '10px',
+              padding: '24px', maxWidth: '480px', width: '100%', maxHeight: '88vh', overflowY: 'auto'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
+              <h3 style={{ color: '#d4af37', margin: 0, fontSize: '20px' }}>{detalhesAgendamento.cliente}</h3>
+              <button
+                onClick={fecharDetalhesAgendamento}
+                style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ color: '#999', fontSize: '12px', marginBottom: '14px' }}>{t('agendamentos.detalhesAgendamento')}</p>
+
+            <div className="detalhe-campo-linha">
+              <div className="detalhe-campo-texto">
+                <span className="detalhe-campo-label">{t('agendamentos.valor')}</span>
+                <span className="detalhe-campo-valor">{detalhesAgendamento.preco ? `¥${detalhesAgendamento.preco.toLocaleString('ja-JP')}` : '-'}</span>
+              </div>
+            </div>
+
+            <div className="detalhe-campo-linha">
+              {campoRapidoEditando === 'servico' ? (
+                <div className="detalhe-campo-edicao">
+                  <select value={valorCampoRapido} onChange={(e) => setValorCampoRapido(e.target.value)}>
+                    {servicosLista.map(s => <option key={s.id} value={s.nome}>{s.nome}</option>)}
+                  </select>
+                  <button className="btn-salvar-campo" onClick={handleSalvarCampoRapido} disabled={salvandoCampoRapido}>✓</button>
+                  <button className="btn-cancelar-campo" onClick={cancelarCampoRapido}>✕</button>
+                </div>
+              ) : (
+                <>
+                  <div className="detalhe-campo-texto">
+                    <span className="detalhe-campo-label">{t('comum.servico')}</span>
+                    <span className="detalhe-campo-valor">{detalhesAgendamento.servico}</span>
+                  </div>
+                  <button className="detalhe-campo-editar-btn" onClick={() => abrirCampoRapido('servico')}>✏️</button>
+                </>
+              )}
+            </div>
+
+            <div className="detalhe-campo-linha">
+              {campoRapidoEditando === 'profissional' ? (
+                <div className="detalhe-campo-edicao">
+                  <select value={valorCampoRapido} onChange={(e) => setValorCampoRapido(e.target.value)}>
+                    {profissionaisLista.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                  </select>
+                  <button className="btn-salvar-campo" onClick={handleSalvarCampoRapido} disabled={salvandoCampoRapido}>✓</button>
+                  <button className="btn-cancelar-campo" onClick={cancelarCampoRapido}>✕</button>
+                </div>
+              ) : (
+                <>
+                  <div className="detalhe-campo-texto">
+                    <span className="detalhe-campo-label">{t('comum.profissional')}</span>
+                    <span className="detalhe-campo-valor">{detalhesAgendamento.profissional}</span>
+                  </div>
+                  <button className="detalhe-campo-editar-btn" onClick={() => abrirCampoRapido('profissional')}>✏️</button>
+                </>
+              )}
+            </div>
+
+            <div className="detalhe-campo-linha">
+              <div className="detalhe-campo-texto">
+                <span className="detalhe-campo-label">{t('agendamentos.dataHoraLabel')}</span>
+                <span className="detalhe-campo-valor">
+                  {new Date(`${detalhesAgendamento.data}T00:00:00`).toLocaleDateString(locale)} · {detalhesAgendamento.hora}
+                </span>
+              </div>
+              <button className="detalhe-campo-editar-btn" onClick={abrirEdicaoDataHoraDeDetalhes}>✏️</button>
+            </div>
+
+            <div className="detalhe-campo-linha">
+              {campoRapidoEditando === 'duracao' ? (
+                <div className="detalhe-campo-edicao">
+                  <input type="number" min="5" step="5" value={valorCampoRapido} onChange={(e) => setValorCampoRapido(e.target.value)} />
+                  <button className="btn-salvar-campo" onClick={handleSalvarCampoRapido} disabled={salvandoCampoRapido}>✓</button>
+                  <button className="btn-cancelar-campo" onClick={cancelarCampoRapido}>✕</button>
+                </div>
+              ) : (
+                <>
+                  <div className="detalhe-campo-texto">
+                    <span className="detalhe-campo-label">{t('agendamentos.duracao')}</span>
+                    <span className="detalhe-campo-valor">
+                      {t('agendamentos.duracaoMinutosSufixo', { n: detalhesAgendamento.duracaoMinutosManual || servicosLista.find(s => s.nome === detalhesAgendamento.servico)?.duracaoMinutos || 60 })}
+                    </span>
+                  </div>
+                  <button className="detalhe-campo-editar-btn" onClick={() => abrirCampoRapido('duracao')}>✏️</button>
+                </>
+              )}
+            </div>
+
+            <div className="detalhe-campo-linha">
+              <div className="detalhe-campo-texto">
+                <span className="detalhe-campo-label">{t('agendamentos.criadoEm')}</span>
+                <span className="detalhe-campo-valor" style={{ fontWeight: 400, fontSize: '13px', color: '#999' }}>
+                  {detalhesAgendamento.criadoEm ? new Date(detalhesAgendamento.criadoEm).toLocaleString(locale) : '-'}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '16px' }}>
+              <label className="detalhe-campo-label" style={{ display: 'block', marginBottom: '6px' }}>{t('agendamentos.notas')}</label>
+              <textarea
+                className="detalhe-notas-textarea"
+                value={notasDetalhes}
+                onChange={(e) => setNotasDetalhes(e.target.value)}
+                placeholder={t('agendamentos.notasPlaceholder')}
+              />
+              <button className="btn-primary" style={{ marginTop: '8px', width: '100%' }} onClick={handleSalvarNotasDetalhes} disabled={salvandoNotas}>
+                {salvandoNotas ? t('comum.salvando') : t('agendamentos.salvarNotas')}
+              </button>
+            </div>
+
+            <div style={{ marginTop: '18px' }}>
+              <div className="toggle-switch-row">
+                <span>{t('agendamentos.statusConfirmado')}</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={detalhesAgendamento.status === 'CONFIRMADO'} onChange={handleToggleConfirmadoDetalhes} />
+                  <span className="toggle-switch-track"></span>
+                </label>
+              </div>
+              <div className="toggle-switch-row">
+                <span>{t('agendamentos.statusPreferencia')}</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={!!detalhesAgendamento.preferenciaProfissional} onChange={handleTogglePreferenciaDetalhes} />
+                  <span className="toggle-switch-track"></span>
+                </label>
+              </div>
+              <div className="toggle-switch-row">
+                <span>{t('agendamentos.statusAusente')}</span>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={detalhesAgendamento.status === 'NÃO_COMPARECEU'} onChange={handleToggleAusenteDetalhes} />
+                  <span className="toggle-switch-track"></span>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '18px' }}>
+              <button className="detalhe-acao-btn whatsapp" onClick={abrirLembreteWhatsapp}>
+                <span>{t('agendamentos.enviarLembrete')}</span>
+              </button>
+              <button className="detalhe-acao-btn" onClick={abrirProntuario}>
+                <span>{t('agendamentos.prontuario')}</span>
+                <span>›</span>
+              </button>
+              <button className="detalhe-acao-btn" onClick={abrirAnamnese}>
+                <span>{t('agendamentos.anamnese')}</span>
+                <span>›</span>
+              </button>
+              {!detalhesAgendamento.encaixe && (
+                <button className="detalhe-acao-btn encaixe" onClick={handleAlterarParaEncaixeDetalhes}>
+                  <span>{t('agendamentos.alterarParaEncaixe')}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="detalhe-barra-inferior">
+              <button className="btn-delete" onClick={handleDeletarDetalhes}>{t('agendamentos.deletarAgendamento')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Prontuário (histórico de atendimentos REALIZADO) ==================== */}
+      {prontuarioAberto && (
+        <div
+          onClick={fecharProntuario}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1100, padding: '20px', paddingTop: 'calc(20px + env(safe-area-inset-top))', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '10px', padding: '22px', maxWidth: '440px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ color: '#d4af37', margin: 0 }}>{t('agendamentos.prontuarioTitulo')}</h3>
+              <button onClick={fecharProntuario} style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}>
+                ✕ {t('comum.cancelar')}
+              </button>
+            </div>
+            {carregandoProntuario ? (
+              <p style={{ color: '#d4af37', textAlign: 'center' }}>{t('comum.carregando')}</p>
+            ) : prontuarioItens.length === 0 ? (
+              <p style={{ color: '#999', textAlign: 'center' }}>{t('agendamentos.prontuarioVazio')}</p>
+            ) : (
+              prontuarioItens.map(item => (
+                <div key={item.id} className="prontuario-item">
+                  <strong>{new Date(item.data).toLocaleDateString(locale)}</strong> — {item.servico} ({item.profissional})
+                  {item.preco ? <span style={{ float: 'right', color: '#d4af37' }}>¥{item.preco.toLocaleString('ja-JP')}</span> : null}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Anamnese (formulário simples por cliente) ==================== */}
+      {anamneseAberta && (
+        <div
+          onClick={fecharAnamnese}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1100, padding: '20px', paddingTop: 'calc(20px + env(safe-area-inset-top))', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '10px', padding: '22px', maxWidth: '440px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ color: '#d4af37', margin: 0 }}>{t('agendamentos.anamneseTitulo')}</h3>
+              <button onClick={fecharAnamnese} style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}>
+                ✕ {t('comum.cancelar')}
+              </button>
+            </div>
+            {carregandoAnamnese ? (
+              <p style={{ color: '#d4af37', textAlign: 'center' }}>{t('comum.carregando')}</p>
+            ) : (
+              <>
+                <textarea
+                  className="detalhe-notas-textarea"
+                  style={{ minHeight: '140px' }}
+                  value={anamneseTexto}
+                  onChange={(e) => setAnamneseTexto(e.target.value)}
+                  placeholder={t('agendamentos.anamnesePlaceholder')}
+                />
+                <button className="btn-primary" style={{ marginTop: '10px', width: '100%' }} onClick={handleSalvarAnamnese} disabled={salvandoAnamnese}>
+                  {salvandoAnamnese ? t('comum.salvando') : t('agendamentos.salvarAnamnese')}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
