@@ -42,10 +42,27 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   // "dia" é a visão padrão ao abrir (grade horária de um único dia, sem
   // rolagem longa); "mes"/"lista"/"bloqueios" são as telas antigas,
   // preservadas do jeito que já funcionavam, só que atrás de sub-abas.
-  const hojeISO = new Date().toISOString().split('T')[0];
+  // Usa os getters locais (não toISOString(), que converte pra UTC e erra
+  // o dia entre 00h–09h no fuso do Japão) — mesmo motivo do gerarIntervaloDatas.
+  const formatarDataLocalISO = (date) => {
+    const ano = date.getFullYear();
+    const mes = String(date.getMonth() + 1).padStart(2, '0');
+    const dia = String(date.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  };
+  const hojeISO = formatarDataLocalISO(new Date());
   const [diaSelecionado, setDiaSelecionado] = useState(hojeISO);
   const [semanaAncora, setSemanaAncora] = useState(() => new Date());
   const [subView, setSubView] = useState('dia');
+
+  // Relógio ao vivo — só usado pra desenhar a linha do "agora" na Agenda
+  // (visão Dia). Atualiza a cada 30s, o suficiente pra linha ir andando
+  // sem gastar bateria/recursos com atualização a cada segundo.
+  const [agora, setAgora] = useState(() => new Date());
+  useEffect(() => {
+    const intervalo = setInterval(() => setAgora(new Date()), 30000);
+    return () => clearInterval(intervalo);
+  }, []);
 
   // No iPhone, o PWA às vezes recarrega a página sozinho quando a pessoa
   // sai pra outro app (Contatos, Telefone etc.) e volta — isso zera o
@@ -1119,6 +1136,15 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     }),
   ].filter(item => item.fimMin > item.inicioMin && item.inicioMin < fechamentoMinDia));
 
+  // Linha do "agora" na timeline do dia — só aparece quando o dia
+  // selecionado é hoje e o horário atual está dentro do expediente.
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const mostrarLinhaAgora = horarioDoDiaSelecionado.aberto
+    && diaSelecionado === formatarDataLocalISO(agora)
+    && agoraMin >= aberturaMinDia
+    && agoraMin <= fechamentoMinDia;
+  const topLinhaAgora = ((agoraMin - aberturaMinDia) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
+
   const diasDaSemanaAtual = obterDiasDaSemana(semanaAncora);
 
   return (
@@ -1266,6 +1292,13 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                     );
                   })}
                 </div>
+
+                {/* Linha do "agora" — atravessa a grade inteira, atualiza sozinha */}
+                {mostrarLinhaAgora && (
+                  <div className="agenda-timeline-linha-agora" style={{ top: `${topLinhaAgora}px` }}>
+                    <span className="agenda-timeline-linha-agora-hora">{paraHHMM(agoraMin)}</span>
+                  </div>
+                )}
               </div>
             </>
           )}

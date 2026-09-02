@@ -700,6 +700,40 @@ body {
   border-left: 1px solid var(--border-color);
 }
 
+.agenda-timeline-linha-agora {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid #ff3b30;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.agenda-timeline-linha-agora::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  background: #ff3b30;
+  border-radius: 50%;
+}
+
+.agenda-timeline-linha-agora-hora {
+  position: absolute;
+  left: 8px;
+  top: -9px;
+  background: #ff3b30;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 .agenda-timeline-evento {
   position: absolute;
   overflow: hidden;
