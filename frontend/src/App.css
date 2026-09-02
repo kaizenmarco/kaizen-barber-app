@@ -903,6 +903,29 @@ body {
   cursor: pointer;
 }
 
+/* Indicador visual de "clicável" para campos de data (ícone de calendário) */
+.campo-data-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.campo-data-wrapper input[type="date"] {
+  width: 100%;
+  padding-right: 34px;
+  cursor: pointer;
+}
+
+.campo-data-wrapper::after {
+  content: '📅';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 14px;
+  opacity: 0.75;
+}
+
 .list-section {
   background-color: var(--secondary-dark);
   border: 1px solid var(--border-color);

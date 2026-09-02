@@ -17,7 +17,6 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [mesAtual, setMesAtual] = useState(new Date());
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
-  const [modoEncaixe, setModoEncaixe] = useState(false);
   const [diaModal, setDiaModal] = useState(null); // data (YYYY-MM-DD) do dia clicado no calendário, ou null se fechado
   const [bloqueios, setBloqueios] = useState([]);
   const [agendamentoEditando, setAgendamentoEditando] = useState(null); // agendamento sendo editado (data/hora), ou null se fechado
@@ -32,9 +31,30 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [diaSelecionado, setDiaSelecionado] = useState(hojeISO);
   const [semanaAncora, setSemanaAncora] = useState(() => new Date());
   const [subView, setSubView] = useState('dia');
-  const [modalNovoAberto, setModalNovoAberto] = useState(false);
 
-  const [novoAgendamento, setNovoAgendamento] = useState({
+  // No iPhone, o PWA às vezes recarrega a página sozinho quando a pessoa
+  // sai pra outro app (Contatos, Telefone etc.) e volta — isso zera o
+  // estado do React normalmente. Pra não perder o que já tinha sido
+  // digitado no meio de um "Novo Agendamento", o formulário fica salvo no
+  // localStorage (que sobrevive a esse recarregamento) e é restaurado
+  // automaticamente assim que a tela abre de novo.
+  const RASCUNHO_NOVO_AGENDAMENTO_STORAGE = 'kaizen_admin_rascunho_novo_agendamento';
+
+  const lerRascunhoNovoAgendamento = () => {
+    try {
+      const salvo = localStorage.getItem(RASCUNHO_NOVO_AGENDAMENTO_STORAGE);
+      return salvo ? JSON.parse(salvo) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const rascunhoInicial = lerRascunhoNovoAgendamento();
+
+  const [modalNovoAberto, setModalNovoAberto] = useState(() => !!rascunhoInicial?.modalAberto);
+  const [modoEncaixe, setModoEncaixe] = useState(() => !!rascunhoInicial?.modoEncaixe);
+
+  const [novoAgendamento, setNovoAgendamento] = useState(() => ({
     cliente: '',
     email: '',
     telefone: '',
@@ -42,8 +62,52 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     data: '',
     horario: '',
     servico: '',
-    profissional: ''
-  });
+    profissional: '',
+    ...(rascunhoInicial?.form || {})
+  }));
+
+  // Mantém o rascunho salvo enquanto a pessoa digita, e limpa quando o
+  // modal fecha sem nada digitado (evita guardar rascunho "vazio" pra
+  // sempre reabrir o modal à toa nas próximas visitas).
+  useEffect(() => {
+    try {
+      const temAlgoDigitado = Object.values(novoAgendamento).some(v => !!v);
+      if (!modalNovoAberto && !temAlgoDigitado) {
+        localStorage.removeItem(RASCUNHO_NOVO_AGENDAMENTO_STORAGE);
+        return;
+      }
+      localStorage.setItem(RASCUNHO_NOVO_AGENDAMENTO_STORAGE, JSON.stringify({
+        modalAberto: modalNovoAberto,
+        modoEncaixe,
+        form: novoAgendamento
+      }));
+    } catch {
+      // sem localStorage disponível, só não persiste — não trava o app.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [novoAgendamento, modalNovoAberto, modoEncaixe]);
+
+  const limparRascunhoNovoAgendamento = () => {
+    try {
+      localStorage.removeItem(RASCUNHO_NOVO_AGENDAMENTO_STORAGE);
+    } catch {
+      // ignora
+    }
+  };
+
+  // Fechar de propósito (botão ✕ ou tocar fora do modal) descarta o
+  // rascunho — diferente de a página recarregar sozinha, que restaura.
+  const fecharModalNovoAgendamentoEDescartar = () => {
+    setModalNovoAberto(false);
+    setModoEncaixe(false);
+    setNovoAgendamento({ cliente: '', email: '', telefone: '', dataNascimento: '', data: '', horario: '', servico: '', profissional: '' });
+    limparRascunhoNovoAgendamento();
+  };
+
+  // Compara só os últimos 9 dígitos do telefone (ignora espaço/traço/+81 na
+  // frente ou 0 local) — usado pra achar um cliente já cadastrado quando
+  // não tem e-mail (agora opcional) pra procurar por ele.
+  const normalizarTelefoneParaComparar = (str) => (str || '').replace(/\D/g, '').slice(-9);
 
   const [novoBloqueio, setNovoBloqueio] = useState({
     profissional: '',
@@ -366,7 +430,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const handleAgendar = async (e) => {
     e.preventDefault();
 
-    if (!novoAgendamento.cliente || !novoAgendamento.email || !novoAgendamento.telefone || !novoAgendamento.data || !novoAgendamento.horario || !novoAgendamento.servico || !novoAgendamento.profissional) {
+    if (!novoAgendamento.cliente || !novoAgendamento.telefone || !novoAgendamento.data || !novoAgendamento.horario || !novoAgendamento.servico || !novoAgendamento.profissional) {
       alert(t('agendamentos.preencherObrigatorios'));
       return;
     }
@@ -392,31 +456,49 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
     try {
       let clienteId = null;
-      const { data: clienteExistente } = await supabase
-        .from('clientes')
-        .select('id')
-        .eq('email', novoAgendamento.email)
-        .single();
 
-      if (clienteExistente) {
-        clienteId = clienteExistente.id;
-        // Cliente já existia — se ele não tinha telefone/data de nascimento
+      // Tenta achar o cliente pelo e-mail primeiro (se foi digitado — agora
+      // é opcional); se não achar (ou não tiver e-mail), tenta pelo
+      // telefone, que é sempre obrigatório aqui.
+      if (novoAgendamento.email) {
+        const { data: porEmail } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('email', novoAgendamento.email)
+          .single();
+        if (porEmail) clienteId = porEmail.id;
+      }
+
+      if (!clienteId) {
+        const alvo = normalizarTelefoneParaComparar(novoAgendamento.telefone);
+        if (alvo) {
+          const { data: candidatos } = await supabase
+            .from('clientes')
+            .select('id, telefone')
+            .not('telefone', 'is', null);
+          const achado = (candidatos || []).find(c => normalizarTelefoneParaComparar(c.telefone) === alvo);
+          if (achado) clienteId = achado.id;
+        }
+      }
+
+      if (clienteId) {
+        // Cliente já existia — se ele não tinha e-mail/data de nascimento
         // salvos ainda, aproveita os dados digitados agora pra completar o
         // cadastro (sem sobrescrever o que já tinha).
         await supabase
           .from('clientes')
           .update({
-            telefone: novoAgendamento.telefone || undefined,
+            email: novoAgendamento.email || undefined,
             data_nascimento: novoAgendamento.dataNascimento || undefined
           })
           .eq('id', clienteId)
-          .or('telefone.is.null,data_nascimento.is.null');
+          .or('email.is.null,data_nascimento.is.null');
       } else {
         const { data: novoCliente, error: erroCliente } = await supabase
           .from('clientes')
           .insert([{
             nome: novoAgendamento.cliente,
-            email: novoAgendamento.email,
+            email: novoAgendamento.email || null,
             telefone: novoAgendamento.telefone || null,
             data_nascimento: novoAgendamento.dataNascimento || null
           }])
@@ -452,6 +534,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       setNovoAgendamento({ cliente: '', email: '', telefone: '', dataNascimento: '', data: '', horario: '', servico: '', profissional: '' });
       setModoEncaixe(false);
       setModalNovoAberto(false);
+      limparRascunhoNovoAgendamento();
       buscarAgendamentos();
     } catch (error) {
       alert(t('agendamentos.erroAoCriar', { msg: error.message }));
@@ -891,13 +974,13 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
       {/* MODAL: NOVO AGENDAMENTO (mesmo formulário de antes, agora dentro de um modal) */}
       {modalNovoAberto && (
-        <div className="agenda-modal-overlay" onClick={() => setModalNovoAberto(false)}>
+        <div className="agenda-modal-overlay" onClick={fecharModalNovoAgendamentoEDescartar}>
           <div className="agenda-modal-conteudo" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ margin: 0 }}>{t('agendamentos.novoAgendamento')}</h3>
               <button
                 type="button"
-                onClick={() => setModalNovoAberto(false)}
+                onClick={fecharModalNovoAgendamentoEDescartar}
                 style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}
               >
                 ✕ {t('comum.cancelar')}
@@ -915,10 +998,9 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
               <input
                 type="email"
                 name="email"
-                placeholder={t('agendamentos.emailCliente')}
+                placeholder={t('agendamentos.emailClienteOpcional')}
                 value={novoAgendamento.email}
                 onChange={handleInputChange}
-                required
               />
               <input
                 type="tel"
@@ -930,12 +1012,14 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
               />
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
                 {t('agendamentos.dataNascimento')}
-                <input
-                  type="date"
-                  name="dataNascimento"
-                  value={novoAgendamento.dataNascimento}
-                  onChange={handleInputChange}
-                />
+                <div className="campo-data-wrapper">
+                  <input
+                    type="date"
+                    name="dataNascimento"
+                    value={novoAgendamento.dataNascimento}
+                    onChange={handleInputChange}
+                  />
+                </div>
               </label>
               <select
                 name="servico"
@@ -961,13 +1045,15 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
               </select>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
                 {t('agendamentos.escolhaData')}
-                <input
-                  type="date"
-                  name="data"
-                  value={novoAgendamento.data}
-                  onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
-                  required
-                />
+                <div className="campo-data-wrapper">
+                  <input
+                    type="date"
+                    name="data"
+                    value={novoAgendamento.data}
+                    onChange={(e) => { handleInputChange(e); setNovoAgendamento(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
+                    required
+                  />
+                </div>
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
@@ -1062,23 +1148,27 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
               {t('agendamentos.dataInicioLabel')}
-              <input
-                type="date"
-                name="data"
-                value={novoBloqueio.data}
-                onChange={handleBloqueioInputChange}
-                required
-              />
+              <div className="campo-data-wrapper">
+                <input
+                  type="date"
+                  name="data"
+                  value={novoBloqueio.data}
+                  onChange={handleBloqueioInputChange}
+                  required
+                />
+              </div>
             </label>
             <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
               {t('agendamentos.dataFimOpcionalLabel')}
-              <input
-                type="date"
-                name="dataFim"
-                value={novoBloqueio.dataFim}
-                min={novoBloqueio.data || undefined}
-                onChange={handleBloqueioInputChange}
-              />
+              <div className="campo-data-wrapper">
+                <input
+                  type="date"
+                  name="dataFim"
+                  value={novoBloqueio.dataFim}
+                  min={novoBloqueio.data || undefined}
+                  onChange={handleBloqueioInputChange}
+                />
+              </div>
             </label>
           </div>
 
@@ -1514,13 +1604,16 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
             <form onSubmit={handleSalvarEdicao}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
                 {t('agendamentos.escolhaData')}
-                <input
-                  type="date"
-                  name="data"
-                  value={edicaoForm.data}
-                  onChange={(e) => { handleEdicaoInputChange(e); setEdicaoForm(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
-                  required
-                />
+                <div className="campo-data-wrapper">
+                  <input
+                    type="date"
+                    name="data"
+                    value={edicaoForm.data}
+                    onChange={(e) => { handleEdicaoInputChange(e); setEdicaoForm(prev => ({ ...prev, data: e.target.value, horario: '' })); }}
+                    required
+                    style={{ width: '100%', padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px', paddingRight: '34px' }}
+                  />
+                </div>
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0', cursor: 'pointer' }}>
