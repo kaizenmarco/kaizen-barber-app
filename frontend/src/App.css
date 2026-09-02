@@ -1163,6 +1163,49 @@ body {
   border-bottom: none;
 }
 
+.campo-busca-wrapper {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.campo-busca-icone {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.campo-busca-input {
+  width: 100%;
+  padding: 12px 36px 12px 36px;
+  background: var(--primary-dark);
+  color: var(--text-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.campo-busca-input:focus {
+  border-color: var(--accent-gold);
+  outline: none;
+}
+
+.campo-busca-limpar {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 6px;
+}
+
 .list-section {
   background-color: var(--secondary-dark);
   border: 1px solid var(--border-color);

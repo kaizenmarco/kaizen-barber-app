@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
+import { SERVICOS } from '../config/servicos';
+import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
 
 function Clientes({ t: tProp, idioma: idiomaProp }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
@@ -52,6 +54,118 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
   const [carregandoAnamnese, setCarregandoAnamnese] = useState(false);
   const [anamneseTexto, setAnamneseTexto] = useState('');
   const [salvandoAnamnese, setSalvandoAnamnese] = useState(false);
+
+  // Busca por nome, na lista de clientes.
+  const [buscaCliente, setBuscaCliente] = useState('');
+
+  // Novo Agendamento direto de dentro do Editar Cliente — útil quando o
+  // cliente liga e o Marco já acha o cadastro dele e agenda na hora, sem
+  // precisar trocar de aba. Mesma lógica de horários livres do Agendamentos.jsx.
+  const servicosLista = SERVICOS;
+  const profissionaisLista = [
+    { id: 1, uuid: '11c0c7fb-e020-4c49-ab0a-28a16109b35f', nome: 'Marco Kaizen' },
+    { id: 2, uuid: '66266181-d06b-4f54-bcc9-12dccc100cb4', nome: 'Gabriel Little Kaizen' },
+    { id: 3, uuid: 'ad232428-9872-46db-82b3-27819ab353ff', nome: 'Neia' },
+  ];
+  const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
+  const [novoAgendamentoAberto, setNovoAgendamentoAberto] = useState(false);
+  const [novoAgendamentoForm, setNovoAgendamentoForm] = useState({ data: '', horario: '', servico: '', profissional: '' });
+  const [ocupadosNoDia, setOcupadosNoDia] = useState([]);
+  const [carregandoOcupados, setCarregandoOcupados] = useState(false);
+  const [criandoAgendamento, setCriandoAgendamento] = useState(false);
+
+  useEffect(() => {
+    buscarHorarioEstendido().then(setHorarioEstendido);
+  }, []);
+
+  // Busca os horários já ocupados do profissional escolhido, no dia
+  // escolhido, pra calcular quais horários ainda estão livres.
+  useEffect(() => {
+    const profObj = profissionaisLista.find(p => p.nome === novoAgendamentoForm.profissional);
+    if (!profObj || !novoAgendamentoForm.data) {
+      setOcupadosNoDia([]);
+      return;
+    }
+    setCarregandoOcupados(true);
+    supabase
+      .from('agendamentos')
+      .select('data_hora, servico_id, status')
+      .eq('profissional_id', profObj.uuid)
+      .gte('data_hora', `${novoAgendamentoForm.data}T00:00:00`)
+      .lt('data_hora', `${novoAgendamentoForm.data}T23:59:59`)
+      .neq('status', 'CANCELADO')
+      .then(({ data, error }) => {
+        if (error) {
+          setOcupadosNoDia([]);
+        } else {
+          setOcupadosNoDia((data || []).map(a => {
+            const hora = a.data_hora.split('T')[1].substring(0, 5);
+            const inicioMin = paraMinutos(hora);
+            const duracao = servicosLista.find(s => s.uuid === a.servico_id)?.duracaoMinutos || 60;
+            return { inicioMin, fimMin: inicioMin + duracao };
+          }));
+        }
+        setCarregandoOcupados(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [novoAgendamentoForm.profissional, novoAgendamentoForm.data]);
+
+  const servicoNovoAgendamentoObj = servicosLista.find(s => s.nome === novoAgendamentoForm.servico);
+  const slotsDisponiveisNovoAgendamento = (!novoAgendamentoForm.data || !servicoNovoAgendamentoObj)
+    ? []
+    : getSlotsLivresNoDia(
+        new Date(`${novoAgendamentoForm.data}T00:00:00`),
+        servicoNovoAgendamentoObj.duracaoMinutos,
+        ocupadosNoDia,
+        horarioEstendido
+      );
+
+  const abrirNovoAgendamento = () => {
+    setNovoAgendamentoAberto(true);
+    setNovoAgendamentoForm({ data: '', horario: '', servico: '', profissional: '' });
+  };
+
+  const fecharNovoAgendamento = () => {
+    setNovoAgendamentoAberto(false);
+    setNovoAgendamentoForm({ data: '', horario: '', servico: '', profissional: '' });
+  };
+
+  const handleNovoAgendamentoChange = (campo, valor) => {
+    setNovoAgendamentoForm(prev => ({ ...prev, [campo]: valor, ...(campo !== 'horario' ? { horario: '' } : {}) }));
+  };
+
+  const handleCriarAgendamentoParaCliente = async () => {
+    if (!clienteEditando) return;
+    if (!novoAgendamentoForm.data || !novoAgendamentoForm.horario || !novoAgendamentoForm.servico || !novoAgendamentoForm.profissional) {
+      alert(t('agendamentos.preencherObrigatorios'));
+      return;
+    }
+    setCriandoAgendamento(true);
+    try {
+      const profObj = profissionaisLista.find(p => p.nome === novoAgendamentoForm.profissional);
+      const servicoObj = servicosLista.find(s => s.nome === novoAgendamentoForm.servico);
+      const { error } = await supabase
+        .from('agendamentos')
+        .insert([{
+          cliente_id: clienteEditando.id,
+          profissional_id: profObj?.uuid,
+          servico_id: servicoObj?.uuid,
+          data_hora: `${novoAgendamentoForm.data}T${novoAgendamentoForm.horario}:00`,
+          status: 'AGENDADO',
+          preco_final: 0
+        }]);
+
+      if (error) throw error;
+
+      alert(t('agendamentos.criadoComSucesso'));
+      fecharNovoAgendamento();
+      buscarClientes();
+    } catch (error) {
+      alert(t('agendamentos.erroAoCriar', { msg: error.message }));
+    } finally {
+      setCriandoAgendamento(false);
+    }
+  };
 
   // Buscar clientes do Supabase
   useEffect(() => {
@@ -176,6 +290,8 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     setProntuarioItens([]);
     setAnamneseAberta(false);
     setAnamneseTexto('');
+    setNovoAgendamentoAberto(false);
+    setNovoAgendamentoForm({ data: '', horario: '', servico: '', profissional: '' });
   };
 
   const abrirProntuario = async () => {
@@ -299,6 +415,10 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     }
   };
 
+  const clientesFiltrados = buscaCliente.trim()
+    ? clientes.filter(c => c.nome.toLowerCase().includes(buscaCliente.trim().toLowerCase()))
+    : clientes;
+
   return (
     <div className="page-container">
       <h2>{t('clientes.titulo')}</h2>
@@ -359,14 +479,30 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
       <section className="list-section">
         <h3>{t('clientes.listaClientes')}</h3>
 
+        <div className="campo-busca-wrapper">
+          <span className="campo-busca-icone">🔍</span>
+          <input
+            type="text"
+            className="campo-busca-input"
+            placeholder={t('clientes.buscarPlaceholder')}
+            value={buscaCliente}
+            onChange={(e) => setBuscaCliente(e.target.value)}
+          />
+          {buscaCliente && (
+            <button type="button" className="campo-busca-limpar" onClick={() => setBuscaCliente('')} aria-label={t('comum.cancelar')}>✕</button>
+          )}
+        </div>
+
         {carregando ? (
           <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : clientes.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#999' }}>{t('clientes.nenhumCadastrado')}</p>
+        ) : clientesFiltrados.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('clientes.nenhumEncontradoBusca')}</p>
         ) : (
           <>
             <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '15px' }}>
-              {t('clientes.totalClientes', { n: clientes.length })}
+              {t('clientes.totalClientes', { n: clientesFiltrados.length })}
             </p>
             <div style={{ overflowX: 'auto' }}>
               <table className="table">
@@ -382,7 +518,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {clientes.map((cliente) => (
+                  {clientesFiltrados.map((cliente) => (
                     <tr key={cliente.id}>
                       <td style={{ fontWeight: 'bold' }}>{cliente.nome}</td>
                       <td style={{ fontSize: '12px', color: '#999' }}>{cliente.email}</td>
@@ -516,6 +652,75 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
             </form>
 
             <div style={{ marginTop: '18px' }}>
+              <button className="detalhe-acao-btn" onClick={() => (novoAgendamentoAberto ? fecharNovoAgendamento() : abrirNovoAgendamento())}>
+                <span>📅 {t('agendamentos.novoAgendamento')}</span>
+                <span>{novoAgendamentoAberto ? '▲' : '›'}</span>
+              </button>
+
+              {novoAgendamentoAberto && (
+                <div style={{ background: '#1a1a1a', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '14px', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <select
+                    value={novoAgendamentoForm.servico}
+                    onChange={(e) => handleNovoAgendamentoChange('servico', e.target.value)}
+                    style={{ padding: '10px', background: '#2d2d2d', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  >
+                    <option value="">{t('comum.selecioneServico')}</option>
+                    {servicosLista.map(s => <option key={s.id} value={s.nome}>{s.nome} ({s.duracao})</option>)}
+                  </select>
+                  <select
+                    value={novoAgendamentoForm.profissional}
+                    onChange={(e) => handleNovoAgendamentoChange('profissional', e.target.value)}
+                    style={{ padding: '10px', background: '#2d2d2d', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  >
+                    <option value="">{t('comum.selecioneProfissional')}</option>
+                    {profissionaisLista.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                  </select>
+                  <div className="campo-data-wrapper">
+                    <input
+                      type="date"
+                      value={novoAgendamentoForm.data}
+                      onChange={(e) => handleNovoAgendamentoChange('data', e.target.value)}
+                      style={{ width: '100%', padding: '10px', background: '#2d2d2d', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px', paddingRight: '34px' }}
+                    />
+                  </div>
+
+                  {novoAgendamentoForm.data && novoAgendamentoForm.servico && novoAgendamentoForm.profissional && (
+                    carregandoOcupados ? (
+                      <p style={{ color: '#999', fontSize: '13px' }}>{t('comum.carregando')}</p>
+                    ) : slotsDisponiveisNovoAgendamento.length === 0 ? (
+                      <p style={{ color: '#999', fontSize: '13px' }}>{t('agendamentos.nenhumHorarioLivre')}</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {slotsDisponiveisNovoAgendamento.map(h => (
+                          <button
+                            type="button"
+                            key={h}
+                            onClick={() => handleNovoAgendamentoChange('horario', h)}
+                            style={{
+                              padding: '6px 10px', borderRadius: '4px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold',
+                              background: novoAgendamentoForm.horario === h ? '#4ade80' : 'transparent',
+                              color: novoAgendamentoForm.horario === h ? '#1a1a1a' : '#4ade80',
+                              border: '1px solid #4ade80'
+                            }}
+                          >
+                            {h}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={!novoAgendamentoForm.horario || criandoAgendamento}
+                    onClick={handleCriarAgendamentoParaCliente}
+                  >
+                    {criandoAgendamento ? t('comum.carregando') : t('agendamentos.agendar')}
+                  </button>
+                </div>
+              )}
+
               <button className="detalhe-acao-btn whatsapp" onClick={abrirWhatsappCliente}>
                 <span>{t('agendamentos.enviarLembrete')}</span>
               </button>
