@@ -62,6 +62,25 @@ function TelaAguardandoVinculo({ email, aoSair }) {
   );
 }
 
+function TelaAssinaturaCancelada({ empresa, aoSair }) {
+  return (
+    <div style={{ ...estilos.pagina, ...estilos.centralizado }}>
+      <div style={estilos.cartao}>
+        <h2 style={{ color: '#f87171', marginBottom: '10px' }}>Assinatura cancelada</h2>
+        <p style={{ color: '#ccc', fontSize: '14px', marginBottom: '20px' }}>
+          O acesso da <strong>{empresa?.nome || 'sua barbearia'}</strong> foi suspenso porque a
+          assinatura está cancelada{empresa?.observacao_status ? ` (${empresa.observacao_status})` : ''}.
+          Renove o pagamento para voltar a usar o sistema.
+        </p>
+        <a href="/cadastro" style={{ ...estilos.botao, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
+          Reativar assinatura
+        </a>
+        <button style={estilos.botaoSecundario} onClick={aoSair}>Sair</button>
+      </div>
+    </div>
+  );
+}
+
 function TelaLogin() {
   const navigate = useNavigate();
   const [modo, setModo] = useState('login');
@@ -141,6 +160,12 @@ function PainelPrincipal({ perfil, empresa, aoSair }) {
         </button>
       </header>
 
+      {empresa?.status === 'inadimplente' && (
+        <div style={{ background: '#4a2b1a', color: '#fbbf24', fontSize: '13px', padding: '10px 20px', textAlign: 'center' }}>
+          Pagamento pendente — regularize em breve para não perder o acesso ao sistema.
+        </div>
+      )}
+
       <main style={estilos.main}>
         {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={IDIOMA_ADMIN_PADRAO} />}
         {abaSelecionada === 'clientes' && <Clientes t={t} idioma={IDIOMA_ADMIN_PADRAO} />}
@@ -199,7 +224,7 @@ export default function PainelEmpresa() {
       if (perfilData?.empresa_id) {
         const { data: empresaData } = await supabaseSaaS
           .from('empresas')
-          .select('nome, plano, status, profissionais_extras')
+          .select('nome, plano, status, profissionais_extras, observacao_status')
           .eq('id', perfilData.empresa_id)
           .maybeSingle();
         if (!cancelado) setEmpresa(empresaData);
@@ -217,6 +242,7 @@ export default function PainelEmpresa() {
   if (!session) return <TelaLogin />;
   if (!perfil) return <TelaCarregando />;
   if (!perfil.empresa_id) return <TelaAguardandoVinculo email={perfil.email} aoSair={handleSair} />;
+  if (empresa?.status === 'cancelado') return <TelaAssinaturaCancelada empresa={empresa} aoSair={handleSair} />;
 
   return <PainelPrincipal perfil={perfil} empresa={empresa} aoSair={handleSair} />;
 }
