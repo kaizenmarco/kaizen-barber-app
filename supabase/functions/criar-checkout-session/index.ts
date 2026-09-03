@@ -16,7 +16,7 @@
 // profissionais, sem cobrança adicional.
 //
 // Body esperado (JSON):
-//   { nome_empresa, slug?, email_contato, plano, moeda, profissionais_adicionais? }
+//   { nome_empresa, slug?, email_contato, telefone, plano, moeda, profissionais_adicionais? }
 //   plano = "basico" | "intermediario" | "completo"
 //   moeda = "jpy" | "brl"
 //   profissionais_adicionais = número inteiro >= 0 (ignorado se plano = "completo")
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
 
   try {
     const corpo = await req.json();
-    const { nome_empresa, slug, email_contato, plano } = corpo;
+    const { nome_empresa, slug, email_contato, plano, telefone } = corpo;
     const moeda = (corpo.moeda ?? "jpy") as Moeda;
     let profissionaisAdicionais = Number.parseInt(corpo.profissionais_adicionais, 10);
     if (!Number.isFinite(profissionaisAdicionais) || profissionaisAdicionais < 0) {
@@ -149,6 +149,7 @@ Deno.serve(async (req) => {
           nome: nome_empresa,
           slug: slugFinal,
           email_contato,
+          telefone: telefone || null,
           plano,
           status: "trial",
           moeda,
@@ -168,7 +169,7 @@ Deno.serve(async (req) => {
       // Empresa já existia (tentativa anterior) — atualiza com a escolha atual.
       await supabaseAdmin
         .from("empresas")
-        .update({ plano, moeda, profissionais_extras: profissionaisAdicionais })
+        .update({ plano, moeda, profissionais_extras: profissionaisAdicionais, telefone: telefone || null })
         .eq("id", empresa.id);
     }
 

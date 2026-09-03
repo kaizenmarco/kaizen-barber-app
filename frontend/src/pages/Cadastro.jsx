@@ -82,6 +82,7 @@ const estilos = {
 export default function Cadastro() {
   const [nomeEmpresa, setNomeEmpresa] = useState('');
   const [emailContato, setEmailContato] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [moeda, setMoeda] = useState('brl');
   const [plano, setPlano] = useState('intermediario');
   const [profissionaisAdicionais, setProfissionaisAdicionais] = useState(0);
@@ -113,8 +114,8 @@ export default function Cadastro() {
     e.preventDefault();
     setErro('');
 
-    if (!nomeEmpresa.trim() || !emailContato.trim()) {
-      setErro('Preencha o nome da barbearia e o e-mail de contato.');
+    if (!nomeEmpresa.trim() || !emailContato.trim() || !telefone.trim()) {
+      setErro('Preencha o nome da barbearia, o e-mail de contato e o telefone/WhatsApp.');
       return;
     }
 
@@ -123,6 +124,7 @@ export default function Cadastro() {
       body: {
         nome_empresa: nomeEmpresa.trim(),
         email_contato: emailContato.trim(),
+        telefone: telefone.trim(),
         plano,
         moeda,
         profissionais_adicionais: permiteAdicional ? profissionaisAdicionais : 0,
@@ -168,6 +170,15 @@ export default function Cadastro() {
             value={emailContato}
             onChange={(e) => setEmailContato(e.target.value)}
             placeholder="contato@suabarbearia.com"
+          />
+
+          <label style={estilos.label}>Telefone / WhatsApp</label>
+          <input
+            style={estilos.input}
+            type="tel"
+            value={telefone}
+            onChange={(e) => setTelefone(e.target.value)}
+            placeholder="+55 11 99999-9999"
           />
 
           <label style={estilos.label}>País / moeda</label>
