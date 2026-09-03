@@ -20,13 +20,16 @@
 //   STRIPE_PRICE_INTERMEDIARIO_JPY / STRIPE_PRICE_INTERMEDIARIO_BRL
 //   STRIPE_PRICE_COMPLETO_JPY / STRIPE_PRICE_COMPLETO_BRL
 //   STRIPE_PRICE_ADICIONAL_JPY / STRIPE_PRICE_ADICIONAL_BRL
+//   WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (injetadas automaticamente)
 //
 // Sobre inadimplência: quando uma cobrança falha, marcamos a empresa como
 // "inadimplente" e guardamos em inadimplente_desde a data da PRIMEIRA falha
 // (não reinicia a cada nova tentativa automática do Stripe). Uma rotina
 // separada no banco (pg_cron, ver migration 012b) cancela automaticamente
-// quem ficar inadimplente por mais de 35 dias.
+// quem ficar inadimplente por mais de 35 dias. Na primeira falha, também
+// disparamos um aviso pelo WhatsApp (modelo "aviso_pagamento_pendente",
+// categoria Utilidade) pro telefone cadastrado da empresa.
 // ============================================================================
 
 import Stripe from "npm:stripe@17";
@@ -42,6 +45,9 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
+
+const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN");
+const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
 
 // Mapeia cada price id de PLANO (Básico/Intermediário/Completo, nas duas
 // moedas) pro nome do plano. O price id do "profissional adicional" fica de
@@ -82,6 +88,68 @@ async function empresaIdPelaSubscription(subscriptionId: string): Promise<string
     .eq("stripe_subscription_id", subscriptionId)
     .maybeSingle();
   return data?.id ?? null;
+}
+
+// Envia o aviso de pagamento pendente pelo WhatsApp (modelo aprovado
+// "aviso_pagamento_pendente", categoria Utilidade) pro telefone cadastrado
+// da empresa. Nunca lança erro pra fora — se o WhatsApp falhar (número não
+// cadastrado, template ainda não aprovado, token expirado etc.) isso não
+// pode derrubar o processamento do webhook do Stripe.
+async function enviarAvisoPagamentoPendente(empresaId: string) {
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    console.warn("WHATSAPP_TOKEN/WHATSAPP_PHONE_NUMBER_ID não configurados — aviso não enviado.");
+    return;
+  }
+
+  const { data: empresa } = await supabaseAdmin
+    .from("empresas")
+    .select("nome, telefone")
+    .eq("id", empresaId)
+    .maybeSingle();
+
+  if (!empresa?.telefone) {
+    console.warn(`Empresa ${empresaId} sem telefone cadastrado — aviso de pagamento não enviado.`);
+    return;
+  }
+
+  const telefone = empresa.telefone.replace(/[^\d]/g, "");
+
+  try {
+    const resposta = await fetch(
+      `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: telefone,
+          type: "template",
+          template: {
+            name: "aviso_pagamento_pendente",
+            language: { code: "pt_BR" },
+            components: [
+              {
+                type: "body",
+                parameters: [{ type: "text", text: empresa.nome || "cliente" }],
+              },
+            ],
+          },
+        }),
+      }
+    );
+
+    if (!resposta.ok) {
+      const corpoErro = await resposta.text();
+      console.error(`Falha ao enviar WhatsApp pra empresa ${empresaId}:`, resposta.status, corpoErro);
+    } else {
+      console.log(`Aviso de pagamento pendente enviado por WhatsApp pra empresa ${empresaId}.`);
+    }
+  } catch (erro) {
+    console.error(`Erro de rede enviando WhatsApp pra empresa ${empresaId}:`, erro);
+  }
 }
 
 // Lê os itens de uma subscription e descobre (a) qual é o plano, pelo item
@@ -160,7 +228,9 @@ Deno.serve(async (req) => {
       // resolver. Guarda a data da PRIMEIRA falha em inadimplente_desde,
       // sem reiniciar a contagem a cada nova tentativa automática do
       // Stripe — é essa data que a rotina de 35 dias (pg_cron) usa depois
-      // pra cancelar automaticamente quem não resolver.
+      // pra cancelar automaticamente quem não resolver. Só dispara o aviso
+      // por WhatsApp na primeira falha, pra não ficar reenviando a cada
+      // nova tentativa automática do Stripe pra mesma fatura.
       case "invoice.payment_failed": {
         const invoice = evento.data.object as Stripe.Invoice;
         const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
@@ -172,9 +242,11 @@ Deno.serve(async (req) => {
               .select("inadimplente_desde")
               .eq("id", empresaId)
               .maybeSingle();
+            const primeiraFalha = !atual?.inadimplente_desde;
             const extra: Record<string, unknown> = {};
-            if (!atual?.inadimplente_desde) extra.inadimplente_desde = new Date().toISOString();
+            if (primeiraFalha) extra.inadimplente_desde = new Date().toISOString();
             await marcarStatus(empresaId, "inadimplente", extra);
+            if (primeiraFalha) await enviarAvisoPagamentoPendente(empresaId);
           }
         }
         break;
