@@ -21,6 +21,12 @@
 //   STRIPE_PRICE_COMPLETO_JPY / STRIPE_PRICE_COMPLETO_BRL
 //   STRIPE_PRICE_ADICIONAL_JPY / STRIPE_PRICE_ADICIONAL_BRL
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (injetadas automaticamente)
+//
+// Sobre inadimplência: quando uma cobrança falha, marcamos a empresa como
+// "inadimplente" e guardamos em inadimplente_desde a data da PRIMEIRA falha
+// (não reinicia a cada nova tentativa automática do Stripe). Uma rotina
+// separada no banco (pg_cron, ver migration 012b) cancela automaticamente
+// quem ficar inadimplente por mais de 35 dias.
 // ============================================================================
 
 import Stripe from "npm:stripe@17";
@@ -122,7 +128,11 @@ Deno.serve(async (req) => {
         const empresaId = session.metadata?.empresa_id;
         const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
         if (empresaId && subscriptionId) {
-          const extra: Record<string, unknown> = { stripe_subscription_id: subscriptionId };
+          const extra: Record<string, unknown> = {
+            stripe_subscription_id: subscriptionId,
+            inadimplente_desde: null,
+            observacao_status: null,
+          };
           if (session.metadata?.moeda) extra.moeda = session.metadata.moeda;
           if (session.metadata?.profissionais_adicionais) {
             extra.profissionais_extras = Number.parseInt(session.metadata.profissionais_adicionais, 10) || 0;
@@ -132,24 +142,40 @@ Deno.serve(async (req) => {
         break;
       }
 
-      // Cobrança recorrente (mês seguinte) bem-sucedida — mantém ativo.
+      // Cobrança recorrente (mês seguinte) bem-sucedida — mantém ativo e
+      // limpa qualquer marca de inadimplência anterior (o cliente pagou).
       case "invoice.payment_succeeded": {
         const invoice = evento.data.object as Stripe.Invoice;
         const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
         if (subscriptionId) {
           const empresaId = await empresaIdPelaSubscription(subscriptionId);
-          if (empresaId) await marcarStatus(empresaId, "ativo");
+          if (empresaId) {
+            await marcarStatus(empresaId, "ativo", { inadimplente_desde: null, observacao_status: null });
+          }
         }
         break;
       }
 
-      // Cobrança falhou (cartão recusado etc.) — desativa o acesso até resolver.
+      // Cobrança falhou (cartão recusado etc.) — desativa o acesso até
+      // resolver. Guarda a data da PRIMEIRA falha em inadimplente_desde,
+      // sem reiniciar a contagem a cada nova tentativa automática do
+      // Stripe — é essa data que a rotina de 35 dias (pg_cron) usa depois
+      // pra cancelar automaticamente quem não resolver.
       case "invoice.payment_failed": {
         const invoice = evento.data.object as Stripe.Invoice;
         const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
         if (subscriptionId) {
           const empresaId = await empresaIdPelaSubscription(subscriptionId);
-          if (empresaId) await marcarStatus(empresaId, "inadimplente");
+          if (empresaId) {
+            const { data: atual } = await supabaseAdmin
+              .from("empresas")
+              .select("inadimplente_desde")
+              .eq("id", empresaId)
+              .maybeSingle();
+            const extra: Record<string, unknown> = {};
+            if (!atual?.inadimplente_desde) extra.inadimplente_desde = new Date().toISOString();
+            await marcarStatus(empresaId, "inadimplente", extra);
+          }
         }
         break;
       }
