@@ -12,15 +12,32 @@ import { supabase } from '../../config/supabaseClientTenant';
 // já foi desenhado assim (preco_minimo obrigatório, preco_maximo opcional)
 // pra cobrir serviços tipo "coloração" cujo preço varia conforme o cabelo.
 // Se só o mínimo for preenchido, mostra como valor fixo.
+//
+// Preço é mostrado/editado na moeda que a empresa escolheu no cadastro
+// (empresas.moeda: 'brl' ou 'jpy') — cada barbearia só opera numa moeda por
+// enquanto. Se no futuro surgir empresa com profissionais em países/moedas
+// diferentes dentro da mesma conta, isso pode virar um seletor por serviço;
+// por ora um catálogo por empresa já resolve, já que moeda é definida por
+// empresa lá no /cadastro.
 
-function formatarPreco(servico) {
-  const min = Number(servico.preco_minimo);
-  const max = servico.preco_maximo != null ? Number(servico.preco_maximo) : null;
-  if (max != null && max > min) return `${min} - ${max}`;
-  return `${min}`;
+const SIMBOLO_MOEDA = { brl: 'R$', jpy: '¥' };
+
+function formatarValor(valor, moeda) {
+  if (moeda === 'jpy') return `¥${Number(valor).toLocaleString('ja-JP')}`;
+  return `R$${Number(valor).toFixed(2).replace('.', ',')}`;
 }
 
-function Servicos() {
+function formatarPreco(servico, moeda) {
+  const min = Number(servico.preco_minimo);
+  const max = servico.preco_maximo != null ? Number(servico.preco_maximo) : null;
+  if (max != null && max > min) return `${formatarValor(min, moeda)} - ${formatarValor(max, moeda)}`;
+  return formatarValor(min, moeda);
+}
+
+function Servicos({ empresa }) {
+  const moeda = empresa?.moeda === 'jpy' ? 'jpy' : 'brl';
+  const simbolo = SIMBOLO_MOEDA[moeda];
+  const casasDecimais = moeda === 'jpy' ? '1' : '0.01';
   const [servicos, setServicos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -137,9 +154,9 @@ function Servicos() {
           <input
             type="number"
             name="preco_minimo"
-            placeholder="Preço"
+            placeholder={`Preço (${simbolo})`}
             min="0"
-            step="0.01"
+            step={casasDecimais}
             value={novo.preco_minimo}
             onChange={handleInputChange}
             required
@@ -147,9 +164,9 @@ function Servicos() {
           <input
             type="number"
             name="preco_maximo"
-            placeholder="Preço máximo (opcional, se variar)"
+            placeholder={`Preço máximo em ${simbolo} (opcional, se variar)`}
             min="0"
-            step="0.01"
+            step={casasDecimais}
             value={novo.preco_maximo}
             onChange={handleInputChange}
           />
@@ -181,7 +198,7 @@ function Servicos() {
                 <tr>
                   <th>Nome</th>
                   <th>Descrição</th>
-                  <th>Preço</th>
+                  <th>Preço ({simbolo})</th>
                   <th>Duração</th>
                   <th>Ação</th>
                 </tr>
@@ -191,7 +208,7 @@ function Servicos() {
                   <tr key={s.id}>
                     <td style={{ fontWeight: 'bold' }}>{s.nome}</td>
                     <td>{s.descricao || '-'}</td>
-                    <td>{formatarPreco(s)}</td>
+                    <td>{formatarPreco(s, moeda)}</td>
                     <td>{s.duracao_minutos ? `${s.duracao_minutos} min` : '-'}</td>
                     <td>
                       <button className="btn-delete" onClick={() => handleDeletar(s.id)}>
