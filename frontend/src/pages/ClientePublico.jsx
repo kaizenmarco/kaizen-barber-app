@@ -702,6 +702,40 @@ function ClientePublico() {
         clienteId = novoCliente.id;
       }
 
+      // Trava de segurança: a checagem de horário livre (getHorariosProfissional)
+      // só olha se AQUELE profissional está livre — nada impedia o mesmo
+      // cliente de ficar marcado duas vezes ao mesmo tempo com profissionais
+      // diferentes (foi o que aconteceu e gerou um agendamento duplicado).
+      // Aqui verificamos se esse cliente já tem algum outro compromisso não
+      // cancelado que colida com o horário novo, em qualquer profissional.
+      const inicioNovoMin = paraMinutos(dadosAgendamento.hora);
+      const fimNovoMin = inicioNovoMin + duracaoSelecionada;
+
+      const { data: agendamentosDoDiaCliente, error: erroConflito } = await supabase
+        .from('agendamentos')
+        .select('data_hora, servico_id')
+        .eq('cliente_id', clienteId)
+        .neq('status', 'CANCELADO')
+        .gte('data_hora', `${dadosAgendamento.data}T00:00:00`)
+        .lte('data_hora', `${dadosAgendamento.data}T23:59:59`);
+
+      if (erroConflito) throw erroConflito;
+
+      const temConflito = (agendamentosDoDiaCliente || []).some(a => {
+        const horaExistente = a.data_hora.split('T')[1]?.substring(0, 5);
+        const inicioExistenteMin = paraMinutos(horaExistente);
+        const servicoExistente = servicos.find(s => s.uuid === a.servico_id);
+        const duracaoExistente = servicoExistente ? servicoExistente.duracaoMinutos : 60;
+        const fimExistenteMin = inicioExistenteMin + duracaoExistente;
+        return inicioNovoMin < fimExistenteMin && fimNovoMin > inicioExistenteMin;
+      });
+
+      if (temConflito) {
+        alert('⚠️ ' + t('alerta_cliente_ja_tem_horario'));
+        setCarregando(false);
+        return;
+      }
+
       const profissionalUUID = diaHorarioSelecionado.prof.uuid;
       const servicoSelecionado = servicos.find(s => s.nome === dadosAgendamento.servico);
       const servicoUUID = servicoSelecionado.uuid;
