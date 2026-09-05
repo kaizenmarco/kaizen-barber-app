@@ -15,6 +15,7 @@ import Cadastros from './Cadastros';
 import Reincidentes from './Reincidentes';
 import BottomNavigation from '../components/BottomNavigation';
 import MenuMais from '../components/MenuMais';
+import NotificacoesRealtime from '../components/NotificacoesRealtime';
 
 // As 3 abas com espaço fixo no menu inferior. Tudo que não estiver aqui
 // (Dashboard, Profissionais, Comandas, Fidelidade, Ordem de Chegada) mora
@@ -386,6 +387,7 @@ function AdminLogin() {
 
   return (
     <div className="admin-shell-mobile">
+      <NotificacoesRealtime t={t} />
       <header className="admin-header-mobile">
         <img src="/images/logo.jpg" alt="Kaizen Barber Shop" className="admin-header-logo" />
         <span className="admin-header-titulo">Kaizen · {t('sidebar.adminPanel')}</span>

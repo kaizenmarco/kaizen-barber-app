@@ -495,6 +495,23 @@ const TEXTOS = {
     'reincidentes.confirmarDesbloquear': 'Remover o bloqueio de {nome}?',
     'reincidentes.erroAtualizar': '❌ Erro ao atualizar: {msg}',
 
+    // Notificações em tempo real (toast + push)
+    'notificacoes.novoAgendamento': 'Novo agendamento',
+    'notificacoes.novoAgendamentoCorpo': '{cliente} marcou {servico} às {hora} com {profissional}.',
+    'notificacoes.agendamentoCancelado': 'Agendamento cancelado',
+    'notificacoes.agendamentoCanceladoCorpo': '{cliente} cancelou {servico} às {hora} com {profissional}.',
+    'notificacoes.ativarSom': 'Ativar som das notificações',
+    'notificacoes.desativarSom': 'Silenciar notificações',
+    'notificacoes.push.titulo': 'Notificações no celular',
+    'notificacoes.push.descricao': 'Receba um aviso no celular sempre que alguém agendar ou cancelar um horário, mesmo com o app fechado.',
+    'notificacoes.push.ativar': 'Ativar notificações neste dispositivo',
+    'notificacoes.push.ativando': 'Ativando...',
+    'notificacoes.push.ativado': '✅ Notificações ativadas neste dispositivo.',
+    'notificacoes.push.desativar': 'Desativar neste dispositivo',
+    'notificacoes.push.naoSuportado': 'Este navegador não suporta notificações push.',
+    'notificacoes.push.permissaoNegada': '⚠️ Você bloqueou as notificações para este site. Ative nas configurações do navegador/celular.',
+    'notificacoes.push.erro': '❌ Erro ao ativar notificações: {msg}',
+
     // Cadastros (Serviços / Produtos / Pacotes)
     'cadastros.titulo': '🗂️ Cadastros',
     'cadastros.servicos.titulo': 'Serviços',
@@ -999,6 +1016,23 @@ const TEXTOS = {
     'reincidentes.confirmarDesbloquear': 'Remove the block from {nome}?',
     'reincidentes.erroAtualizar': '❌ Error updating: {msg}',
 
+    // Real-time notifications (toast + push)
+    'notificacoes.novoAgendamento': 'New appointment',
+    'notificacoes.novoAgendamentoCorpo': '{cliente} booked {servico} at {hora} with {profissional}.',
+    'notificacoes.agendamentoCancelado': 'Appointment cancelled',
+    'notificacoes.agendamentoCanceladoCorpo': '{cliente} cancelled {servico} at {hora} with {profissional}.',
+    'notificacoes.ativarSom': 'Turn on notification sound',
+    'notificacoes.desativarSom': 'Mute notifications',
+    'notificacoes.push.titulo': 'Phone notifications',
+    'notificacoes.push.descricao': 'Get an alert on your phone whenever someone books or cancels an appointment, even with the app closed.',
+    'notificacoes.push.ativar': 'Enable notifications on this device',
+    'notificacoes.push.ativando': 'Enabling...',
+    'notificacoes.push.ativado': '✅ Notifications enabled on this device.',
+    'notificacoes.push.desativar': 'Disable on this device',
+    'notificacoes.push.naoSuportado': 'This browser does not support push notifications.',
+    'notificacoes.push.permissaoNegada': '⚠️ You blocked notifications for this site. Enable them in your browser/phone settings.',
+    'notificacoes.push.erro': '❌ Error enabling notifications: {msg}',
+
     // Records (Services / Products / Packages)
     'cadastros.titulo': '🗂️ Records',
     'cadastros.servicos.titulo': 'Services',
@@ -1502,6 +1536,23 @@ const TEXTOS = {
     'reincidentes.confirmarBloquear': '{nome}をブロック済みにしますか？',
     'reincidentes.confirmarDesbloquear': '{nome}のブロックを解除しますか？',
     'reincidentes.erroAtualizar': '❌ 更新エラー: {msg}',
+
+    // リアルタイム通知（トースト + プッシュ）
+    'notificacoes.novoAgendamento': '新規予約',
+    'notificacoes.novoAgendamentoCorpo': '{cliente}様が{hora}に{profissional}で{servico}を予約しました。',
+    'notificacoes.agendamentoCancelado': '予約キャンセル',
+    'notificacoes.agendamentoCanceladoCorpo': '{cliente}様が{hora}の{profissional}での{servico}をキャンセルしました。',
+    'notificacoes.ativarSom': '通知音をオンにする',
+    'notificacoes.desativarSom': '通知をミュートする',
+    'notificacoes.push.titulo': 'スマホ通知',
+    'notificacoes.push.descricao': 'アプリを閉じていても、予約や キャンセルがあったときにスマホに通知が届きます。',
+    'notificacoes.push.ativar': 'この端末で通知を有効にする',
+    'notificacoes.push.ativando': '有効にしています...',
+    'notificacoes.push.ativado': '✅ この端末で通知が有効になりました。',
+    'notificacoes.push.desativar': 'この端末で無効にする',
+    'notificacoes.push.naoSuportado': 'このブラウザはプッシュ通知に対応していません。',
+    'notificacoes.push.permissaoNegada': '⚠️ このサイトの通知がブロックされています。ブラウザ/端末の設定で許可してください。',
+    'notificacoes.push.erro': '❌ 通知の有効化エラー: {msg}',
 
     // 登録管理（サービス・商品・パッケージ）
     'cadastros.titulo': '🗂️ 登録管理',
