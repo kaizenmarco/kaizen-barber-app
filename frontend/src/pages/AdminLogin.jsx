@@ -12,6 +12,7 @@ import Fidelidade from './Fidelidade';
 import OrdemChegada from './OrdemChegada';
 import Aniversariantes from './Aniversariantes';
 import Cadastros from './Cadastros';
+import Reincidentes from './Reincidentes';
 import BottomNavigation from '../components/BottomNavigation';
 import MenuMais from '../components/MenuMais';
 
@@ -36,6 +37,7 @@ const CHAVES_ABAS = [
   { key: 'ordem', labelChave: 'nav.ordem', admin: true, restrito: true },
   { key: 'aniversariantes', labelChave: 'nav.aniversariantes', admin: true, restrito: false },
   { key: 'cadastros', labelChave: 'nav.cadastros', admin: true, restrito: false },
+  { key: 'reincidentes', labelChave: 'nav.reincidentes', admin: true, restrito: false },
 ];
 
 const inputStyle = {
@@ -416,6 +418,7 @@ function AdminLogin() {
             {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} />}
             {abaSelecionada === 'ordem' && <OrdemChegada t={t} idioma={idioma} />}
             {abaSelecionada === 'aniversariantes' && <Aniversariantes t={t} idioma={idioma} />}
+            {abaSelecionada === 'reincidentes' && <Reincidentes t={t} idioma={idioma} />}
             {abaSelecionada === 'cadastros' && <Cadastros t={t} idioma={idioma} />}
           </>
         )}

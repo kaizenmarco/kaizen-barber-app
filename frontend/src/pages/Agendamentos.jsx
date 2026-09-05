@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
 import { SERVICOS, buscarServicosCompletos } from '../config/servicos';
 import { LOCALE_POR_IDIOMA_ADMIN, DIAS_SEMANA_ABREV_ADMIN, DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
+import { contarCancelamentosUltimaHora, LIMITE_ULTIMA_HORA_MIN } from '../config/reincidencias';
 
 function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
@@ -38,6 +39,13 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [anamneseTexto, setAnamneseTexto] = useState('');
   const [salvandoAnamnese, setSalvandoAnamnese] = useState(false);
 
+  // ---- Cancelamento com motivo (exige "quem cancelou" + motivo, alimenta a
+  // tela Reincidentes em Mais quando é o cliente cancelando em cima da hora) ----
+  const [cancelamentoAlvo, setCancelamentoAlvo] = useState(null); // agendamento sendo cancelado, ou null se modal fechado
+  const [cancelamentoQuem, setCancelamentoQuem] = useState('cliente'); // 'cliente' | 'barbearia'
+  const [cancelamentoMotivo, setCancelamentoMotivo] = useState('');
+  const [salvandoCancelamento, setSalvandoCancelamento] = useState(false);
+
   // ---- Tela principal reformulada: dia selecionado + sub-abas ----
   // "dia" é a visão padrão ao abrir (grade horária de um único dia, sem
   // rolagem longa); "mes"/"lista"/"bloqueios" são as telas antigas,
@@ -49,6 +57,15 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     const mes = String(date.getMonth() + 1).padStart(2, '0');
     const dia = String(date.getDate()).padStart(2, '0');
     return `${ano}-${mes}-${dia}`;
+  };
+  // Mesma ideia da de cima, mas com hora — usada pra gravar cancelado_em
+  // como timestamp "local" (sem timezone), no mesmo formato que data_hora
+  // já usa, pra dar pra comparar os dois direto (ver config/reincidencias.js).
+  const formatarDataHoraLocalISO = (date) => {
+    const hora = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const seg = String(date.getSeconds()).padStart(2, '0');
+    return `${formatarDataLocalISO(date)}T${hora}:${min}:${seg}`;
   };
   const hojeISO = formatarDataLocalISO(new Date());
   const [diaSelecionado, setDiaSelecionado] = useState(hojeISO);
@@ -329,6 +346,9 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           criado_em,
           preferencia_profissional,
           duracao_minutos_manual,
+          motivo_cancelamento,
+          cancelado_por,
+          cancelado_em,
           clientes(id, nome, email, telefone),
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
@@ -359,7 +379,10 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           encaixe: !!agendamento.observacoes?.startsWith('[ENCAIXE]'),
           criadoEm: agendamento.criado_em,
           preferenciaProfissional: !!agendamento.preferencia_profissional,
-          duracaoMinutosManual: agendamento.duracao_minutos_manual || null
+          duracaoMinutosManual: agendamento.duracao_minutos_manual || null,
+          motivoCancelamento: agendamento.motivo_cancelamento || '',
+          canceladoPor: agendamento.cancelado_por || null,
+          canceladoEm: agendamento.cancelado_em || null
         };
       });
 
@@ -601,6 +624,73 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       buscarAgendamentos();
     } catch (error) {
       alert(t('agendamentos.erroAtualizarStatus', { msg: error.message }));
+    }
+  };
+
+  // Sempre que o novo status for CANCELADO, abre o modal pedindo motivo +
+  // quem cancelou (em vez de aplicar direto) — é o que alimenta a tela
+  // Reincidentes quando é o cliente cancelando em cima da hora. Qualquer
+  // outro status continua indo direto, como sempre.
+  const handleMudarStatusOuCancelar = (agendamento, novoStatus) => {
+    if (novoStatus === 'CANCELADO') {
+      iniciarCancelamento(agendamento);
+    } else {
+      handleAlterarStatus(agendamento.id, novoStatus);
+    }
+  };
+
+  const iniciarCancelamento = (agendamento) => {
+    setCancelamentoAlvo(agendamento);
+    setCancelamentoQuem('cliente');
+    setCancelamentoMotivo('');
+  };
+
+  const fecharModalCancelamento = () => {
+    setCancelamentoAlvo(null);
+    setCancelamentoMotivo('');
+  };
+
+  const handleConfirmarCancelamento = async () => {
+    if (!cancelamentoAlvo) return;
+    if (!cancelamentoMotivo.trim()) {
+      alert(t('agendamentos.motivoCancelamentoObrigatorio'));
+      return;
+    }
+    setSalvandoCancelamento(true);
+    try {
+      const agora = new Date();
+      const { error } = await supabase
+        .from('agendamentos')
+        .update({
+          status: 'CANCELADO',
+          motivo_cancelamento: cancelamentoMotivo.trim(),
+          cancelado_por: cancelamentoQuem,
+          cancelado_em: formatarDataHoraLocalISO(agora)
+        })
+        .eq('id', cancelamentoAlvo.id);
+
+      if (error) throw error;
+
+      // Se foi o cliente que pediu e faltava menos de 2h pro horário, é uma
+      // reincidência de última hora — avisa o Admin na hora, além de já
+      // aparecer depois na tela Reincidentes (menu Mais).
+      if (cancelamentoQuem === 'cliente') {
+        const dataHoraAgendamento = new Date(`${cancelamentoAlvo.data}T${cancelamentoAlvo.hora}:00`);
+        const diffMin = (dataHoraAgendamento - agora) / 60000;
+        if (diffMin < LIMITE_ULTIMA_HORA_MIN) {
+          const total = await contarCancelamentosUltimaHora(cancelamentoAlvo.clienteId);
+          alert(t('agendamentos.avisoReincidencia', { nome: cancelamentoAlvo.cliente, n: total }));
+        }
+      }
+
+      alert(t('agendamentos.cancelado'));
+      fecharModalCancelamento();
+      fecharDetalhesAgendamento();
+      buscarAgendamentos();
+    } catch (error) {
+      alert(t('agendamentos.erroCancelar', { msg: error.message }));
+    } finally {
+      setSalvandoCancelamento(false);
     }
   };
 
@@ -1153,6 +1243,52 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const diasDaSemanaAtual = obterDiasDaSemana(semanaAncora);
 
+  // ---- Visão "Semana": mesma lógica da timeline do Dia, só que com uma
+  // coluna por dia em vez de uma coluna só. Usa um eixo de horário único
+  // (o mais cedo que abre até o mais tarde que fecha na semana) pra todas
+  // as colunas ficarem alinhadas na mesma régua de horas. ----
+  const SLOT_ALTURA_PX_SEMANA = 18;
+  const horariosPorDiaSemana = diasDaSemanaAtual.map(d => getHorarioDoDia(d, horarioEstendido));
+  const diasAbertosSemana = horariosPorDiaSemana.filter(h => h.aberto);
+  const aberturaMinSemana = diasAbertosSemana.length ? Math.min(...diasAbertosSemana.map(h => paraMinutos(h.abertura))) : 0;
+  const fechamentoMinSemana = diasAbertosSemana.length ? Math.max(...diasAbertosSemana.map(h => paraMinutos(h.fechamento))) : 0;
+  const totalSlotsSemana = diasAbertosSemana.length ? Math.round((fechamentoMinSemana - aberturaMinSemana) / SLOT_MINUTOS) : 0;
+  const alturaGradeSemanaPx = totalSlotsSemana * SLOT_ALTURA_PX_SEMANA;
+
+  const marcasDeHoraSemana = [];
+  if (diasAbertosSemana.length) {
+    for (let m = aberturaMinSemana; m <= fechamentoMinSemana; m += 60) {
+      marcasDeHoraSemana.push(m);
+    }
+  }
+
+  const colunasSemana = diasDaSemanaAtual.map((d, idx) => {
+    const dataStr = formatarDataLocalISO(d);
+    const horarioDoDia = horariosPorDiaSemana[idx];
+    const agendamentosNoDia = agendamentosFiltrados.filter(a => a.data === dataStr).sort((a, b) => a.hora.localeCompare(b.hora));
+    const bloqueiosNoDia = bloqueiosFiltrados.filter(b => b.data === dataStr).sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+
+    const itens = !horarioDoDia.aberto ? [] : atribuirColunasTimeline([
+      ...agendamentosNoDia.map(a => {
+        const duracaoReal = a.duracaoMinutosManual || servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+        const inicioReal = paraMinutos(a.hora);
+        const fimReal = inicioReal + duracaoReal;
+        const inicioMin = Math.max(aberturaMinSemana, arredondarParaBaixo15(inicioReal));
+        const fimMin = Math.min(fechamentoMinSemana, Math.max(inicioMin + SLOT_MINUTOS, arredondarParaCima15(fimReal)));
+        return { tipo: 'agendamento', id: `ag-${a.id}`, inicioMin, fimMin, dado: a };
+      }),
+      ...bloqueiosNoDia.map(b => {
+        const inicioReal = Math.max(aberturaMinSemana, paraMinutos(b.horaInicio));
+        const fimReal = Math.min(fechamentoMinSemana, paraMinutos(b.horaFim));
+        const inicioMin = arredondarParaBaixo15(inicioReal);
+        const fimMin = Math.min(fechamentoMinSemana, Math.max(inicioMin + SLOT_MINUTOS, arredondarParaCima15(fimReal)));
+        return { tipo: 'bloqueio', id: `bl-${b.id}`, inicioMin, fimMin, dado: b };
+      }),
+    ].filter(item => item.fimMin > item.inicioMin && item.inicioMin < fechamentoMinSemana));
+
+    return { data: d, dataStr, horarioDoDia, itens };
+  });
+
   return (
     <div className="page-container agenda-espaco-fab">
       <h2>{t('agendamentos.titulo')}</h2>
@@ -1195,6 +1331,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       {/* SUB-ABAS: Dia (padrão) | Mês | Lista | Bloqueios */}
       <div className="agenda-subview-tabs">
         <button type="button" className={subView === 'dia' ? 'ativo' : ''} onClick={() => setSubView('dia')}>{t('agendamentos.subDia')}</button>
+        <button type="button" className={subView === 'semana' ? 'ativo' : ''} onClick={() => setSubView('semana')}>{t('agendamentos.subSemana')}</button>
         <button type="button" className={subView === 'mes' ? 'ativo' : ''} onClick={() => setSubView('mes')}>{t('agendamentos.subMes')}</button>
         <button type="button" className={subView === 'lista' ? 'ativo' : ''} onClick={() => setSubView('lista')}>{t('agendamentos.subLista')}</button>
         <button type="button" className={subView === 'bloqueios' ? 'ativo' : ''} onClick={() => setSubView('bloqueios')}>{t('agendamentos.subBloqueios')}</button>
@@ -1285,7 +1422,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                               <select
                                 value={a.status}
                                 onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => handleAlterarStatus(a.id, e.target.value)}
+                                onChange={(e) => handleMudarStatusOuCancelar(a, e.target.value)}
                                 style={{ background: getCorStatus(a.status), color: '#1a1a1a', border: 'none', borderRadius: '4px', padding: '4px 8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}
                               >
                                 {statusOpcoes.map(s => <option key={s} value={s}>{t(`statusAg.${s}`)}</option>)}
@@ -1307,6 +1444,92 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 )}
               </div>
             </>
+          )}
+        </section>
+      )}
+
+      {/* VISÃO SEMANA: grade com uma coluna por dia, mesma régua de horário pra todos */}
+      {subView === 'semana' && (
+        <section className="agenda-semana-view">
+          {diasAbertosSemana.length === 0 ? (
+            <p className="agenda-fechado-aviso">{t('agendamentos.salaoFechadoNaSemana')}</p>
+          ) : (
+            <div className="agenda-semana-scroll">
+              <div className="agenda-semana-grade">
+                <div className="agenda-timeline-marcas agenda-semana-marcas" style={{ height: `${alturaGradeSemanaPx}px` }}>
+                  {marcasDeHoraSemana.map(m => (
+                    <div
+                      key={`sm-${m}`}
+                      className="agenda-timeline-marca-hora"
+                      style={{ top: `${((m - aberturaMinSemana) / SLOT_MINUTOS) * SLOT_ALTURA_PX_SEMANA}px` }}
+                    >
+                      {paraHHMM(m)}
+                    </div>
+                  ))}
+                </div>
+
+                {colunasSemana.map(col => (
+                  <div key={col.dataStr} className={`agenda-semana-coluna${col.dataStr === hojeISO ? ' hoje' : ''}`}>
+                    <div className="agenda-semana-coluna-cabecalho">
+                      <span>{diasAbrev[col.data.getDay()]}</span>
+                      <span>{col.data.getDate()}</span>
+                    </div>
+                    <div
+                      className="agenda-semana-coluna-corpo"
+                      style={{
+                        height: `${alturaGradeSemanaPx}px`,
+                        backgroundImage: col.horarioDoDia.aberto
+                          ? `repeating-linear-gradient(to bottom, var(--border-color) 0, var(--border-color) 1px, transparent 1px, transparent ${SLOT_ALTURA_PX_SEMANA * 4}px)`
+                          : 'none'
+                      }}
+                    >
+                      {!col.horarioDoDia.aberto && <span className="agenda-semana-fechado-label">{t('agendamentos.fechado')}</span>}
+
+                      {col.itens.map(item => {
+                        const top = ((item.inicioMin - aberturaMinSemana) / SLOT_MINUTOS) * SLOT_ALTURA_PX_SEMANA;
+                        const altura = ((item.fimMin - item.inicioMin) / SLOT_MINUTOS) * SLOT_ALTURA_PX_SEMANA;
+                        const larguraPercentual = 100 / item.totalColunas;
+                        const estiloPosicao = {
+                          top: `${top}px`,
+                          height: `${Math.max(altura - 2, 14)}px`,
+                          left: `calc(${item.coluna * larguraPercentual}% + 1px)`,
+                          width: `calc(${larguraPercentual}% - 2px)`
+                        };
+
+                        if (item.tipo === 'bloqueio') {
+                          const b = item.dado;
+                          return (
+                            <div
+                              key={item.id}
+                              className="agenda-semana-evento agenda-semana-bloqueio"
+                              style={estiloPosicao}
+                              title={`${formatarHorarioBloqueio(b)}${b.motivo ? ' — ' + b.motivo : ''}`}
+                              onClick={() => handleDeletarBloqueio(b.id)}
+                            >
+                              🚫
+                            </div>
+                          );
+                        }
+
+                        const a = item.dado;
+                        return (
+                          <div
+                            key={item.id}
+                            className="agenda-semana-evento agenda-semana-agendamento"
+                            style={{ ...estiloPosicao, borderLeftColor: getCorStatus(a.status) }}
+                            title={`${a.hora} · ${a.cliente} · ${a.servico}`}
+                            onClick={() => abrirDetalhesAgendamento(a)}
+                          >
+                            <span className="agenda-semana-evento-hora">{a.hora}</span>
+                            <span className="agenda-semana-evento-nome">{a.cliente.split(' ')[0]}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </section>
       )}
@@ -1701,7 +1924,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                     <td>
                       <select
                         value={agendamento.status}
-                        onChange={(e) => handleAlterarStatus(agendamento.id, e.target.value)}
+                        onChange={(e) => handleMudarStatusOuCancelar(agendamento, e.target.value)}
                         style={{
                           padding: '6px',
                           borderRadius: '4px',
@@ -1870,7 +2093,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                       <div style={{ marginTop: '10px' }}>
                         <select
                           value={a.status}
-                          onChange={(e) => handleAlterarStatus(a.id, e.target.value)}
+                          onChange={(e) => handleMudarStatusOuCancelar(a, e.target.value)}
                           style={{
                             padding: '6px',
                             borderRadius: '4px',
@@ -2200,11 +2423,100 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                   <span>{t('agendamentos.alterarParaEncaixe')}</span>
                 </button>
               )}
+              {detalhesAgendamento.status !== 'CANCELADO' && (
+                <button className="detalhe-acao-btn cancelar" onClick={() => iniciarCancelamento(detalhesAgendamento)}>
+                  <span>{t('agendamentos.cancelarAgendamento')}</span>
+                </button>
+              )}
+              {detalhesAgendamento.status === 'CANCELADO' && detalhesAgendamento.motivoCancelamento && (
+                <div className="agenda-timeline-bloqueio-motivo" style={{ marginTop: '4px', fontSize: '12px', color: '#999' }}>
+                  🚫 {t('agendamentos.canceladoPorLabel', { quem: t(`agendamentos.canceladoPor.${detalhesAgendamento.canceladoPor || 'barbearia'}`) })}
+                  {': "'}{detalhesAgendamento.motivoCancelamento}{'"'}
+                </div>
+              )}
             </div>
 
             <div className="detalhe-barra-inferior">
               <button className="btn-delete" onClick={handleDeletarDetalhes}>{t('agendamentos.deletarAgendamento')}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Cancelar agendamento (motivo + quem cancelou) ==================== */}
+      {cancelamentoAlvo && (
+        <div
+          onClick={fecharModalCancelamento}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1200, padding: '20px', paddingTop: 'calc(20px + env(safe-area-inset-top))', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#2d2d2d', border: '1px solid #f87171', borderRadius: '10px', padding: '22px', maxWidth: '440px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <h3 style={{ color: '#f87171', margin: 0 }}>{t('agendamentos.cancelarAgendamento')}</h3>
+              <button onClick={fecharModalCancelamento} style={{ background: 'transparent', border: '1px solid #f87171', color: '#f87171', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}>
+                ✕
+              </button>
+            </div>
+            <p style={{ color: '#999', fontSize: '12px', marginBottom: '16px' }}>
+              {cancelamentoAlvo.cliente} · {new Date(`${cancelamentoAlvo.data}T00:00:00`).toLocaleDateString(locale)} · {cancelamentoAlvo.hora}
+            </p>
+
+            <label className="detalhe-campo-label" style={{ display: 'block', marginBottom: '6px' }}>{t('agendamentos.quemCancelou')}</label>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setCancelamentoQuem('cliente')}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold',
+                  border: `1px solid ${cancelamentoQuem === 'cliente' ? '#d4af37' : '#404040'}`,
+                  background: cancelamentoQuem === 'cliente' ? '#d4af37' : 'transparent',
+                  color: cancelamentoQuem === 'cliente' ? '#1a1a1a' : '#e8e8e8'
+                }}
+              >
+                {t('agendamentos.canceladoPor.cliente')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCancelamentoQuem('barbearia')}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold',
+                  border: `1px solid ${cancelamentoQuem === 'barbearia' ? '#d4af37' : '#404040'}`,
+                  background: cancelamentoQuem === 'barbearia' ? '#d4af37' : 'transparent',
+                  color: cancelamentoQuem === 'barbearia' ? '#1a1a1a' : '#e8e8e8'
+                }}
+              >
+                {t('agendamentos.canceladoPor.barbearia')}
+              </button>
+            </div>
+
+            <label className="detalhe-campo-label" style={{ display: 'block', marginBottom: '6px' }}>{t('agendamentos.motivoCancelamento')}</label>
+            <textarea
+              className="detalhe-notas-textarea"
+              value={cancelamentoMotivo}
+              onChange={(e) => setCancelamentoMotivo(e.target.value)}
+              placeholder={t('agendamentos.motivoCancelamentoPlaceholder')}
+            />
+
+            {cancelamentoQuem === 'cliente' && (
+              <p style={{ color: '#f97316', fontSize: '12px', marginTop: '10px' }}>
+                ℹ️ {t('agendamentos.avisoReincidenciaExplicacao')}
+              </p>
+            )}
+
+            <button
+              className="btn-primary"
+              style={{ marginTop: '14px', width: '100%', background: '#f87171' }}
+              onClick={handleConfirmarCancelamento}
+              disabled={salvandoCancelamento}
+            >
+              {salvandoCancelamento ? t('comum.salvando') : t('agendamentos.confirmarCancelamento')}
+            </button>
           </div>
         </div>
       )}

@@ -185,6 +185,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
           telefone,
           data_nascimento,
           criado_em,
+          bloqueado,
           agendamentos(id, status, data_hora)
         `)
         .order('criado_em', { ascending: false });
@@ -200,7 +201,8 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
         data_nascimento: cliente.data_nascimento || '',
         data_primeira_visita: cliente.criado_em?.split('T')[0] || '-',
         total_agendamentos: cliente.agendamentos?.length || 0,
-        agendamentos_confirmados: cliente.agendamentos?.filter(a => a.status === 'CONFIRMADO').length || 0
+        agendamentos_confirmados: cliente.agendamentos?.filter(a => a.status === 'CONFIRMADO').length || 0,
+        bloqueado: !!cliente.bloqueado
       }));
 
       setClientes(clientesFormatados);
@@ -520,7 +522,14 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
                 <tbody>
                   {clientesFiltrados.map((cliente) => (
                     <tr key={cliente.id}>
-                      <td style={{ fontWeight: 'bold' }}>{cliente.nome}</td>
+                      <td style={{ fontWeight: 'bold' }}>
+                        {cliente.nome}
+                        {cliente.bloqueado && (
+                          <span style={{ marginLeft: '8px', color: '#f87171', fontSize: '10px', fontWeight: 'bold', border: '1px solid #f87171', borderRadius: '4px', padding: '2px 5px' }}>
+                            🚫 {t('clientes.bloqueado')}
+                          </span>
+                        )}
+                      </td>
                       <td style={{ fontSize: '12px', color: '#999' }}>{cliente.email}</td>
                       <td>{cliente.telefone}</td>
                       <td>{cliente.data_primeira_visita}</td>
