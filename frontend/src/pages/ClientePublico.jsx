@@ -210,6 +210,7 @@ function ClientePublico() {
   const [consultaPontosFeita, setConsultaPontosFeita] = useState(false);
 
   const [emailConsultaAgendamentos, setEmailConsultaAgendamentos] = useState('');
+  const [telefoneConsultaAgendamentos, setTelefoneConsultaAgendamentos] = useState('');
   const [agendamentosDoCliente, setAgendamentosDoCliente] = useState([]);
   const [consultandoAgendamentos, setConsultandoAgendamentos] = useState(false);
   const [consultaAgendamentosFeita, setConsultaAgendamentosFeita] = useState(false);
@@ -446,24 +447,29 @@ function ClientePublico() {
   };
 
   // Busca os agendamentos futuros (ainda não cancelados) do cliente pelo
-  // e-mail, pra ele poder cancelar sozinho — mesmo padrão de consulta por
-  // e-mail já usado em Fidelidade, sem precisar de login.
-  const buscarAgendamentosCliente = async (emailParam) => {
+  // e-mail + telefone (os dois precisam bater com o mesmo cadastro), pra ele
+  // poder cancelar sozinho sem precisar de login. Exigir os dois evita puxar
+  // (e deixar cancelar) o agendamento de outra pessoa por engano — e-mail
+  // sozinho não é garantia suficiente de identidade.
+  const buscarAgendamentosCliente = async (emailParam, telefoneParam) => {
     const email = emailParam || emailConsultaAgendamentos;
-    if (!email) return;
+    const telefoneAlvo = normalizarTelefoneParaComparar(telefoneParam || telefoneConsultaAgendamentos);
+    if (!email || !telefoneAlvo) return;
     setConsultandoAgendamentos(true);
     try {
       const { data: clientes } = await supabase
         .from('clientes')
-        .select('id')
+        .select('id, telefone')
         .eq('email', email);
 
-      if (!clientes || clientes.length === 0) {
+      const clienteEncontrado = (clientes || []).find(c => normalizarTelefoneParaComparar(c.telefone) === telefoneAlvo);
+
+      if (!clienteEncontrado) {
         setAgendamentosDoCliente([]);
         return;
       }
 
-      const clienteId = clientes[0].id;
+      const clienteId = clienteEncontrado.id;
       const agoraMs = Date.now();
 
       const { data, error } = await supabase
@@ -1423,6 +1429,7 @@ function ClientePublico() {
             <h2 style={{ color: '#d4af37' }}>📋 {t('meusAgendamentos_titulo')}</h2>
 
             <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '20px' }}>
+              <p style={{ color: '#999', fontSize: '12px', margin: '0 0 10px' }}>{t('meusAgendamentos_identificacaoAviso')}</p>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <input
                   type="email"
@@ -1431,9 +1438,16 @@ function ClientePublico() {
                   onChange={(e) => setEmailConsultaAgendamentos(e.target.value)}
                   style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
                 />
+                <input
+                  type="tel"
+                  placeholder={t('fidelidade_telefone_placeholder')}
+                  value={telefoneConsultaAgendamentos}
+                  onChange={(e) => setTelefoneConsultaAgendamentos(e.target.value)}
+                  style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
+                />
                 <button
-                  onClick={async () => { await buscarAgendamentosCliente(emailConsultaAgendamentos); setConsultaAgendamentosFeita(true); }}
-                  disabled={!emailConsultaAgendamentos.includes('@') || consultandoAgendamentos}
+                  onClick={async () => { await buscarAgendamentosCliente(emailConsultaAgendamentos, telefoneConsultaAgendamentos); setConsultaAgendamentosFeita(true); }}
+                  disabled={!emailConsultaAgendamentos.includes('@') || telefoneConsultaAgendamentos.replace(/\D/g, '').length < 8 || consultandoAgendamentos}
                   style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: consultandoAgendamentos ? 'wait' : 'pointer' }}
                 >
                   {consultandoAgendamentos ? '⏳' : t('fidelidade_consultar_botao')}

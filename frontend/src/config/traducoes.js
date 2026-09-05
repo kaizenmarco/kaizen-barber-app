@@ -92,7 +92,8 @@ const TEXTOS = {
     profissionais_contato: 'Contato',
 
     meusAgendamentos_titulo: 'Meus Agendamentos',
-    meusAgendamentos_nenhum: 'Nenhum agendamento futuro encontrado para esse e-mail.',
+    meusAgendamentos_nenhum: 'Nenhum agendamento futuro encontrado para esse e-mail e telefone.',
+    meusAgendamentos_identificacaoAviso: 'Informe o e-mail e o telefone usados no agendamento (os dois precisam bater com o mesmo cadastro).',
     meusAgendamentos_cancelar_botao: 'Cancelar agendamento',
     meusAgendamentos_cancelando: 'Cancelando...',
     meusAgendamentos_confirmarCancelamento: 'Tem certeza que deseja cancelar esse agendamento?',
@@ -221,7 +222,8 @@ const TEXTOS = {
     profissionais_contato: 'Contact',
 
     meusAgendamentos_titulo: 'My Appointments',
-    meusAgendamentos_nenhum: 'No upcoming appointments found for that email.',
+    meusAgendamentos_nenhum: 'No upcoming appointments found for that email and phone number.',
+    meusAgendamentos_identificacaoAviso: 'Enter the email and phone number used when booking (both need to match the same record).',
     meusAgendamentos_cancelar_botao: 'Cancel appointment',
     meusAgendamentos_cancelando: 'Cancelling...',
     meusAgendamentos_confirmarCancelamento: 'Are you sure you want to cancel this appointment?',
@@ -350,7 +352,8 @@ const TEXTOS = {
     profissionais_contato: '連絡先',
 
     meusAgendamentos_titulo: '予約管理',
-    meusAgendamentos_nenhum: 'このメールアドレスの今後の予約は見つかりませんでした。',
+    meusAgendamentos_nenhum: 'このメールアドレスと電話番号での今後の予約は見つかりませんでした。',
+    meusAgendamentos_identificacaoAviso: '予約時に使用したメールアドレスと電話番号を入力してください（両方とも同じ登録情報と一致する必要があります）。',
     meusAgendamentos_cancelar_botao: '予約をキャンセル',
     meusAgendamentos_cancelando: 'キャンセル中...',
     meusAgendamentos_confirmarCancelamento: 'この予約をキャンセルしてもよろしいですか?',
@@ -479,7 +482,8 @@ const TEXTOS = {
     profissionais_contato: 'Contacto',
 
     meusAgendamentos_titulo: 'Mis Turnos',
-    meusAgendamentos_nenhum: 'No se encontraron turnos futuros para ese correo.',
+    meusAgendamentos_nenhum: 'No se encontraron turnos futuros para ese correo y teléfono.',
+    meusAgendamentos_identificacaoAviso: 'Ingresa el correo y el teléfono usados al reservar (ambos deben coincidir con el mismo registro).',
     meusAgendamentos_cancelar_botao: 'Cancelar turno',
     meusAgendamentos_cancelando: 'Cancelando...',
     meusAgendamentos_confirmarCancelamento: '¿Seguro que querés cancelar este turno?',
