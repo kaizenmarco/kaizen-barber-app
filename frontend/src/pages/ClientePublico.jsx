@@ -472,32 +472,35 @@ function ClientePublico() {
       const clienteId = clienteEncontrado.id;
       const agoraMs = Date.now();
 
+      // Histórico completo (passado e futuro, qualquer status) — é um
+      // relatório de tudo que já foi marcado nesse cadastro, não só o que
+      // ainda vai acontecer. O cancelamento continua só valendo pros
+      // agendamentos futuros e ainda não cancelados (ver podeCancelar/futuro).
       const { data, error } = await supabase
         .from('agendamentos')
         .select('id, data_hora, status, observacoes, servicos(nome), profissionais(nome)')
         .eq('cliente_id', clienteId)
-        .neq('status', 'CANCELADO')
-        .order('data_hora', { ascending: true });
+        .order('data_hora', { ascending: false });
 
       if (error) throw error;
 
-      const futuros = (data || [])
-        .filter(a => dataHoraJstParaUtcMs(a.data_hora) > agoraMs)
-        .map(a => {
-          const minutosRestantes = (dataHoraJstParaUtcMs(a.data_hora) - agoraMs) / 60000;
-          return {
-            id: a.id,
-            data: a.data_hora.split('T')[0],
-            hora: a.data_hora.split('T')[1]?.substring(0, 5) || '',
-            status: a.status,
-            observacoes: a.observacoes,
-            servico: a.servicos?.nome || '-',
-            profissional: a.profissionais?.nome || '-',
-            podeCancelar: minutosRestantes >= LIMITE_CANCELAMENTO_MINUTOS,
-          };
-        });
+      const todos = (data || []).map(a => {
+        const minutosRestantes = (dataHoraJstParaUtcMs(a.data_hora) - agoraMs) / 60000;
+        const futuro = minutosRestantes > 0;
+        return {
+          id: a.id,
+          data: a.data_hora.split('T')[0],
+          hora: a.data_hora.split('T')[1]?.substring(0, 5) || '',
+          status: a.status,
+          observacoes: a.observacoes,
+          servico: a.servicos?.nome || '-',
+          profissional: a.profissionais?.nome || '-',
+          futuro,
+          podeCancelar: futuro && a.status !== 'CANCELADO' && minutosRestantes >= LIMITE_CANCELAMENTO_MINUTOS,
+        };
+      });
 
-      setAgendamentosDoCliente(futuros);
+      setAgendamentosDoCliente(todos);
     } catch (error) {
       console.error('Erro ao buscar agendamentos do cliente:', error);
       setAgendamentosDoCliente([]);
@@ -527,7 +530,9 @@ function ClientePublico() {
       if (error) throw error;
 
       alert(t('meusAgendamentos_cancelado_sucesso'));
-      setAgendamentosDoCliente(prev => prev.filter(a => a.id !== agendamento.id));
+      // Continua na lista (agora como histórico) em vez de sumir, já que a
+      // tela virou um relatório completo — só perde a opção de cancelar.
+      setAgendamentosDoCliente(prev => prev.map(a => (a.id === agendamento.id ? { ...a, status: 'CANCELADO', podeCancelar: false } : a)));
     } catch (error) {
       alert(t('meusAgendamentos_erro_cancelar') + error.message);
     } finally {
@@ -1458,54 +1463,99 @@ function ClientePublico() {
             {consultaAgendamentosFeita && !consultandoAgendamentos && (
               agendamentosDoCliente.length === 0 ? (
                 <p style={{ color: '#999', maxWidth: '600px' }}>{t('meusAgendamentos_nenhum')}</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '600px' }}>
-                  {agendamentosDoCliente.map(a => (
-                    <div
-                      key={a.id}
-                      style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '8px', padding: '16px' }}
-                    >
+              ) : (() => {
+                const ativo = (a) => a.futuro && a.status !== 'CANCELADO';
+                const proximos = agendamentosDoCliente.filter(ativo).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`));
+                const historico = agendamentosDoCliente.filter(a => !ativo(a));
+
+                const rotuloStatus = (status) => {
+                  if (status === 'REALIZADO') return t('meusAgendamentos_statusRealizado');
+                  if (status === 'CANCELADO') return t('meusAgendamentos_statusCancelado');
+                  if (status === 'NÃO_COMPARECEU') return t('meusAgendamentos_statusNaoCompareceu');
+                  if (status === 'CONFIRMADO') return t('meusAgendamentos_statusConfirmado');
+                  return t('meusAgendamentos_statusAgendado');
+                };
+                const corStatus = (status) => {
+                  if (status === 'REALIZADO') return '#4ade80';
+                  if (status === 'CANCELADO') return '#f87171';
+                  if (status === 'NÃO_COMPARECEU') return '#fb923c';
+                  return '#d4af37';
+                };
+
+                const Card = (a) => (
+                  <div
+                    key={a.id}
+                    style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '8px', padding: '16px' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
                       <p style={{ margin: '0 0 4px', fontSize: '16px' }}>
                         <strong style={{ color: '#d4af37' }}>{new Date(`${a.data}T00:00:00`).toLocaleDateString(localeAtual)}</strong>
                         {' · '}
                         <strong style={{ color: '#d4af37' }}>{a.hora}</strong>
                       </p>
-                      <p style={{ margin: '0 0 4px', color: '#e8e8e8' }}>{a.servico} — {a.profissional}</p>
+                      <span style={{ color: corStatus(a.status), fontSize: '11px', fontWeight: 'bold', border: `1px solid ${corStatus(a.status)}`, borderRadius: '4px', padding: '2px 8px', whiteSpace: 'nowrap' }}>
+                        {rotuloStatus(a.status)}
+                      </span>
+                    </div>
+                    <p style={{ margin: '0 0 4px', color: '#e8e8e8' }}>{a.servico} — {a.profissional}</p>
 
-                      {a.podeCancelar ? (
-                        <button
-                          onClick={() => handleCancelarAgendamento(a)}
-                          disabled={cancelandoId === a.id}
-                          style={{
-                            marginTop: '10px',
-                            background: 'transparent',
-                            color: '#f87171',
-                            border: '1px solid #f87171',
-                            padding: '8px 16px',
-                            borderRadius: '4px',
-                            fontWeight: 'bold',
-                            cursor: cancelandoId === a.id ? 'wait' : 'pointer'
-                          }}
+                    {a.podeCancelar && (
+                      <button
+                        onClick={() => handleCancelarAgendamento(a)}
+                        disabled={cancelandoId === a.id}
+                        style={{
+                          marginTop: '10px',
+                          background: 'transparent',
+                          color: '#f87171',
+                          border: '1px solid #f87171',
+                          padding: '8px 16px',
+                          borderRadius: '4px',
+                          fontWeight: 'bold',
+                          cursor: cancelandoId === a.id ? 'wait' : 'pointer'
+                        }}
+                      >
+                        {cancelandoId === a.id ? t('meusAgendamentos_cancelando') : t('meusAgendamentos_cancelar_botao')}
+                      </button>
+                    )}
+                    {ativo(a) && !a.podeCancelar && (
+                      <div style={{ marginTop: '10px', background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px' }}>
+                        <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f97316' }}>{t('meusAgendamentos_menosDe2h')}</p>
+                        <a
+                          href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366', display: 'inline-flex' }}
                         >
-                          {cancelandoId === a.id ? t('meusAgendamentos_cancelando') : t('meusAgendamentos_cancelar_botao')}
-                        </button>
+                          <FaWhatsapp size={16} /> WhatsApp
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+
+                return (
+                  <div style={{ maxWidth: '600px' }}>
+                    {proximos.length > 0 && (
+                      <div style={{ marginBottom: '26px' }}>
+                        <h3 style={{ color: '#d4af37', fontSize: '15px', marginBottom: '10px' }}>{t('meusAgendamentos_proximos')}</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          {proximos.map(Card)}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <h3 style={{ color: '#d4af37', fontSize: '15px', marginBottom: '10px' }}>{t('meusAgendamentos_historico')}</h3>
+                      {historico.length === 0 ? (
+                        <p style={{ color: '#999', fontSize: '13px' }}>{t('meusAgendamentos_semHistorico')}</p>
                       ) : (
-                        <div style={{ marginTop: '10px', background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px' }}>
-                          <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f97316' }}>{t('meusAgendamentos_menosDe2h')}</p>
-                          <a
-                            href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366', display: 'inline-flex' }}
-                          >
-                            <FaWhatsapp size={16} /> WhatsApp
-                          </a>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          {historico.map(Card)}
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              )
+                  </div>
+                );
+              })()
             )}
           </section>
         )}
