@@ -1,10 +1,56 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { suportaPush, buscarInscricaoAtual, ativarNotificacoesPush, desativarNotificacoesPush } from '../config/pushNotificacoes';
 
 // Painel do botão "Mais" do menu inferior. Reúne as telas que não têm
 // espaço fixo na barra (Dashboard, Profissionais, Comandas, Fidelidade,
-// Ordem de Chegada) + idioma e logout — o que antes vivia espalhado na
-// barra lateral longa.
+// Ordem de Chegada) + idioma, notificações push e logout — o que antes
+// vivia espalhado na barra lateral longa.
 function MenuMais({ itens, aoSelecionarItem, t, SeletorIdioma, perfil, sessionUser, aoSair }) {
+  const [inscricaoAtiva, setInscricaoAtiva] = useState(false);
+  const [carregandoInscricao, setCarregandoInscricao] = useState(true);
+  const [processandoPush, setProcessandoPush] = useState(false);
+
+  useEffect(() => {
+    let cancelado = false;
+    if (!suportaPush()) {
+      setCarregandoInscricao(false);
+      return;
+    }
+    buscarInscricaoAtual().then(inscricao => {
+      if (!cancelado) {
+        setInscricaoAtiva(!!inscricao);
+        setCarregandoInscricao(false);
+      }
+    });
+    return () => { cancelado = true; };
+  }, []);
+
+  const handleAtivarPush = async () => {
+    setProcessandoPush(true);
+    try {
+      await ativarNotificacoesPush(sessionUser?.id);
+      setInscricaoAtiva(true);
+    } catch (erro) {
+      if (erro.message === 'SEM_SUPORTE') alert(t('notificacoes.push.naoSuportado'));
+      else if (erro.message === 'PERMISSAO_NEGADA') alert(t('notificacoes.push.permissaoNegada'));
+      else alert(t('notificacoes.push.erro', { msg: erro.message }));
+    } finally {
+      setProcessandoPush(false);
+    }
+  };
+
+  const handleDesativarPush = async () => {
+    setProcessandoPush(true);
+    try {
+      await desativarNotificacoesPush();
+      setInscricaoAtiva(false);
+    } catch (erro) {
+      alert(t('notificacoes.push.erro', { msg: erro.message }));
+    } finally {
+      setProcessandoPush(false);
+    }
+  };
+
   return (
     <div className="menu-mais-lista page-container">
       <h2>{t('menu.titulo')}</h2>
@@ -21,6 +67,25 @@ function MenuMais({ itens, aoSelecionarItem, t, SeletorIdioma, perfil, sessionUs
           </button>
         ))}
       </div>
+
+      {!carregandoInscricao && suportaPush() && (
+        <div className="menu-mais-push-card">
+          <h3 style={{ color: '#d4af37', fontSize: '14px', margin: '0 0 6px' }}>🔔 {t('notificacoes.push.titulo')}</h3>
+          <p style={{ color: '#999', fontSize: '12px', margin: '0 0 10px' }}>{t('notificacoes.push.descricao')}</p>
+          {inscricaoAtiva ? (
+            <>
+              <p style={{ color: '#4ade80', fontSize: '12px', margin: '0 0 10px' }}>{t('notificacoes.push.ativado')}</p>
+              <button type="button" className="menu-mais-push-btn desativar" onClick={handleDesativarPush} disabled={processandoPush}>
+                {t('notificacoes.push.desativar')}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="menu-mais-push-btn" onClick={handleAtivarPush} disabled={processandoPush}>
+              {processandoPush ? t('notificacoes.push.ativando') : t('notificacoes.push.ativar')}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="menu-mais-rodape">
         <SeletorIdioma estilo={{ marginBottom: '16px' }} />

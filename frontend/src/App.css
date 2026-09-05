@@ -490,6 +490,31 @@ body {
   padding-top: 20px;
 }
 
+.menu-mais-push-card {
+  background: var(--secondary-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.menu-mais-push-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--accent-gold);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.menu-mais-push-btn.desativar {
+  background: transparent;
+  border: 1px solid #f87171;
+  color: #f87171;
+}
+
 /* ============================================================================
    Tela de Agenda (dia) — seletor de dias, avatares de profissional e grade
    horária. Ver pages/Agendamentos.jsx.
