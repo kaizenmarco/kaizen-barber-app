@@ -9,6 +9,7 @@ import Aniversariantes from './tenant/Aniversariantes';
 import Profissionais from './tenant/Profissionais';
 import Servicos from './tenant/Servicos';
 import Visual from './tenant/Visual';
+import HorariosProfissionais from './tenant/HorariosProfissionais';
 
 // Painel administrativo MULTI-TENANT do Kaizen Flow App — versão inicial,
 // com as telas que já funcionam sem depender de cadastro de serviços /
@@ -28,6 +29,7 @@ const ABAS = [
   { key: 'profissionais', label: 'Profissionais', icone: '💈' },
   { key: 'servicos', label: 'Serviços', icone: '✂️' },
   { key: 'visual', label: 'Identidade Visual', icone: '🎨' },
+  { key: 'horarios', label: 'Horário de Trabalho', icone: '🕒' },
 ];
 
 const estilos = {
@@ -178,6 +180,7 @@ function PainelPrincipal({ perfil, empresa, aoSair }) {
         {abaSelecionada === 'profissionais' && <Profissionais empresa={empresa} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'servicos' && <Servicos empresa={empresa} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'visual' && <Visual empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'horarios' && <HorariosProfissionais />}
       </main>
 
       <nav style={estilos.nav}>
