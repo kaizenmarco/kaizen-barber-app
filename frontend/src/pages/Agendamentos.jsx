@@ -168,6 +168,13 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     motivo: ''
   });
 
+  // Bloqueio rápido: clicar direto num horário vazio da timeline do dia
+  // já abre este popup pré-preenchido (profissional/data/hora vêm de onde
+  // clicou) — só falta confirmar o período e, se quiser, o motivo.
+  const [bloqueioRapido, setBloqueioRapido] = useState(null);
+  const [salvandoBloqueioRapido, setSalvandoBloqueioRapido] = useState(false);
+  const DURACAO_PADRAO_BLOQUEIO_RAPIDO = 30; // minutos
+
   // Sentinela usado para representar "dia inteiro" — cobre de sobra o
   // horário de funcionamento do salão (ver getSlotsLivresNoDia), então
   // nenhum slot sobra livre naquele dia, sem precisar saber o horário exato.
@@ -494,6 +501,54 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       buscarBloqueios();
     } catch (error) {
       alert(t('agendamentos.erroDeletarBloqueio', { msg: error.message }));
+    }
+  };
+
+  // Abre o popup de bloqueio rápido já com profissional/data/hora
+  // preenchidos a partir de onde a pessoa clicou na timeline do dia.
+  const abrirBloqueioRapido = (minutosClicados) => {
+    const inicioArredondado = Math.floor(minutosClicados / SLOT_MINUTOS) * SLOT_MINUTOS;
+    const inicio = Math.min(Math.max(inicioArredondado, aberturaMinDia), Math.max(aberturaMinDia, fechamentoMinDia - SLOT_MINUTOS));
+    const fim = Math.min(fechamentoMinDia, inicio + DURACAO_PADRAO_BLOQUEIO_RAPIDO);
+    setBloqueioRapido({
+      profissionalId: abaProfissional,
+      data: diaSelecionado,
+      horaInicio: paraHHMM(inicio),
+      horaFim: paraHHMM(fim),
+      motivo: ''
+    });
+  };
+
+  const fecharBloqueioRapido = () => setBloqueioRapido(null);
+
+  const handleConfirmarBloqueioRapido = async () => {
+    if (!bloqueioRapido.horaInicio || !bloqueioRapido.horaFim) {
+      alert(t('agendamentos.preencherObrigatorios'));
+      return;
+    }
+    if (paraMinutos(bloqueioRapido.horaFim) <= paraMinutos(bloqueioRapido.horaInicio)) {
+      alert(t('agendamentos.horarioFimAntesInicio'));
+      return;
+    }
+
+    setSalvandoBloqueioRapido(true);
+    try {
+      const { error } = await supabase.from('bloqueios_horario').insert([{
+        profissional_id: bloqueioRapido.profissionalId,
+        data: bloqueioRapido.data,
+        horario_inicio: bloqueioRapido.horaInicio,
+        horario_fim: bloqueioRapido.horaFim,
+        motivo: bloqueioRapido.motivo || null
+      }]);
+
+      if (error) throw error;
+
+      setBloqueioRapido(null);
+      buscarBloqueios();
+    } catch (error) {
+      alert(t('agendamentos.erroCriarBloqueio', { msg: error.message }));
+    } finally {
+      setSalvandoBloqueioRapido(false);
     }
   };
 
@@ -1368,7 +1423,19 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                   style={{
                     backgroundImage:
                       `repeating-linear-gradient(to bottom, rgba(212,175,55,0.35) 0, rgba(212,175,55,0.35) 1px, transparent 1px, transparent ${SLOT_ALTURA_PX * 4}px),` +
-                      `repeating-linear-gradient(to bottom, var(--border-color) 0, var(--border-color) 1px, transparent 1px, transparent ${SLOT_ALTURA_PX}px)`
+                      `repeating-linear-gradient(to bottom, var(--border-color) 0, var(--border-color) 1px, transparent 1px, transparent ${SLOT_ALTURA_PX}px)`,
+                    cursor: 'pointer'
+                  }}
+                  title={t('agendamentos.cliqueParaBloquear')}
+                  onClick={(e) => {
+                    // Só abre o bloqueio rápido se o clique foi no fundo vazio
+                    // da grade — clicar em cima de um agendamento/bloqueio já
+                    // tem sua própria ação (abrir detalhes, deletar etc.).
+                    if (e.target !== e.currentTarget) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const offsetY = e.clientY - rect.top;
+                    const minutosClicados = aberturaMinDia + (offsetY / SLOT_ALTURA_PX) * SLOT_MINUTOS;
+                    abrirBloqueioRapido(minutosClicados);
                   }}
                 >
                   {itensTimeline.map(item => {
@@ -2516,6 +2583,67 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
               disabled={salvandoCancelamento}
             >
               {salvandoCancelamento ? t('comum.salvando') : t('agendamentos.confirmarCancelamento')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Bloqueio rápido (clique direto na timeline do Dia) ==================== */}
+      {bloqueioRapido && (
+        <div
+          onClick={fecharBloqueioRapido}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 1220, padding: '20px', paddingTop: 'calc(20px + env(safe-area-inset-top))', overflowY: 'auto'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '10px', padding: '22px', maxWidth: '400px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <h3 style={{ color: '#d4af37', margin: 0 }}>🚫 {t('agendamentos.bloquearHorarioRapido')}</h3>
+              <button onClick={fecharBloqueioRapido} style={{ background: 'transparent', border: '1px solid #d4af37', color: '#d4af37', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontWeight: 'bold' }}>
+                ✕
+              </button>
+            </div>
+            <p style={{ color: '#999', fontSize: '12px', marginBottom: '16px' }}>
+              {profissionaisLista.find(p => p.uuid === bloqueioRapido.profissionalId)?.nome} · {new Date(`${bloqueioRapido.data}T00:00:00`).toLocaleDateString(locale)}
+            </p>
+
+            <label className="detalhe-campo-label" style={{ display: 'block', marginBottom: '6px' }}>{t('agendamentos.periodoBloqueio')}</label>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <input
+                type="time"
+                value={bloqueioRapido.horaInicio}
+                onChange={(e) => setBloqueioRapido(prev => ({ ...prev, horaInicio: e.target.value }))}
+                style={{ flex: 1, padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+              />
+              <span style={{ color: '#999', alignSelf: 'center' }}>–</span>
+              <input
+                type="time"
+                value={bloqueioRapido.horaFim}
+                onChange={(e) => setBloqueioRapido(prev => ({ ...prev, horaFim: e.target.value }))}
+                style={{ flex: 1, padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+              />
+            </div>
+
+            <label className="detalhe-campo-label" style={{ display: 'block', marginBottom: '6px' }}>{t('agendamentos.motivoBloqueioOpcional')}</label>
+            <textarea
+              className="detalhe-notas-textarea"
+              value={bloqueioRapido.motivo}
+              onChange={(e) => setBloqueioRapido(prev => ({ ...prev, motivo: e.target.value }))}
+              placeholder={t('agendamentos.motivoBloqueioPlaceholder')}
+            />
+
+            <button
+              className="btn-primary"
+              style={{ marginTop: '14px', width: '100%' }}
+              onClick={handleConfirmarBloqueioRapido}
+              disabled={salvandoBloqueioRapido}
+            >
+              {salvandoBloqueioRapido ? t('comum.salvando') : t('agendamentos.confirmarBloqueio')}
             </button>
           </div>
         </div>
