@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
+import { enviarImagemTenant } from '../../config/uploadImagemTenant';
 
 // Cadastro de serviços MULTI-TENANT: cada empresa cadastra seu próprio
-// catálogo (nome, preço, duração) — empresa_id é preenchido automaticamente
-// pelo banco (default private.empresa_atual()), isolado por RLS, mesmo
-// padrão de Profissionais/Clientes. É esse catálogo que a Agenda vai usar
-// (etapa seguinte) em vez do arquivo fixo config/servicos.js do app
+// catálogo (nome, preço, duração, foto) — empresa_id é preenchido
+// automaticamente pelo banco (default private.empresa_atual()), isolado por
+// RLS, mesmo padrão de Profissionais/Clientes. É esse catálogo que a Agenda
+// vai usar (etapa seguinte) em vez do arquivo fixo config/servicos.js do app
 // original de UMA barbearia só.
 //
 // Preço aceita uma faixa (mínimo/máximo) em vez de um valor único — o banco
@@ -19,6 +20,10 @@ import { supabase } from '../../config/supabaseClientTenant';
 // diferentes dentro da mesma conta, isso pode virar um seletor por serviço;
 // por ora um catálogo por empresa já resolve, já que moeda é definida por
 // empresa lá no /cadastro.
+//
+// Foto (imagem_url) vai pro bucket compartilhado "empresas-imagens",
+// isolado por empresa — mesmo mecanismo já usado no app original pra
+// Serviços/Produtos/Pacotes.
 
 const SIMBOLO_MOEDA = { brl: 'R$', jpy: '¥' };
 
@@ -34,10 +39,11 @@ function formatarPreco(servico, moeda) {
   return formatarValor(min, moeda);
 }
 
-function Servicos({ empresa }) {
+function Servicos({ empresa, empresaId }) {
   const moeda = empresa?.moeda === 'jpy' ? 'jpy' : 'brl';
   const simbolo = SIMBOLO_MOEDA[moeda];
   const casasDecimais = moeda === 'jpy' ? '1' : '0.01';
+
   const [servicos, setServicos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -49,6 +55,8 @@ function Servicos({ empresa }) {
     preco_maximo: '',
     duracao_minutos: '',
   });
+  const [arquivoImagem, setArquivoImagem] = useState(null);
+  const [trocandoFotoId, setTrocandoFotoId] = useState(null);
 
   useEffect(() => {
     buscarServicos();
@@ -60,7 +68,7 @@ function Servicos({ empresa }) {
     try {
       const { data, error } = await supabase
         .from('servicos')
-        .select('id, nome, descricao, preco_minimo, preco_maximo, duracao_minutos, criado_em')
+        .select('id, nome, descricao, preco_minimo, preco_maximo, duracao_minutos, imagem_url, criado_em')
         .eq('eh_pacote', false)
         .order('criado_em', { ascending: false });
       if (error) throw error;
@@ -95,6 +103,10 @@ function Servicos({ empresa }) {
     setSalvando(true);
     setErro('');
     try {
+      let imagemUrl = null;
+      if (arquivoImagem) {
+        imagemUrl = await enviarImagemTenant(empresaId, arquivoImagem, 'servicos');
+      }
       const { error } = await supabase.from('servicos').insert([
         {
           nome: novo.nome.trim(),
@@ -102,15 +114,33 @@ function Servicos({ empresa }) {
           preco_minimo: Number(novo.preco_minimo),
           preco_maximo: novo.preco_maximo !== '' ? Number(novo.preco_maximo) : null,
           duracao_minutos: novo.duracao_minutos !== '' ? Number(novo.duracao_minutos) : null,
+          imagem_url: imagemUrl,
         },
       ]);
       if (error) throw error;
       setNovo({ nome: '', descricao: '', preco_minimo: '', preco_maximo: '', duracao_minutos: '' });
+      setArquivoImagem(null);
       buscarServicos();
     } catch (e) {
       setErro(`Não consegui adicionar: ${e.message}`);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const handleTrocarFoto = async (id, arquivo) => {
+    if (!arquivo) return;
+    setTrocandoFotoId(id);
+    setErro('');
+    try {
+      const imagemUrl = await enviarImagemTenant(empresaId, arquivo, 'servicos');
+      const { error } = await supabase.from('servicos').update({ imagem_url: imagemUrl }).eq('id', id);
+      if (error) throw error;
+      buscarServicos();
+    } catch (e) {
+      setErro(`Não consegui trocar a foto: ${e.message}`);
+    } finally {
+      setTrocandoFotoId(null);
     }
   };
 
@@ -178,6 +208,14 @@ function Servicos({ empresa }) {
             value={novo.duracao_minutos}
             onChange={handleInputChange}
           />
+          <label style={{ display: 'block', fontSize: '12px', color: '#999', marginTop: '10px', marginBottom: '4px' }}>
+            Foto (opcional)
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setArquivoImagem(e.target.files?.[0] || null)}
+          />
           <button type="submit" className="btn-primary" disabled={salvando}>
             {salvando ? 'Salvando...' : 'Adicionar serviço'}
           </button>
@@ -196,6 +234,7 @@ function Servicos({ empresa }) {
             <table className="table">
               <thead>
                 <tr>
+                  <th>Foto</th>
                   <th>Nome</th>
                   <th>Descrição</th>
                   <th>Preço ({simbolo})</th>
@@ -206,6 +245,28 @@ function Servicos({ empresa }) {
               <tbody>
                 {servicos.map((s) => (
                   <tr key={s.id}>
+                    <td>
+                      {s.imagem_url ? (
+                        <img
+                          src={s.imagem_url}
+                          alt={s.nome}
+                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px' }}
+                      />
+                      ) : (
+                        <span style={{ color: '#666', fontSize: '12px' }}>-</span>
+                      )}
+                      <br />
+                      <label style={{ fontSize: '11px', color: '#d4af37', cursor: 'pointer' }}>
+                        {trocandoFotoId === s.id ? 'Enviando...' : 'Trocar foto'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={trocandoFotoId === s.id}
+                          onChange={(e) => handleTrocarFoto(s.id, e.target.files?.[0])}
+                        />
+                      </label>
+                    </td>
                     <td style={{ fontWeight: 'bold' }}>{s.nome}</td>
                     <td>{s.descricao || '-'}</td>
                     <td>{formatarPreco(s, moeda)}</td>

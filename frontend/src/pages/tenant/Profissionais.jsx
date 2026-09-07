@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
+import { enviarImagemTenant } from '../../config/uploadImagemTenant';
 
 // Cadastro de profissionais MULTI-TENANT: cada empresa vê e gerencia só os
 // seus próprios profissionais (empresa_id preenchido automaticamente pelo
 // banco, isolado por RLS — mesmo padrão de Clientes/Dashboard). Ainda não
 // cria um login separado para o profissional entrar sozinho no sistema —
 // isso fica para uma etapa futura; por enquanto é só o cadastro (nome,
-// telefone, comissão) que a Agenda/Comandas vão usar quando existirem.
+// telefone, comissão, foto) que a Agenda/Comandas vão usar quando existirem.
 //
 // O limite de quantos profissionais podem ser cadastrados é amarrado ao
 // que a empresa realmente contratou no Stripe: 1 profissional incluído no
 // Básico/Intermediário + os adicionais pagos (profissionais_extras); o
 // Completo não tem limite.
+//
+// A foto (imagem_url) substitui o campo fixo do app original
+// (config/profissionais.js, ex: '/images/marco.jpg') — vai pro bucket
+// compartilhado "empresas-imagens", isolado por empresa.
 
 const PROFISSIONAIS_INCLUIDOS_POR_PLANO = {
   basico: 1,
@@ -25,12 +30,14 @@ function calcularLimite(empresa) {
   return incluidos + (empresa?.profissionais_extras || 0);
 }
 
-function Profissionais({ empresa }) {
+function Profissionais({ empresa, empresaId }) {
   const [profissionais, setProfissionais] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [novo, setNovo] = useState({ nome: '', telefone: '', comissao_percentual: '' });
+  const [arquivoImagem, setArquivoImagem] = useState(null);
+  const [trocandoFotoId, setTrocandoFotoId] = useState(null);
 
   const limite = calcularLimite(empresa);
   const limiteAtingido = Number.isFinite(limite) && profissionais.length >= limite;
@@ -45,7 +52,7 @@ function Profissionais({ empresa }) {
     try {
       const { data, error } = await supabase
         .from('profissionais')
-        .select('id, nome, telefone, comissao_percentual, criado_em')
+        .select('id, nome, telefone, comissao_percentual, imagem_url, criado_em')
         .order('criado_em', { ascending: false });
       if (error) throw error;
       setProfissionais(data || []);
@@ -75,20 +82,42 @@ function Profissionais({ empresa }) {
     setSalvando(true);
     setErro('');
     try {
+      let imagemUrl = null;
+      if (arquivoImagem) {
+        imagemUrl = await enviarImagemTenant(empresaId, arquivoImagem, 'profissionais');
+      }
       const { error } = await supabase.from('profissionais').insert([
         {
           nome: novo.nome.trim(),
           telefone: novo.telefone.trim() || null,
           comissao_percentual: novo.comissao_percentual ? Number(novo.comissao_percentual) : null,
+          imagem_url: imagemUrl,
         },
       ]);
       if (error) throw error;
       setNovo({ nome: '', telefone: '', comissao_percentual: '' });
+      setArquivoImagem(null);
       buscarProfissionais();
     } catch (e) {
       setErro(`Não consegui adicionar: ${e.message}`);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const handleTrocarFoto = async (id, arquivo) => {
+    if (!arquivo) return;
+    setTrocandoFotoId(id);
+    setErro('');
+    try {
+      const imagemUrl = await enviarImagemTenant(empresaId, arquivo, 'profissionais');
+      const { error } = await supabase.from('profissionais').update({ imagem_url: imagemUrl }).eq('id', id);
+      if (error) throw error;
+      buscarProfissionais();
+    } catch (e) {
+      setErro(`Não consegui trocar a foto: ${e.message}`);
+    } finally {
+      setTrocandoFotoId(null);
     }
   };
 
@@ -154,6 +183,15 @@ function Profissionais({ empresa }) {
             onChange={handleInputChange}
             disabled={limiteAtingido}
           />
+          <label style={{ display: 'block', fontSize: '12px', color: '#999', marginTop: '10px', marginBottom: '4px' }}>
+            Foto (opcional)
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setArquivoImagem(e.target.files?.[0] || null)}
+            disabled={limiteAtingido}
+          />
           <button type="submit" className="btn-primary" disabled={salvando || limiteAtingido}>
             {salvando ? 'Salvando...' : 'Adicionar profissional'}
           </button>
@@ -178,6 +216,7 @@ function Profissionais({ empresa }) {
             <table className="table">
               <thead>
                 <tr>
+                  <th>Foto</th>
                   <th>Nome</th>
                   <th>Telefone</th>
                   <th>Comissão</th>
@@ -187,6 +226,28 @@ function Profissionais({ empresa }) {
               <tbody>
                 {profissionais.map((p) => (
                   <tr key={p.id}>
+                    <td>
+                      {p.imagem_url ? (
+                        <img
+                          src={p.imagem_url}
+                          alt={p.nome}
+                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '50%' }}
+                        />
+                      ) : (
+                        <span style={{ color: '#666', fontSize: '12px' }}>-</span>
+                      )}
+                      <br />
+                      <label style={{ fontSize: '11px', color: '#d4af37', cursor: 'pointer' }}>
+                        {trocandoFotoId === p.id ? 'Enviando...' : 'Trocar foto'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={trocandoFotoId === p.id}
+                          onChange={(e) => handleTrocarFoto(p.id, e.target.files?.[0])}
+                        />
+                      </label>
+                    </td>
                     <td style={{ fontWeight: 'bold' }}>{p.nome}</td>
                     <td>{p.telefone || '-'}</td>
                     <td>{p.comissao_percentual != null ? `${p.comissao_percentual}%` : '-'}</td>

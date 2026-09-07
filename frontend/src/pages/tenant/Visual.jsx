@@ -1,0 +1,162 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../config/supabaseClientTenant';
+import { enviarImagemTenant } from '../../config/uploadImagemTenant';
+
+// Personalização visual da empresa: logo e fotos do salão. Antes era
+// pensado como exclusivo do plano Completo (ver migration
+// 009_personalizacao_visual_plano_completo), mas foi liberado pra todos os
+// planos. Os arquivos vão pro bucket compartilhado "empresas-imagens",
+// sempre dentro da pasta da própria empresa; e como empresas.status/plano
+// não podem ser alterados pelo tenant (só o Super Admin/Stripe), salvar
+// logo_url/imagens_local passa pela function private.atualizar_visual_empresa
+// em vez de um update direto na tabela.
+
+function Visual({ empresaId }) {
+  const [logoUrl, setLogoUrl] = useState('');
+  const [fotos, setFotos] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [enviandoLogo, setEnviandoLogo] = useState(false);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    buscarVisual();
+  }, []);
+
+  const buscarVisual = async () => {
+    setCarregando(true);
+    setErro('');
+    try {
+      const { data, error } = await supabase
+        .from('empresas')
+        .select('logo_url, imagens_local')
+        .eq('id', empresaId)
+        .maybeSingle();
+      if (error) throw error;
+      setLogoUrl(data?.logo_url || '');
+      setFotos(data?.imagens_local || []);
+    } catch (e) {
+      setErro(`Não consegui carregar a personalização visual: ${e.message}`);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const salvar = async (novoLogoUrl, novasFotos) => {
+    const { error } = await supabase.rpc('atualizar_visual_empresa', {
+      p_logo_url: novoLogoUrl,
+      p_imagens_local: novasFotos,
+    });
+    if (error) throw error;
+  };
+
+  const handleTrocarLogo = async (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setEnviandoLogo(true);
+    setErro('');
+    try {
+      const url = await enviarImagemTenant(empresaId, arquivo, 'logo');
+      await salvar(url, fotos);
+      setLogoUrl(url);
+    } catch (e2) {
+      setErro(`Não consegui enviar o logo: ${e2.message}`);
+    } finally {
+      setEnviandoLogo(false);
+    }
+  };
+
+  const handleAdicionarFoto = async (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setEnviandoFoto(true);
+    setErro('');
+    try {
+      const url = await enviarImagemTenant(empresaId, arquivo, 'salao');
+      const novasFotos = [...fotos, url];
+      await salvar(logoUrl, novasFotos);
+      setFotos(novasFotos);
+    } catch (e2) {
+      setErro(`Não consegui enviar a foto: ${e2.message}`);
+    } finally {
+      setEnviandoFoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoverFoto = async (url) => {
+    if (!window.confirm('Remover esta foto?')) return;
+    const novasFotos = fotos.filter((f) => f !== url);
+    try {
+      await salvar(logoUrl, novasFotos);
+      setFotos(novasFotos);
+    } catch (e) {
+      setErro(`Não consegui remover: ${e.message}`);
+    }
+  };
+
+  if (carregando) {
+    return (
+      <div className="page-container">
+        <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-container">
+      <h2>Identidade visual</h2>
+
+      <section className="form-section">
+        <h3>Logo da barbearia</h3>
+        <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
+          Aparece no seu painel e no site público de agendamento.
+        </p>
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt="Logo atual"
+            style={{ width: '96px', height: '96px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #333', marginBottom: '12px', display: 'block' }}
+          />
+        )}
+        <input type="file" accept="image/*" onChange={handleTrocarLogo} disabled={enviandoLogo} />
+        {enviandoLogo && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>Enviando...</p>}
+      </section>
+
+      <section className="list-section">
+        <h3>Fotos do salão</h3>
+        <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
+          Fotos do ambiente, usadas no site público de agendamento (aba Endereço/Sobre).
+        </p>
+        <input type="file" accept="image/*" onChange={handleAdicionarFoto} disabled={enviandoFoto} />
+        {enviandoFoto && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>Enviando...</p>}
+
+        {fotos.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999', marginTop: '14px' }}>Nenhuma foto adicionada ainda.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '14px' }}>
+            {fotos.map((url) => (
+              <div key={url} style={{ position: 'relative' }}>
+                <img
+                  src={url}
+                  alt="Foto do salão"
+                  style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid #333' }}
+                />
+                <button
+                  onClick={() => handleRemoverFoto(url)}
+                  style={{ position: 'absolute', top: '4px', right: '4px', background: '#1a1a1a', border: '1px solid #f87171', color: '#f87171', borderRadius: '6px', fontSize: '11px', padding: '2px 6px', cursor: 'pointer' }}
+                >
+                  🗑️
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {erro && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>{erro}</p>}
+      </section>
+    </div>
+  );
+}
+
+export default Visual;
