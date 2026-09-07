@@ -11,12 +11,13 @@ import Servicos from './tenant/Servicos';
 import Visual from './tenant/Visual';
 import HorariosProfissionais from './tenant/HorariosProfissionais';
 import Agenda from './tenant/Agenda';
+import Comandas from './tenant/Comandas';
+import Caixa from './tenant/Caixa';
 
-// Painel administrativo MULTI-TENANT do Kaizen Flow App — versão inicial,
-// com as telas que já funcionam sem depender de cadastro de serviços /
-// profissionais próprio (isso ainda vem hardcoded do app original e será
-// resolvido numa próxima etapa). Agenda, Caixa, Comandas e Profissionais
-// ainda não estão aqui.
+// Painel administrativo MULTI-TENANT do Kaizen Flow App — Dashboard,
+// Clientes, Fidelidade, Aniversariantes, Profissionais, Serviços, Identidade
+// Visual, Horário de Trabalho, Agenda, Comandas e Caixa já portados; falta
+// OrdemChegada e a página pública de agendamento (slug/subdomínio).
 //
 // Login separado do /admin (que continua servindo só a barbearia do
 // Marco, no projeto de produção antigo) — aqui a autenticação e os dados
@@ -32,6 +33,8 @@ const ABAS = [
   { key: 'visual', label: 'Identidade Visual', icone: '🎨' },
   { key: 'horarios', label: 'Horário de Trabalho', icone: '🕒' },
   { key: 'agenda', label: 'Agenda', icone: '📅' },
+  { key: 'comandas', label: 'Comandas', icone: '🧾' },
+  { key: 'caixa', label: 'Caixa', icone: '💰' },
 ];
 
 const estilos = {
@@ -184,6 +187,8 @@ function PainelPrincipal({ perfil, empresa, aoSair }) {
         {abaSelecionada === 'visual' && <Visual empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'horarios' && <HorariosProfissionais />}
         {abaSelecionada === 'agenda' && <Agenda empresa={empresa} />}
+        {abaSelecionada === 'comandas' && <Comandas empresa={empresa} />}
+        {abaSelecionada === 'caixa' && <Caixa empresa={empresa} />}
       </main>
 
       <nav style={estilos.nav}>
