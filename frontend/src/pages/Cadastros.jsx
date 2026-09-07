@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import { VENDAS_PACOTES_MOCK } from '../data/cadastrosMockData';
+import { formatarDiasSemanaPt } from '../config/promocoes';
+
+const DIAS_SEMANA_OPCOES = [0, 1, 2, 3, 4, 5, 6]; // 0=domingo..6=sábado (extract(dow) do Postgres)
+const CHAVES_DIA = ['diaDom', 'diaSeg', 'diaTer', 'diaQua', 'diaQui', 'diaSex', 'diaSab'];
 
 // ============================================================================
 // Módulo de Cadastros — Menu principal (Serviços / Produtos / Pacotes) que
@@ -105,6 +109,14 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
 
   const [vendasPacotes, setVendasPacotes] = useState(VENDAS_PACOTES_MOCK);
 
+  // Promoções (pausáveis/retomáveis) têm sua própria tabela "promocoes" — o
+  // preço/pontos-de-fidelidade são aplicados automaticamente pelo banco em
+  // qualquer agendamento (público ou criado aqui no Admin) que se encaixe
+  // nos dias/horário configurados (ver config/promocoes.js).
+  const [promocoes, setPromocoes] = useState([]);
+  const [carregandoPromocoes, setCarregandoPromocoes] = useState(true);
+  const [salvandoPromocao, setSalvandoPromocao] = useState(false);
+
   const [modalAberto, setModalAberto] = useState(false);
   const [itemEditando, setItemEditando] = useState(null); // null = criando novo
   const [formModal, setFormModal] = useState({});
@@ -184,10 +196,41 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     }
   };
 
+  const buscarPromocoesAdmin = async () => {
+    setCarregandoPromocoes(true);
+    try {
+      const { data, error } = await supabase
+        .from('promocoes')
+        .select('id, nome, descricao, servico_id, tipo_desconto, valor_desconto, dias_semana, hora_inicio, hora_fim, pontos_fidelidade, ativo, data_inicio, data_fim')
+        .order('nome');
+      if (error) throw error;
+      setPromocoes((data || []).map(row => ({
+        id: row.id,
+        nome: row.nome,
+        descricao: row.descricao || '',
+        servicoId: row.servico_id || '',
+        tipoDesconto: row.tipo_desconto,
+        valorDesconto: row.valor_desconto != null ? Number(row.valor_desconto) : 0,
+        diasSemana: row.dias_semana || [],
+        horaInicio: (row.hora_inicio || '').substring(0, 5),
+        horaFim: (row.hora_fim || '').substring(0, 5),
+        pontosFidelidade: row.pontos_fidelidade !== false,
+        ativo: row.ativo !== false,
+        dataInicio: row.data_inicio || '',
+        dataFim: row.data_fim || ''
+      })));
+    } catch (error) {
+      alert(t('cadastros.erroCarregarPromocoes', { msg: error.message }));
+    } finally {
+      setCarregandoPromocoes(false);
+    }
+  };
+
   useEffect(() => {
     buscarServicosAdmin();
     buscarProdutosAdmin();
     buscarMeusPacotesAdmin();
+    buscarPromocoesAdmin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -214,13 +257,21 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
       setFormModal({ nome: '', descricao: '', preco: '', quantidadeSessoes: '', validadeDias: '', ativo: true, imagemUrl: '', imagemArquivo: null, imagemPreview: '' });
     } else if (tela === 'vendaPacotes') {
       setFormModal({ cliente: '', pacote: meusPacotes[0]?.nome || '', dataVenda: new Date().toISOString().split('T')[0], sessoesRestantes: '' });
+    } else if (tela === 'promocoes') {
+      setFormModal({
+        nome: '', descricao: '', servicoId: '', tipoDesconto: 'preco_fixo', valorDesconto: '',
+        diasSemana: [], horaInicio: '', horaFim: '', pontosFidelidade: false, ativo: true,
+        dataInicio: '', dataFim: ''
+      });
     }
     setModalAberto(true);
   };
 
   const abrirEditar = (item) => {
     setItemEditando(item);
-    if (TELAS_COM_IMAGEM.includes(tela)) {
+    if (tela === 'promocoes') {
+      setFormModal({ ...item, valorDesconto: item.valorDesconto != null ? String(item.valorDesconto) : '' });
+    } else if (TELAS_COM_IMAGEM.includes(tela)) {
       setFormModal({
         nome: item.nome,
         descricao: item.descricao || '',
@@ -370,6 +421,74 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     }
   };
 
+  const salvarModalPromocao = async () => {
+    if (!formModal.nome?.trim()) {
+      alert(t('cadastros.nomeObrigatorio'));
+      return;
+    }
+    if (!(formModal.diasSemana || []).length) {
+      alert(t('cadastros.diasSemanaObrigatorio'));
+      return;
+    }
+    if (!formModal.horaInicio || !formModal.horaFim) {
+      alert(t('cadastros.horarioObrigatorio'));
+      return;
+    }
+    setSalvandoPromocao(true);
+    try {
+      const payload = {
+        nome: formModal.nome.trim(),
+        descricao: formModal.descricao || null,
+        servico_id: formModal.servicoId || null,
+        tipo_desconto: formModal.tipoDesconto || 'preco_fixo',
+        valor_desconto: Number(formModal.valorDesconto) || 0,
+        dias_semana: formModal.diasSemana || [],
+        hora_inicio: formModal.horaInicio,
+        hora_fim: formModal.horaFim,
+        pontos_fidelidade: formModal.pontosFidelidade === true,
+        ativo: formModal.ativo !== false,
+        data_inicio: formModal.dataInicio || null,
+        data_fim: formModal.dataFim || null
+      };
+
+      if (itemEditando) {
+        const { error } = await supabase.from('promocoes').update(payload).eq('id', itemEditando.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('promocoes').insert([payload]);
+        if (error) throw error;
+      }
+
+      alert(t('cadastros.promocaoSalva'));
+      fecharModal();
+      buscarPromocoesAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarPromocao', { msg: error.message }));
+    } finally {
+      setSalvandoPromocao(false);
+    }
+  };
+
+  const toggleAtivoPromocao = async (promocao) => {
+    const novoValor = !promocao.ativo;
+    if (!window.confirm(novoValor ? t('cadastros.confirmarRetomarPromocao') : t('cadastros.confirmarPausarPromocao'))) return;
+    try {
+      const { error } = await supabase.from('promocoes').update({ ativo: novoValor }).eq('id', promocao.id);
+      if (error) throw error;
+      buscarPromocoesAdmin();
+    } catch (error) {
+      alert(t('cadastros.erroSalvarPromocao', { msg: error.message }));
+    }
+  };
+
+  const toggleDiaSemanaForm = (dia) => {
+    setFormModal(prev => {
+      const atual = prev.diasSemana || [];
+      const novo = atual.includes(dia) ? atual.filter(d => d !== dia) : [...atual, dia].sort((a, b) => a - b);
+      return { ...prev, diasSemana: novo };
+    });
+  };
+
   const toggleAtivoServico = async (servico) => {
     const novoValor = !servico.ativo;
     if (!window.confirm(novoValor ? t('cadastros.confirmarReativarServico') : t('cadastros.confirmarDesativarServico'))) return;
@@ -410,6 +529,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     if (tela === 'servicos') { salvarModalServico(); return; }
     if (tela === 'produtos') { salvarModalProduto(); return; }
     if (tela === 'meusPacotes') { salvarModalPacote(); return; }
+    if (tela === 'promocoes') { salvarModalPromocao(); return; }
 
     if (tela === 'vendaPacotes') {
       if (!formModal.cliente?.trim() || !formModal.pacote) {
@@ -440,6 +560,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
   const servicosFiltrados = servicos.filter(s => s.nome.toLowerCase().includes(buscaLower));
   const produtosFiltrados = produtos.filter(p => p.nome.toLowerCase().includes(buscaLower));
   const meusPacotesFiltrados = meusPacotes.filter(p => p.nome.toLowerCase().includes(buscaLower));
+  const promocoesFiltradas = promocoes.filter(p => p.nome.toLowerCase().includes(buscaLower));
   const vendasPacotesFiltradas = vendasPacotes.filter(v =>
     v.cliente.toLowerCase().includes(buscaLower) || v.pacote.toLowerCase().includes(buscaLower)
   );
@@ -464,6 +585,11 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
               icone="🎁" cor="#a855f7"
               titulo={t('cadastros.pacotes.titulo')} subtitulo={t('cadastros.pacotes.subtitulo')}
               onClick={() => irPara('pacotesMenu')}
+            />
+            <ItemMenuCadastro
+              icone="🏷️" cor="#ef4444"
+              titulo={t('cadastros.promocoes.titulo')} subtitulo={t('cadastros.promocoes.subtitulo')}
+              onClick={() => irPara('promocoes')}
             />
           </div>
         </>
@@ -567,6 +693,35 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
         </>
       )}
 
+      {tela === 'promocoes' && (
+        <>
+          <CabecalhoLista titulo={t('cadastros.promocoes.titulo')} aoVoltar={() => irPara('menu')} aoAdicionar={abrirNovo} labelAdicionar={t('cadastros.novaPromocao')} />
+          <BarraBusca valor={busca} onChange={setBusca} placeholder={t('cadastros.buscarPlaceholder')} />
+          <div className="cadastros-lista-corpo">
+            {carregandoPromocoes ? (
+              <p className="cadastros-vazio">{t('comum.carregando')}</p>
+            ) : promocoesFiltradas.length === 0 ? (
+              <p className="cadastros-vazio">{t('cadastros.nenhumEncontrado')}</p>
+            ) : promocoesFiltradas.map(p => {
+              const servicoNome = servicos.find(s => s.id === p.servicoId)?.nome || t('cadastros.servicoTodos');
+              const precoLabel = p.tipoDesconto === 'percentual' ? `-${p.valorDesconto}%` : `¥${Number(p.valorDesconto).toLocaleString('ja-JP')}`;
+              return (
+                <ItemLista
+                  key={p.id}
+                  titulo={p.nome}
+                  linha2={`${servicoNome} · ${formatarDiasSemanaPt(p.diasSemana)} · ${p.horaInicio}-${p.horaFim}${!p.ativo ? ` · ${t('cadastros.pausada')}` : ''}`}
+                  preco={null}
+                  badge={<span className="cadastros-badge-estoque">{precoLabel}</span>}
+                  onEditar={() => abrirEditar(p)}
+                  onDeletar={() => toggleAtivoPromocao(p)}
+                  iconeAcao={p.ativo ? '⏸️' : '▶️'}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {tela === 'vendaPacotes' && (
         <>
           <CabecalhoLista titulo={t('cadastros.pacotes.vendaPacotes')} aoVoltar={() => irPara('pacotesMenu')} aoAdicionar={abrirNovo} labelAdicionar={t('cadastros.registrarVenda')} />
@@ -645,6 +800,108 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                     value={formModal.sessoesRestantes ?? ''} onChange={(e) => setFormModal(prev => ({ ...prev, sessoesRestantes: e.target.value }))}
                     style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
                   />
+                </>
+              ) : tela === 'promocoes' ? (
+                <>
+                  <input
+                    type="text" placeholder={t('cadastros.nomeCampo')}
+                    value={formModal.nome || ''} onChange={(e) => setFormModal(prev => ({ ...prev, nome: e.target.value }))}
+                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  />
+                  <textarea
+                    placeholder={t('cadastros.descricaoCampo')}
+                    value={formModal.descricao || ''} onChange={(e) => setFormModal(prev => ({ ...prev, descricao: e.target.value }))}
+                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px', minHeight: '50px', fontFamily: 'inherit', resize: 'vertical' }}
+                  />
+
+                  <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.servicoCampo')}</label>
+                  <select
+                    value={formModal.servicoId || ''} onChange={(e) => setFormModal(prev => ({ ...prev, servicoId: e.target.value }))}
+                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  >
+                    <option value="">{t('cadastros.servicoTodos')}</option>
+                    {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                  </select>
+
+                  <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.tipoDescontoCampo')}</label>
+                  <select
+                    value={formModal.tipoDesconto || 'preco_fixo'} onChange={(e) => setFormModal(prev => ({ ...prev, tipoDesconto: e.target.value }))}
+                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  >
+                    <option value="preco_fixo">{t('cadastros.tipoDescontoPrecoFixo')}</option>
+                    <option value="percentual">{t('cadastros.tipoDescontoPercentual')}</option>
+                  </select>
+
+                  <input
+                    type="number"
+                    placeholder={formModal.tipoDesconto === 'percentual' ? t('cadastros.valorDescontoCampoPercentual') : t('cadastros.valorDescontoCampoFixo')}
+                    value={formModal.valorDesconto ?? ''} onChange={(e) => setFormModal(prev => ({ ...prev, valorDesconto: e.target.value }))}
+                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  />
+
+                  <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.diasSemanaCampo')}</label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {DIAS_SEMANA_OPCOES.map((dia, idx) => (
+                      <button
+                        key={dia}
+                        type="button"
+                        onClick={() => toggleDiaSemanaForm(dia)}
+                        style={{
+                          padding: '8px 10px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer',
+                          border: '1px solid #d4af37',
+                          background: (formModal.diasSemana || []).includes(dia) ? '#d4af37' : 'transparent',
+                          color: (formModal.diasSemana || []).includes(dia) ? '#1a1a1a' : '#d4af37',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        {t(`cadastros.${CHAVES_DIA[idx]}`)}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.horaInicioCampo')}</label>
+                  <input
+                    type="time" value={formModal.horaInicio || ''} onChange={(e) => setFormModal(prev => ({ ...prev, horaInicio: e.target.value }))}
+                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  />
+                  <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.horaFimCampo')}</label>
+                  <input
+                    type="time" value={formModal.horaFim || ''} onChange={(e) => setFormModal(prev => ({ ...prev, horaFim: e.target.value }))}
+                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  />
+
+                  <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.dataInicioCampo')}</label>
+                  <div className="campo-data-wrapper">
+                    <input
+                      type="date" value={formModal.dataInicio || ''} onChange={(e) => setFormModal(prev => ({ ...prev, dataInicio: e.target.value }))}
+                      style={{ width: '100%', padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px', paddingRight: '34px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.dataFimCampo')}</label>
+                  <div className="campo-data-wrapper">
+                    <input
+                      type="date" value={formModal.dataFim || ''} onChange={(e) => setFormModal(prev => ({ ...prev, dataFim: e.target.value }))}
+                      style={{ width: '100%', padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px', paddingRight: '34px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#999', fontSize: '13px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formModal.pontosFidelidade === true}
+                      onChange={(e) => setFormModal(prev => ({ ...prev, pontosFidelidade: e.target.checked }))}
+                    />
+                    {t('cadastros.pontosFidelidadeCampo')}
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#999', fontSize: '13px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formModal.ativo !== false}
+                      onChange={(e) => setFormModal(prev => ({ ...prev, ativo: e.target.checked }))}
+                    />
+                    {t('cadastros.ativoCampo')}
+                  </label>
                 </>
               ) : (
                 <>
@@ -726,9 +983,9 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
 
               <button
                 type="button" className="btn-primary" onClick={salvarModal} style={{ marginTop: '4px' }}
-                disabled={salvandoServico || salvandoProduto || salvandoPacote}
+                disabled={salvandoServico || salvandoProduto || salvandoPacote || salvandoPromocao}
               >
-                {(salvandoServico || salvandoProduto || salvandoPacote) ? t('comum.salvando') : t('comum.salvar')}
+                {(salvandoServico || salvandoProduto || salvandoPacote || salvandoPromocao) ? t('comum.salvando') : t('comum.salvar')}
               </button>
             </div>
           </div>

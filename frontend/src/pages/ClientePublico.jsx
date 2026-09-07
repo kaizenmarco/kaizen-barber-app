@@ -11,6 +11,7 @@ import {
   getDiaSemana,
 } from '../config/horarios';
 import { SERVICOS, getNomeServico, buscarServicosCompletos, buscarPacotesAtivos } from '../config/servicos';
+import { buscarPromocoesAtivas, encontrarPromocaoAplicavel, calcularPrecoComPromocao } from '../config/promocoes';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
@@ -251,6 +252,27 @@ function ClientePublico() {
     buscarPacotesAtivos().then(setPacotes);
   }, []);
 
+  // Promoções cadastradas pelo Admin em Cadastros > Promoções (pausável a
+  // qualquer momento por lá). Mostramos um popup ao entrar no app (1x por
+  // dia por navegador, pra não incomodar) e aplicamos o preço promocional
+  // automaticamente quando o horário escolhido se encaixa na promoção — o
+  // corte de pontos de fidelidade é decidido automaticamente pelo banco.
+  const [promocoes, setPromocoes] = useState([]);
+  const [promocaoPopup, setPromocaoPopup] = useState(null);
+  useEffect(() => {
+    buscarPromocoesAtivas().then((lista) => {
+      setPromocoes(lista);
+      if (lista.length > 0) {
+        const chaveVisto = `kaizen_promo_popup_${lista[0].id}`;
+        const hojeStr = paraDataStr(new Date());
+        if (localStorage.getItem(chaveVisto) !== hojeStr) {
+          setPromocaoPopup(lista[0]);
+          localStorage.setItem(chaveVisto, hojeStr);
+        }
+      }
+    });
+  }, []);
+
   const profissionais = [
     {
       id: 1,
@@ -355,11 +377,15 @@ function ClientePublico() {
   // já identificado (por e-mail, na tela de agendamento, ou por telefone, na
   // consulta pública de pontos) — a partir daqui a lógica é a mesma pros dois.
   const calcularESetarPontosDoCliente = async (clienteId) => {
+    // conta_pontos_fidelidade vem preenchido automaticamente pelo banco: fica
+    // "false" quando o agendamento caiu dentro de alguma promoção configurada
+    // sem pontos (ver config/promocoes.js e o trigger aplicar_promocao_agendamento).
     const { data: realizados, error: erroRealizados } = await supabase
       .from('agendamentos')
       .select('id')
       .eq('cliente_id', clienteId)
-      .eq('status', 'REALIZADO');
+      .eq('status', 'REALIZADO')
+      .eq('conta_pontos_fidelidade', true);
 
     if (erroRealizados) throw erroRealizados;
 
@@ -626,11 +652,31 @@ function ClientePublico() {
     return slots;
   };
 
+  // Promoção que se aplica ao horário/serviço atualmente escolhidos no
+  // formulário de agendamento (ou null, se nenhuma promoção ativa encaixa).
+  const promocaoDoAgendamentoAtual = () => {
+    if (!dadosAgendamento.servico || !dadosAgendamento.data || !dadosAgendamento.hora) return null;
+    const servico = servicos.find(s => s.nome === dadosAgendamento.servico);
+    if (!servico) return null;
+    return encontrarPromocaoAplicavel(promocoes, {
+      servicoId: servico.uuid,
+      dataStr: dadosAgendamento.data,
+      horaInicio: dadosAgendamento.hora,
+      duracaoMinutos: servico.duracaoMinutos,
+    });
+  };
+
   const calcularPrecoFinal = () => {
     if (!dadosAgendamento.servico) return 0;
     const servico = servicos.find(s => s.nome === dadosAgendamento.servico);
     if (!servico) return 0;
     let preco = servico.preco;
+    const promo = promocaoDoAgendamentoAtual();
+    if (promo) {
+      // Preço promocional prevalece — não combina com resgate de pontos,
+      // pra não empilhar dois descontos no mesmo agendamento.
+      return calcularPrecoComPromocao(preco, promo);
+    }
     if (usarPontos && pontosCliente >= 10) {
       preco -= 500;
     }
@@ -751,9 +797,11 @@ function ClientePublico() {
       const servicoSelecionado = servicos.find(s => s.nome === dadosAgendamento.servico);
       const servicoUUID = servicoSelecionado.uuid;
       const precoFinal = calcularPrecoFinal();
+      const promoAplicada = promocaoDoAgendamentoAtual();
 
       const notas = [
-        usarPontos ? 'Desconto de pontos de fidelidade aplicado (-¥500)' : null,
+        promoAplicada ? `Promoção aplicada: ${promoAplicada.nome}` : null,
+        (!promoAplicada && usarPontos) ? 'Desconto de pontos de fidelidade aplicado (-¥500)' : null,
         observacoesCliente ? `Observação do cliente: ${observacoesCliente}` : null,
       ].filter(Boolean).join(' | ') || null;
 
@@ -790,7 +838,8 @@ function ClientePublico() {
         duracaoMinutos: duracaoSelecionada,
         precoOriginal: servicoSelecionado.preco,
         precoFinal: precoFinal,
-        desconto: usarPontos ? 500 : 0
+        desconto: promoAplicada ? (servicoSelecionado.preco - precoFinal) : (usarPontos ? 500 : 0),
+        promocaoNome: promoAplicada ? promoAplicada.nome : null
       });
 
       setPresencaConfirmada(false);
@@ -999,6 +1048,44 @@ function ClientePublico() {
 
   return (
     <div style={{ background: '#1a1a1a', color: '#e8e8e8', minHeight: '100vh' }}>
+      {promocaoPopup && (
+        <div
+          onClick={() => setPromocaoPopup(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 2000, padding: '20px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#2d2d2d', border: '2px solid #d4af37', borderRadius: '12px',
+              padding: '26px', maxWidth: '380px', width: '100%', textAlign: 'center', position: 'relative'
+            }}
+          >
+            <button
+              onClick={() => setPromocaoPopup(null)}
+              aria-label="Fechar"
+              style={{
+                position: 'absolute', top: '10px', right: '10px', background: 'transparent',
+                border: 'none', color: '#999', fontSize: '20px', cursor: 'pointer', lineHeight: 1
+              }}
+            >
+              ✕
+            </button>
+            <div style={{ fontSize: '38px', marginBottom: '8px' }}>🏷️</div>
+            <h3 style={{ color: '#d4af37', margin: '0 0 10px 0' }}>{promocaoPopup.nome}</h3>
+            <p style={{ color: '#e8e8e8', fontSize: '14px', margin: '0 0 18px 0', lineHeight: 1.5 }}>{promocaoPopup.descricao}</p>
+            <button
+              onClick={() => { setPromocaoPopup(null); setAbaAtiva('agendar'); }}
+              style={{ width: '100%', background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' }}
+            >
+              {t('modal_promocao_agendarAgora')}
+            </button>
+          </div>
+        </div>
+      )}
       <header style={{ borderBottom: '3px solid #d4af37', position: 'relative' }}>
         <img
           src="/images/header_banner.jpg"
@@ -1812,7 +1899,7 @@ function ClientePublico() {
                 📅 {diaHorarioSelecionado.data.toLocaleDateString(localeAtual)} · 🕐 {diaHorarioSelecionado.hora} - {somarMinutos(diaHorarioSelecionado.hora, duracaoSelecionada)} ({duracaoSelecionada} min)
               </p>
               <p style={{ margin: 0 }}>
-                {usarPontos && pontosCliente >= 10 ? (
+                {(promocaoDoAgendamentoAtual() || (usarPontos && pontosCliente >= 10)) ? (
                   <>
                     <span style={{ textDecoration: 'line-through', color: '#999', marginRight: '8px' }}>{formatarPreco(servicoSelecionadoInfo?.preco || 0)}</span>
                     <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
@@ -1821,6 +1908,11 @@ function ClientePublico() {
                   <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
                 )}
               </p>
+              {promocaoDoAgendamentoAtual() && (
+                <p style={{ margin: '6px 0 0 0', color: '#4ade80', fontSize: '12px', fontWeight: 'bold' }}>
+                  🏷️ {t('modal_promocao_aplicada', { nome: promocaoDoAgendamentoAtual().nome })}
+                </p>
+              )}
             </div>
 
             <input type="text" placeholder={t('modal_nome_placeholder')} value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
@@ -1837,7 +1929,7 @@ function ClientePublico() {
               style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', minHeight: '60px' }}
             />
 
-            {dadosAgendamento.email && dadosAgendamento.email.includes('@') && (
+            {dadosAgendamento.email && dadosAgendamento.email.includes('@') && !promocaoDoAgendamentoAtual() && (
               <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '4px', padding: '12px', marginBottom: '15px', fontSize: '13px' }}>
                 {carregandoPontos ? (
                   <p style={{ margin: 0, color: '#999' }}>⏳ {t('modal_consultando_pontos')}</p>

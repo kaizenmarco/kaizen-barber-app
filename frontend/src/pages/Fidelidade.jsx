@@ -29,12 +29,16 @@ function Fidelidade({ t: tProp, idioma: idiomaProp }) {
       // Para cada cliente, calcular pontos
       const clientesComPontos = await Promise.all(
         clientesData.map(async (cliente) => {
-          // Buscar agendamentos REALIZADOS deste cliente
+          // Buscar agendamentos REALIZADOS deste cliente que contam pontos
+          // (conta_pontos_fidelidade fica "false" automaticamente quando o
+          // agendamento caiu numa promoção configurada sem pontos — ver
+          // config/promocoes.js)
           const { data: agendamentos, error: erroAgendamentos } = await supabase
             .from('agendamentos')
             .select('id, status, preco_final, data_hora')
             .eq('cliente_id', cliente.id)
-            .eq('status', 'REALIZADO');
+            .eq('status', 'REALIZADO')
+            .eq('conta_pontos_fidelidade', true);
 
           if (erroAgendamentos) throw erroAgendamentos;
 
