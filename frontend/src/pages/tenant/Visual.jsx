@@ -21,6 +21,7 @@ function Visual({ empresaId }) {
 
   useEffect(() => {
     buscarVisual();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const buscarVisual = async () => {

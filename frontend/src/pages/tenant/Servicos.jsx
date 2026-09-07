@@ -24,6 +24,13 @@ import { enviarImagemTenant } from '../../config/uploadImagemTenant';
 // Foto (imagem_url) vai pro bucket compartilhado "empresas-imagens",
 // isolado por empresa — mesmo mecanismo já usado no app original pra
 // Serviços/Produtos/Pacotes.
+//
+// Pacotes (ex: "5 cortes por ¥15.000, válido por 90 dias") NÃO são uma
+// tabela separada — são linhas desta MESMA tabela servicos, com
+// eh_pacote=true e mais 2 campos (quantidade_sessoes, validade_dias) — é
+// exatamente como o app original já funcionava (ver config/servicos.js,
+// buscarPacotesAtivos). Por isso o formulário abaixo tem um checkbox "É um
+// pacote?" em vez de uma tela separada.
 
 const SIMBOLO_MOEDA = { brl: 'R$', jpy: '¥' };
 
@@ -39,40 +46,55 @@ function formatarPreco(servico, moeda) {
   return formatarValor(min, moeda);
 }
 
+const NOVO_VAZIO = {
+  nome: '',
+  descricao: '',
+  preco_minimo: '',
+  preco_maximo: '',
+  duracao_minutos: '',
+  eh_pacote: false,
+  quantidade_sessoes: '',
+  validade_dias: '',
+};
+
 function Servicos({ empresa, empresaId }) {
   const moeda = empresa?.moeda === 'jpy' ? 'jpy' : 'brl';
   const simbolo = SIMBOLO_MOEDA[moeda];
   const casasDecimais = moeda === 'jpy' ? '1' : '0.01';
 
   const [servicos, setServicos] = useState([]);
+  const [pacotes, setPacotes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
-  const [novo, setNovo] = useState({
-    nome: '',
-    descricao: '',
-    preco_minimo: '',
-    preco_maximo: '',
-    duracao_minutos: '',
-  });
+  const [novo, setNovo] = useState(NOVO_VAZIO);
   const [arquivoImagem, setArquivoImagem] = useState(null);
   const [trocandoFotoId, setTrocandoFotoId] = useState(null);
 
   useEffect(() => {
-    buscarServicos();
+    buscarCatalogo();
   }, []);
 
-  const buscarServicos = async () => {
+  const buscarCatalogo = async () => {
     setCarregando(true);
     setErro('');
     try {
-      const { data, error } = await supabase
-        .from('servicos')
-        .select('id, nome, descricao, preco_minimo, preco_maximo, duracao_minutos, imagem_url, criado_em')
-        .eq('eh_pacote', false)
-        .order('criado_em', { ascending: false });
-      if (error) throw error;
-      setServicos(data || []);
+      const [{ data: dadosServicos, error: erroServicos }, { data: dadosPacotes, error: erroPacotes }] = await Promise.all([
+        supabase
+          .from('servicos')
+          .select('id, nome, descricao, preco_minimo, preco_maximo, duracao_minutos, imagem_url, criado_em')
+          .eq('eh_pacote', false)
+          .order('criado_em', { ascending: false }),
+        supabase
+          .from('servicos')
+          .select('id, nome, descricao, preco_minimo, quantidade_sessoes, validade_dias, ativo, imagem_url, criado_em')
+          .eq('eh_pacote', true)
+          .order('criado_em', { ascending: false }),
+      ]);
+      if (erroServicos) throw erroServicos;
+      if (erroPacotes) throw erroPacotes;
+      setServicos(dadosServicos || []);
+      setPacotes(dadosPacotes || []);
     } catch (e) {
       setErro(`Não consegui carregar os serviços: ${e.message}`);
     } finally {
@@ -81,8 +103,8 @@ function Servicos({ empresa, empresaId }) {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNovo({ ...novo, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setNovo({ ...novo, [name]: type === 'checkbox' ? checked : value });
   };
 
   const handleAdicionar = async (e) => {
@@ -92,10 +114,10 @@ function Servicos({ empresa, empresaId }) {
       return;
     }
     if (novo.preco_minimo === '' || Number(novo.preco_minimo) < 0) {
-      setErro('Informe o preço do serviço.');
+      setErro('Informe o preço.');
       return;
     }
-    if (novo.preco_maximo !== '' && Number(novo.preco_maximo) < Number(novo.preco_minimo)) {
+    if (!novo.eh_pacote && novo.preco_maximo !== '' && Number(novo.preco_maximo) < Number(novo.preco_minimo)) {
       setErro('O preço máximo não pode ser menor que o preço mínimo.');
       return;
     }
@@ -107,20 +129,33 @@ function Servicos({ empresa, empresaId }) {
       if (arquivoImagem) {
         imagemUrl = await enviarImagemTenant(empresaId, arquivoImagem, 'servicos');
       }
-      const { error } = await supabase.from('servicos').insert([
-        {
-          nome: novo.nome.trim(),
-          descricao: novo.descricao.trim() || null,
-          preco_minimo: Number(novo.preco_minimo),
-          preco_maximo: novo.preco_maximo !== '' ? Number(novo.preco_maximo) : null,
-          duracao_minutos: novo.duracao_minutos !== '' ? Number(novo.duracao_minutos) : null,
-          imagem_url: imagemUrl,
-        },
-      ]);
+
+      const linha = novo.eh_pacote
+        ? {
+            nome: novo.nome.trim(),
+            descricao: novo.descricao.trim() || null,
+            preco_minimo: Number(novo.preco_minimo),
+            duracao_minutos: null,
+            eh_pacote: true,
+            ativo: true,
+            quantidade_sessoes: novo.quantidade_sessoes !== '' ? Number(novo.quantidade_sessoes) : null,
+            validade_dias: novo.validade_dias !== '' ? Number(novo.validade_dias) : null,
+            imagem_url: imagemUrl,
+          }
+        : {
+            nome: novo.nome.trim(),
+            descricao: novo.descricao.trim() || null,
+            preco_minimo: Number(novo.preco_minimo),
+            preco_maximo: novo.preco_maximo !== '' ? Number(novo.preco_maximo) : null,
+            duracao_minutos: novo.duracao_minutos !== '' ? Number(novo.duracao_minutos) : null,
+            imagem_url: imagemUrl,
+          };
+
+      const { error } = await supabase.from('servicos').insert([linha]);
       if (error) throw error;
-      setNovo({ nome: '', descricao: '', preco_minimo: '', preco_maximo: '', duracao_minutos: '' });
+      setNovo(NOVO_VAZIO);
       setArquivoImagem(null);
-      buscarServicos();
+      buscarCatalogo();
     } catch (e) {
       setErro(`Não consegui adicionar: ${e.message}`);
     } finally {
@@ -136,7 +171,7 @@ function Servicos({ empresa, empresaId }) {
       const imagemUrl = await enviarImagemTenant(empresaId, arquivo, 'servicos');
       const { error } = await supabase.from('servicos').update({ imagem_url: imagemUrl }).eq('id', id);
       if (error) throw error;
-      buscarServicos();
+      buscarCatalogo();
     } catch (e) {
       setErro(`Não consegui trocar a foto: ${e.message}`);
     } finally {
@@ -145,13 +180,23 @@ function Servicos({ empresa, empresaId }) {
   };
 
   const handleDeletar = async (id) => {
-    if (!window.confirm('Remover este serviço?')) return;
+    if (!window.confirm('Remover este item?')) return;
     try {
       const { error } = await supabase.from('servicos').delete().eq('id', id);
       if (error) throw error;
-      buscarServicos();
+      buscarCatalogo();
     } catch (e) {
       setErro(`Não consegui remover: ${e.message}`);
+    }
+  };
+
+  const handleAlternarAtivoPacote = async (id, ativoAtual) => {
+    try {
+      const { error } = await supabase.from('servicos').update({ ativo: !ativoAtual }).eq('id', id);
+      if (error) throw error;
+      buscarCatalogo();
+    } catch (e) {
+      setErro(`Não consegui atualizar o pacote: ${e.message}`);
     }
   };
 
@@ -160,16 +205,27 @@ function Servicos({ empresa, empresaId }) {
       <h2>Serviços</h2>
 
       <section className="form-section">
-        <h3>Adicionar serviço</h3>
+        <h3>Adicionar</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
           Cadastre aqui os serviços que sua barbearia oferece (corte, barba, coloração
-          etc.). É esse catálogo que vai aparecer na Agenda.
+          etc.), ou marque a caixa abaixo para cadastrar um pacote (ex: "5 cortes por
+          {` ${simbolo}15.000`}, válido por 90 dias"). É esse catálogo que aparece na
+          Agenda e no site público de agendamento.
         </p>
         <form onSubmit={handleAdicionar}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#d4af37', marginBottom: '10px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              name="eh_pacote"
+              checked={novo.eh_pacote}
+              onChange={handleInputChange}
+            />
+            É um pacote?
+          </label>
           <input
             type="text"
             name="nome"
-            placeholder="Nome do serviço"
+            placeholder={novo.eh_pacote ? 'Nome do pacote' : 'Nome do serviço'}
             value={novo.nome}
             onChange={handleInputChange}
             required
@@ -191,23 +247,46 @@ function Servicos({ empresa, empresaId }) {
             onChange={handleInputChange}
             required
           />
-          <input
-            type="number"
-            name="preco_maximo"
-            placeholder={`Preço máximo em ${simbolo} (opcional, se variar)`}
-            min="0"
-            step={casasDecimais}
-            value={novo.preco_maximo}
-            onChange={handleInputChange}
-          />
-          <input
-            type="number"
-            name="duracao_minutos"
-            placeholder="Duração em minutos (opcional)"
-            min="0"
-            value={novo.duracao_minutos}
-            onChange={handleInputChange}
-          />
+          {novo.eh_pacote ? (
+            <>
+              <input
+                type="number"
+                name="quantidade_sessoes"
+                placeholder="Quantidade de sessões (vazio = ilimitado)"
+                min="0"
+                value={novo.quantidade_sessoes}
+                onChange={handleInputChange}
+              />
+              <input
+                type="number"
+                name="validade_dias"
+                placeholder="Validade em dias (opcional)"
+                min="0"
+                value={novo.validade_dias}
+                onChange={handleInputChange}
+              />
+            </>
+          ) : (
+            <>
+              <input
+                type="number"
+                name="preco_maximo"
+                placeholder={`Preço máximo em ${simbolo} (opcional, se variar)`}
+                min="0"
+                step={casasDecimais}
+                value={novo.preco_maximo}
+                onChange={handleInputChange}
+              />
+              <input
+                type="number"
+                name="duracao_minutos"
+                placeholder="Duração em minutos (opcional)"
+                min="0"
+                value={novo.duracao_minutos}
+                onChange={handleInputChange}
+              />
+            </>
+          )}
           <label style={{ display: 'block', fontSize: '12px', color: '#999', marginTop: '10px', marginBottom: '4px' }}>
             Foto (opcional)
           </label>
@@ -217,7 +296,7 @@ function Servicos({ empresa, empresaId }) {
             onChange={(e) => setArquivoImagem(e.target.files?.[0] || null)}
           />
           <button type="submit" className="btn-primary" disabled={salvando}>
-            {salvando ? 'Salvando...' : 'Adicionar serviço'}
+            {salvando ? 'Salvando...' : (novo.eh_pacote ? 'Adicionar pacote' : 'Adicionar serviço')}
           </button>
         </form>
         {erro && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>{erro}</p>}
@@ -273,6 +352,86 @@ function Servicos({ empresa, empresaId }) {
                     <td>{s.duracao_minutos ? `${s.duracao_minutos} min` : '-'}</td>
                     <td>
                       <button className="btn-delete" onClick={() => handleDeletar(s.id)}>
+                        🗑️ Remover
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="list-section">
+        <h3>Seus pacotes</h3>
+        {carregando ? (
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+        ) : pacotes.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum pacote cadastrado ainda.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>Nome</th>
+                  <th>Descrição</th>
+                  <th>Preço ({simbolo})</th>
+                  <th>Sessões</th>
+                  <th>Validade</th>
+                  <th>Status</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pacotes.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      {p.imagem_url ? (
+                        <img
+                          src={p.imagem_url}
+                          alt={p.nome}
+                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px' }}
+                        />
+                      ) : (
+                        <span style={{ color: '#666', fontSize: '12px' }}>-</span>
+                      )}
+                      <br />
+                      <label style={{ fontSize: '11px', color: '#d4af37', cursor: 'pointer' }}>
+                        {trocandoFotoId === p.id ? 'Enviando...' : 'Trocar foto'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={trocandoFotoId === p.id}
+                          onChange={(e) => handleTrocarFoto(p.id, e.target.files?.[0])}
+                        />
+                      </label>
+                    </td>
+                    <td style={{ fontWeight: 'bold' }}>{p.nome}</td>
+                    <td>{p.descricao || '-'}</td>
+                    <td>{formatarValor(p.preco_minimo, moeda)}</td>
+                    <td>{p.quantidade_sessoes == null ? 'Ilimitado' : p.quantidade_sessoes}</td>
+                    <td>{p.validade_dias == null ? '-' : `${p.validade_dias} dias`}</td>
+                    <td>
+                      <button
+                        onClick={() => handleAlternarAtivoPacote(p.id, p.ativo)}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${p.ativo ? '#4ade80' : '#666'}`,
+                          color: p.ativo ? '#4ade80' : '#999',
+                          borderRadius: '4px',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {p.ativo ? 'Ativo' : 'Pausado'}
+                      </button>
+                    </td>
+                    <td>
+                      <button className="btn-delete" onClick={() => handleDeletar(p.id)}>
                         🗑️ Remover
                       </button>
                     </td>
