@@ -29,7 +29,7 @@ const fimDaSemana = (data) => {
   return inicio.toISOString().split('T')[0];
 };
 
-function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
+function Caixa({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
   const diasNomes = DIAS_SEMANA_ADMIN[idioma] || DIAS_SEMANA_ADMIN['pt-BR'];
@@ -69,8 +69,8 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
     setCarregando(true);
     try {
       const [caixaResp, movResp] = await Promise.all([
-        supabase.from('caixa_dias').select('*').eq('data', hojeStr).maybeSingle(),
-        supabase.from('caixa_movimentacoes').select('*').eq('data', hojeStr).order('hora', { ascending: true }),
+        supabase.from('caixa_dias').select('*').eq('empresa_id', empresaId).eq('data', hojeStr).maybeSingle(),
+        supabase.from('caixa_movimentacoes').select('*').eq('empresa_id', empresaId).eq('data', hojeStr).order('hora', { ascending: true }),
       ]);
       if (caixaResp.error) throw caixaResp.error;
       if (movResp.error) throw movResp.error;
@@ -84,7 +84,7 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
       setCarregando(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hojeStr]);
+  }, [hojeStr, empresaId]);
 
   useEffect(() => {
     buscarDadosDoDia();
@@ -101,9 +101,9 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
         const desdeStr = desde.toISOString().split('T')[0];
 
         const [movResp, diasResp, profResp] = await Promise.all([
-          supabase.from('caixa_movimentacoes').select('*').gte('data', desdeStr).order('data', { ascending: false }),
-          supabase.from('caixa_dias').select('*').gte('data', desdeStr).order('data', { ascending: false }),
-          supabase.from('profissionais').select('id, nome, comissao_percentual').order('nome', { ascending: true }),
+          supabase.from('caixa_movimentacoes').select('*').eq('empresa_id', empresaId).gte('data', desdeStr).order('data', { ascending: false }),
+          supabase.from('caixa_dias').select('*').eq('empresa_id', empresaId).gte('data', desdeStr).order('data', { ascending: false }),
+          supabase.from('profissionais').select('id, nome, comissao_percentual').eq('empresa_id', empresaId).order('nome', { ascending: true }),
         ]);
         if (movResp.error) throw movResp.error;
         if (diasResp.error) throw diasResp.error;
@@ -121,7 +121,7 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planoBasico]);
+  }, [planoBasico, empresaId]);
 
   // Movimento do mês selecionado — mesma trava de plano.
   useEffect(() => {
@@ -137,6 +137,7 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
         const { data, error } = await supabase
           .from('caixa_movimentacoes')
           .select('*')
+          .eq('empresa_id', empresaId)
           .gte('data', inicio)
           .lte('data', fim);
 
@@ -149,7 +150,7 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mesSelecionado, planoBasico]);
+  }, [mesSelecionado, planoBasico, empresaId]);
 
   const handleAbrirCaixa = async () => {
     try {
@@ -158,7 +159,8 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
         const { error } = await supabase
           .from('caixa_dias')
           .update({ status: 'aberto', aberto_em: new Date().toISOString() })
-          .eq('id', caixaHoje.id);
+          .eq('id', caixaHoje.id)
+          .eq('empresa_id', empresaId);
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -178,7 +180,8 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
       const { error } = await supabase
         .from('caixa_dias')
         .update({ status: 'fechado', fechado_em: new Date().toISOString() })
-        .eq('id', caixaHoje.id);
+        .eq('id', caixaHoje.id)
+        .eq('empresa_id', empresaId);
       if (error) throw error;
       buscarDadosDoDia();
     } catch (error) {
@@ -209,7 +212,7 @@ function Caixa({ t: tProp, idioma: idiomaProp, empresa }) {
   const handleDeletarMovimentacao = async (mov) => {
     if (!window.confirm(t('caixa.confirmarRemoverMov'))) return;
     try {
-      const { error } = await supabase.from('caixa_movimentacoes').delete().eq('id', mov.id);
+      const { error } = await supabase.from('caixa_movimentacoes').delete().eq('id', mov.id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarDadosDoDia();
     } catch (error) {

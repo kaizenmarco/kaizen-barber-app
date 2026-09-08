@@ -23,7 +23,7 @@ const DIAS = [
   { chave: 'sabado', label: 'Sábado' },
 ];
 
-function HorariosProfissionais() {
+function HorariosProfissionais({ empresaId }) {
   const [profissionais, setProfissionais] = useState([]);
   const [profissionalId, setProfissionalId] = useState('');
   const [horarios, setHorarios] = useState([]); // linhas da tabela horarios_profissional do profissional selecionado
@@ -34,6 +34,7 @@ function HorariosProfissionais() {
 
   useEffect(() => {
     buscarProfissionais();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -48,6 +49,7 @@ function HorariosProfissionais() {
       const { data, error } = await supabase
         .from('profissionais')
         .select('id, nome')
+        .eq('empresa_id', empresaId)
         .order('nome', { ascending: true });
       if (error) throw error;
       setProfissionais(data || []);
@@ -66,6 +68,7 @@ function HorariosProfissionais() {
       const { data, error } = await supabase
         .from('horarios_profissional')
         .select('id, dia_semana, horario_inicio, horario_fim')
+        .eq('empresa_id', empresaId)
         .eq('profissional_id', pid)
         .order('dia_semana', { ascending: true });
       if (error) throw error;
@@ -122,7 +125,7 @@ function HorariosProfissionais() {
 
   const handleRemoverBloco = async (id) => {
     try {
-      const { error } = await supabase.from('horarios_profissional').delete().eq('id', id);
+      const { error } = await supabase.from('horarios_profissional').delete().eq('id', id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarHorarios(profissionalId);
     } catch (e) {

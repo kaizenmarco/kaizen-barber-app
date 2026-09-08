@@ -10,7 +10,7 @@ const formatarValor = (valor, moeda) => {
   return `R$${num.toFixed(2).replace('.', ',')}`;
 };
 
-function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
+function Comandas({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
   const diasNomes = DIAS_SEMANA_ADMIN[idioma] || DIAS_SEMANA_ADMIN['pt-BR'];
@@ -31,13 +31,14 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
   const [profissionaisLista, setProfissionaisLista] = useState([]);
   const [servicosLista, setServicosLista] = useState([]);
   useEffect(() => {
-    supabase.from('profissionais').select('id, nome').order('nome', { ascending: true })
+    supabase.from('profissionais').select('id, nome').eq('empresa_id', empresaId).order('nome', { ascending: true })
       .then(({ data, error }) => {
         if (!error && data) setProfissionaisLista(data.map(p => ({ id: p.id, uuid: p.id, nome: p.nome })));
       });
     supabase
       .from('servicos')
       .select('id, nome, preco_minimo')
+      .eq('empresa_id', empresaId)
       .eq('eh_pacote', false)
       .order('nome', { ascending: true })
       .then(({ data, error }) => {
@@ -45,6 +46,7 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
           setServicosLista(data.map(s => ({ id: s.id, uuid: s.id, nome: s.nome, precoMinimo: s.preco_minimo || 0 })));
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [novoItem, setNovoItem] = useState({
@@ -60,7 +62,7 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
     setCarregando(true);
     try {
       const [caixaResp, abertasResp, realizadasResp] = await Promise.all([
-        supabase.from('caixa_dias').select('*').eq('data', hojeStr).maybeSingle(),
+        supabase.from('caixa_dias').select('*').eq('empresa_id', empresaId).eq('data', hojeStr).maybeSingle(),
         supabase
           .from('agendamentos')
           .select(`
@@ -69,6 +71,7 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
           `)
+          .eq('empresa_id', empresaId)
           .gte('data_hora', `${hojeStr}T00:00:00`)
           .lte('data_hora', `${hojeStr}T23:59:59`)
           .in('status', ['AGENDADO', 'CONFIRMADO'])
@@ -81,6 +84,7 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
           `)
+          .eq('empresa_id', empresaId)
           .gte('data_hora', `${hojeStr}T00:00:00`)
           .lte('data_hora', `${hojeStr}T23:59:59`)
           .eq('status', 'REALIZADO')
@@ -112,7 +116,7 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
       setCarregando(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hojeStr]);
+  }, [hojeStr, empresaId]);
 
   useEffect(() => {
     buscarTudo();
@@ -165,7 +169,8 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
       const { error: erroUpdate } = await supabase
         .from('agendamentos')
         .update({ status: 'REALIZADO', preco_final: valor })
-        .eq('id', item.id);
+        .eq('id', item.id)
+        .eq('empresa_id', empresaId);
       if (erroUpdate) throw erroUpdate;
 
       await registrarNoCaixa({
@@ -205,6 +210,7 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa }) {
       const { data: clienteExistente } = await supabase
         .from('clientes')
         .select('id')
+        .eq('empresa_id', empresaId)
         .eq('nome', novoItem.cliente)
         .maybeSingle();
 

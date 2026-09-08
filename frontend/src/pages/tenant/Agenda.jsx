@@ -12,7 +12,7 @@ const formatarPreco = (valor, moeda) => {
   return `R$${Number(valor).toFixed(2).replace('.', ',')}`;
 };
 
-function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
+function Agenda({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
   const moeda = empresa?.moeda === 'jpy' ? 'jpy' : 'brl';
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
@@ -247,11 +247,12 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
   const [profissionaisLista, setProfissionaisLista] = useState([]);
   const [carregandoProfissionais, setCarregandoProfissionais] = useState(true);
   useEffect(() => {
-    supabase.from('profissionais').select('id, nome').order('nome', { ascending: true })
+    supabase.from('profissionais').select('id, nome').eq('empresa_id', empresaId).order('nome', { ascending: true })
       .then(({ data, error }) => {
         if (!error && data) setProfissionaisLista(data.map(p => ({ id: p.id, uuid: p.id, nome: p.nome })));
         setCarregandoProfissionais(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -276,6 +277,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     supabase
       .from('servicos')
       .select('id, nome, preco_minimo, duracao_minutos')
+      .eq('empresa_id', empresaId)
       .eq('eh_pacote', false)
       .order('nome', { ascending: true })
       .then(({ data, error }) => {
@@ -289,6 +291,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
           })));
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -306,10 +309,12 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     supabase
       .from('clientes')
       .select('id, nome, email, telefone, data_nascimento')
+      .eq('empresa_id', empresaId)
       .order('nome', { ascending: true })
       .then(({ data, error }) => {
         if (!error && data) setClientesLista(data);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sugestões de nome que COMEÇAM com o texto digitado (não "contém" — é o
@@ -440,6 +445,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
         `)
+        .eq('empresa_id', empresaId)
         .order('data_hora', { ascending: false });
 
       if (error) throw error;
@@ -486,6 +492,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
       const { data, error } = await supabase
         .from('bloqueios_horario')
         .select('id, profissional_id, data, horario_inicio, horario_fim, motivo')
+        .eq('empresa_id', empresaId)
         .order('data', { ascending: true });
 
       if (error) throw error;
@@ -573,7 +580,8 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
       const { error } = await supabase
         .from('bloqueios_horario')
         .delete()
-        .eq('id', bloqueioId);
+        .eq('id', bloqueioId)
+        .eq('empresa_id', empresaId);
 
       if (error) throw error;
 
@@ -669,6 +677,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
         const { data: porEmail } = await supabase
           .from('clientes')
           .select('id')
+          .eq('empresa_id', empresaId)
           .eq('email', novoAgendamento.email)
           .single();
         if (porEmail) clienteId = porEmail.id;
@@ -680,6 +689,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
           const { data: candidatos } = await supabase
             .from('clientes')
             .select('id, telefone')
+            .eq('empresa_id', empresaId)
             .not('telefone', 'is', null);
           const achado = (candidatos || []).find(c => normalizarTelefoneParaComparar(c.telefone) === alvo);
           if (achado) clienteId = achado.id;
@@ -697,6 +707,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
             data_nascimento: novoAgendamento.dataNascimento || undefined
           })
           .eq('id', clienteId)
+          .eq('empresa_id', empresaId)
           .or('email.is.null,data_nascimento.is.null');
       } else {
         const { data: novoCliente, error: erroCliente } = await supabase
@@ -751,7 +762,8 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
       const { error } = await supabase
         .from('agendamentos')
         .update({ status: novoStatus })
-        .eq('id', agendamentoId);
+        .eq('id', agendamentoId)
+        .eq('empresa_id', empresaId);
 
       if (error) throw error;
 
@@ -802,7 +814,8 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
           cancelado_por: cancelamentoQuem,
           cancelado_em: formatarDataHoraLocalISO(agora)
         })
-        .eq('id', cancelamentoAlvo.id);
+        .eq('id', cancelamentoAlvo.id)
+        .eq('empresa_id', empresaId);
 
       if (error) throw error;
 
@@ -836,7 +849,8 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
       const { error } = await supabase
         .from('agendamentos')
         .delete()
-        .eq('id', agendamentoId);
+        .eq('id', agendamentoId)
+        .eq('empresa_id', empresaId);
 
       if (error) throw error;
 
@@ -909,7 +923,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     const novoStatus = statusAnterior === 'CONFIRMADO' ? 'AGENDADO' : 'CONFIRMADO';
     setDetalhesAgendamento(prev => ({ ...prev, status: novoStatus }));
     try {
-      const { error } = await supabase.from('agendamentos').update({ status: novoStatus }).eq('id', detalhesAgendamento.id);
+      const { error } = await supabase.from('agendamentos').update({ status: novoStatus }).eq('id', detalhesAgendamento.id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarAgendamentos();
     } catch (error) {
@@ -924,7 +938,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     const novoStatus = statusAnterior === 'NÃO_COMPARECEU' ? 'AGENDADO' : 'NÃO_COMPARECEU';
     setDetalhesAgendamento(prev => ({ ...prev, status: novoStatus }));
     try {
-      const { error } = await supabase.from('agendamentos').update({ status: novoStatus }).eq('id', detalhesAgendamento.id);
+      const { error } = await supabase.from('agendamentos').update({ status: novoStatus }).eq('id', detalhesAgendamento.id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarAgendamentos();
     } catch (error) {
@@ -939,7 +953,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     const novoValor = !anterior;
     setDetalhesAgendamento(prev => ({ ...prev, preferenciaProfissional: novoValor }));
     try {
-      const { error } = await supabase.from('agendamentos').update({ preferencia_profissional: novoValor }).eq('id', detalhesAgendamento.id);
+      const { error } = await supabase.from('agendamentos').update({ preferencia_profissional: novoValor }).eq('id', detalhesAgendamento.id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarAgendamentos();
     } catch (error) {
@@ -956,7 +970,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
       : (notasDetalhes || null);
     setSalvandoNotas(true);
     try {
-      const { error } = await supabase.from('agendamentos').update({ observacoes: novaObservacao }).eq('id', detalhesAgendamento.id);
+      const { error } = await supabase.from('agendamentos').update({ observacoes: novaObservacao }).eq('id', detalhesAgendamento.id).eq('empresa_id', empresaId);
       if (error) throw error;
       setDetalhesAgendamento(prev => ({ ...prev, observacoesCompletas: novaObservacao || '' }));
       buscarAgendamentos();
@@ -974,7 +988,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     const { notas } = separarObservacoes(detalhesAgendamento.observacoesCompletas);
     const novaObservacao = `[ENCAIXE] ${t('agendamentos.encaixeConvertidoTag')}${notas ? `\n${notas}` : ''}`;
     try {
-      const { error } = await supabase.from('agendamentos').update({ observacoes: novaObservacao }).eq('id', detalhesAgendamento.id);
+      const { error } = await supabase.from('agendamentos').update({ observacoes: novaObservacao }).eq('id', detalhesAgendamento.id).eq('empresa_id', empresaId);
       if (error) throw error;
       setDetalhesAgendamento(prev => ({ ...prev, observacoesCompletas: novaObservacao, encaixe: true }));
       buscarAgendamentos();
@@ -1023,7 +1037,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
         atualizacaoLocal = { duracaoMinutosManual: minutos };
       }
 
-      const { error } = await supabase.from('agendamentos').update(updatePayload).eq('id', detalhesAgendamento.id);
+      const { error } = await supabase.from('agendamentos').update(updatePayload).eq('id', detalhesAgendamento.id).eq('empresa_id', empresaId);
       if (error) throw error;
 
       setDetalhesAgendamento(prev => ({ ...prev, ...atualizacaoLocal }));
@@ -1076,6 +1090,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
       const { data, error } = await supabase
         .from('agendamentos')
         .select('id, data_hora, preco_final, servicos:servico_id(nome), profissionais:profissional_id(nome)')
+        .eq('empresa_id', empresaId)
         .eq('cliente_id', detalhesAgendamento.clienteId)
         .eq('status', 'REALIZADO')
         .order('data_hora', { ascending: false });
@@ -1104,7 +1119,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     setAnamneseAberta(true);
     setCarregandoAnamnese(true);
     try {
-      const { data, error } = await supabase.from('clientes').select('anamnese').eq('id', detalhesAgendamento.clienteId).single();
+      const { data, error } = await supabase.from('clientes').select('anamnese').eq('id', detalhesAgendamento.clienteId).eq('empresa_id', empresaId).single();
       if (error) throw error;
       setAnamneseTexto(data?.anamnese || '');
     } catch (error) {
@@ -1123,7 +1138,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     if (!detalhesAgendamento?.clienteId) return;
     setSalvandoAnamnese(true);
     try {
-      const { error } = await supabase.from('clientes').update({ anamnese: anamneseTexto || null }).eq('id', detalhesAgendamento.clienteId);
+      const { error } = await supabase.from('clientes').update({ anamnese: anamneseTexto || null }).eq('id', detalhesAgendamento.clienteId).eq('empresa_id', empresaId);
       if (error) throw error;
       alert(t('agendamentos.anamneseSalva'));
     } catch (error) {
@@ -1137,7 +1152,7 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
     if (!detalhesAgendamento) return;
     if (!window.confirm(t('agendamentos.confirmarDeletar'))) return;
     try {
-      const { error } = await supabase.from('agendamentos').delete().eq('id', detalhesAgendamento.id);
+      const { error } = await supabase.from('agendamentos').delete().eq('id', detalhesAgendamento.id).eq('empresa_id', empresaId);
       if (error) throw error;
       alert(t('agendamentos.deletado'));
       fecharDetalhesAgendamento();
@@ -1186,7 +1201,8 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa }) {
       const { error } = await supabase
         .from('agendamentos')
         .update({ data_hora: `${edicaoForm.data}T${edicaoForm.horario}:00` })
-        .eq('id', agendamentoEditando.id);
+        .eq('id', agendamentoEditando.id)
+        .eq('empresa_id', empresaId);
 
       if (error) throw error;
 

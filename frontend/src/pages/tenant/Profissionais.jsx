@@ -44,6 +44,7 @@ function Profissionais({ empresa, empresaId }) {
 
   useEffect(() => {
     buscarProfissionais();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const buscarProfissionais = async () => {
@@ -53,6 +54,7 @@ function Profissionais({ empresa, empresaId }) {
       const { data, error } = await supabase
         .from('profissionais')
         .select('id, nome, telefone, comissao_percentual, imagem_url, criado_em')
+        .eq('empresa_id', empresaId)
         .order('criado_em', { ascending: false });
       if (error) throw error;
       setProfissionais(data || []);
@@ -111,7 +113,7 @@ function Profissionais({ empresa, empresaId }) {
     setErro('');
     try {
       const imagemUrl = await enviarImagemTenant(empresaId, arquivo, 'profissionais');
-      const { error } = await supabase.from('profissionais').update({ imagem_url: imagemUrl }).eq('id', id);
+      const { error } = await supabase.from('profissionais').update({ imagem_url: imagemUrl }).eq('id', id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarProfissionais();
     } catch (e) {
@@ -124,7 +126,7 @@ function Profissionais({ empresa, empresaId }) {
   const handleDeletar = async (id) => {
     if (!window.confirm('Remover este profissional?')) return;
     try {
-      const { error } = await supabase.from('profissionais').delete().eq('id', id);
+      const { error } = await supabase.from('profissionais').delete().eq('id', id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarProfissionais();
     } catch (e) {

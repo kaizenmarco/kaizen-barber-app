@@ -3,7 +3,7 @@ import { supabase } from '../../config/supabaseClientTenant';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../../config/traducoesAdmin';
 import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, buscarHorariosPorProfissional, HORARIO_ESTENDIDO_PADRAO } from '../../config/horariosTenant';
 
-function Clientes({ t: tProp, idioma: idiomaProp }) {
+function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
 
@@ -66,13 +66,14 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
   const [profissionaisLista, setProfissionaisLista] = useState([]);
   const [servicosLista, setServicosLista] = useState([]);
   useEffect(() => {
-    supabase.from('profissionais').select('id, nome').order('nome', { ascending: true })
+    supabase.from('profissionais').select('id, nome').eq('empresa_id', empresaId).order('nome', { ascending: true })
       .then(({ data, error }) => {
         if (!error && data) setProfissionaisLista(data.map(p => ({ id: p.id, uuid: p.id, nome: p.nome })));
       });
     supabase
       .from('servicos')
       .select('id, nome, preco_minimo, duracao_minutos')
+      .eq('empresa_id', empresaId)
       .eq('eh_pacote', false)
       .order('nome', { ascending: true })
       .then(({ data, error }) => {
@@ -86,6 +87,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
           })));
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Horário de trabalho de cada profissional (aba "Horário de Trabalho") —
@@ -118,6 +120,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     supabase
       .from('agendamentos')
       .select('data_hora, servico_id, status')
+      .eq('empresa_id', empresaId)
       .eq('profissional_id', profObj.uuid)
       .gte('data_hora', `${novoAgendamentoForm.data}T00:00:00`)
       .lt('data_hora', `${novoAgendamentoForm.data}T23:59:59`)
@@ -219,6 +222,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
           bloqueado,
           agendamentos(id, status, data_hora)
         `)
+        .eq('empresa_id', empresaId)
         .order('criado_em', { ascending: false });
 
       if (error) throw error;
@@ -288,7 +292,8 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
       const { error: erroAgendamentos } = await supabase
         .from('agendamentos')
         .delete()
-        .eq('cliente_id', clienteId);
+        .eq('cliente_id', clienteId)
+        .eq('empresa_id', empresaId);
 
       if (erroAgendamentos) throw erroAgendamentos;
 
@@ -296,7 +301,8 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
       const { error: erroCliente } = await supabase
         .from('clientes')
         .delete()
-        .eq('id', clienteId);
+        .eq('id', clienteId)
+        .eq('empresa_id', empresaId);
 
       if (erroCliente) throw erroCliente;
 
@@ -335,6 +341,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
       const { data, error } = await supabase
         .from('agendamentos')
         .select('id, data_hora, preco_final, servicos:servico_id(nome), profissionais:profissional_id(nome)')
+        .eq('empresa_id', empresaId)
         .eq('cliente_id', clienteEditando.id)
         .eq('status', 'REALIZADO')
         .order('data_hora', { ascending: false });
@@ -363,7 +370,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     setAnamneseAberta(true);
     setCarregandoAnamnese(true);
     try {
-      const { data, error } = await supabase.from('clientes').select('anamnese').eq('id', clienteEditando.id).single();
+      const { data, error } = await supabase.from('clientes').select('anamnese').eq('id', clienteEditando.id).eq('empresa_id', empresaId).single();
       if (error) throw error;
       setAnamneseTexto(data?.anamnese || '');
     } catch (error) {
@@ -382,7 +389,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     if (!clienteEditando) return;
     setSalvandoAnamnese(true);
     try {
-      const { error } = await supabase.from('clientes').update({ anamnese: anamneseTexto || null }).eq('id', clienteEditando.id);
+      const { error } = await supabase.from('clientes').update({ anamnese: anamneseTexto || null }).eq('id', clienteEditando.id).eq('empresa_id', empresaId);
       if (error) throw error;
       alert(t('agendamentos.anamneseSalva'));
     } catch (error) {
@@ -434,7 +441,8 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
           email: edicaoClienteForm.email || null,
           data_nascimento: edicaoClienteForm.data_nascimento || null
         })
-        .eq('id', clienteEditando.id);
+        .eq('id', clienteEditando.id)
+        .eq('empresa_id', empresaId);
 
       if (error) throw error;
 

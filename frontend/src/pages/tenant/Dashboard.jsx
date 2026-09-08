@@ -3,7 +3,7 @@ import { supabase } from '../../config/supabaseClientTenant';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { LOCALE_POR_IDIOMA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../../config/traducoesAdmin';
 
-function Dashboard({ t: tProp, idioma: idiomaProp }) {
+function Dashboard({ t: tProp, idioma: idiomaProp, empresaId }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
   const locale = LOCALE_POR_IDIOMA_ADMIN[idioma] || 'pt-BR';
@@ -34,6 +34,7 @@ function Dashboard({ t: tProp, idioma: idiomaProp }) {
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
         `)
+        .eq('empresa_id', empresaId)
         .order('data_hora', { ascending: false });
 
       if (erroAgendamentos) throw erroAgendamentos;
@@ -41,7 +42,8 @@ function Dashboard({ t: tProp, idioma: idiomaProp }) {
       // Buscar clientes
       const { data: clientesData, error: erroClientes } = await supabase
         .from('clientes')
-        .select('id, nome');
+        .select('id, nome')
+        .eq('empresa_id', empresaId);
 
       if (erroClientes) throw erroClientes;
 

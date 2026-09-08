@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../../config/traducoesAdmin';
 
-function Fidelidade({ t: tProp, idioma: idiomaProp }) {
+function Fidelidade({ t: tProp, idioma: idiomaProp, empresaId }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
 
@@ -22,6 +22,7 @@ function Fidelidade({ t: tProp, idioma: idiomaProp }) {
       const { data: clientesData, error: erroClientes } = await supabase
         .from('clientes')
         .select('id, nome, email, criado_em')
+        .eq('empresa_id', empresaId)
         .order('nome', { ascending: true });
 
       if (erroClientes) throw erroClientes;
@@ -33,6 +34,7 @@ function Fidelidade({ t: tProp, idioma: idiomaProp }) {
           const { data: agendamentos, error: erroAgendamentos } = await supabase
             .from('agendamentos')
             .select('id, status, preco_final, data_hora')
+            .eq('empresa_id', empresaId)
             .eq('cliente_id', cliente.id)
             .eq('status', 'REALIZADO');
 

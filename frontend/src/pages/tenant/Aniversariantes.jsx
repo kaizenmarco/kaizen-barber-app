@@ -8,7 +8,7 @@ import { IDIOMA_ADMIN_PADRAO, LOCALE_POR_IDIOMA_ADMIN, traduzirAdmin } from '../
 // ver migração "desconto_aniversario_cron" e a função conceder_desconto_aniversario).
 // Aqui é só a visão + o botão pra marcar o desconto como usado depois que o
 // Admin aplicar os 40% manualmente ao fechar a comanda do cliente.
-function Aniversariantes({ t: tProp, idioma: idiomaProp }) {
+function Aniversariantes({ t: tProp, idioma: idiomaProp, empresaId }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
   const locale = LOCALE_POR_IDIOMA_ADMIN[idioma] || 'pt-BR';
@@ -27,6 +27,7 @@ function Aniversariantes({ t: tProp, idioma: idiomaProp }) {
       const { data, error } = await supabase
         .from('clientes')
         .select('id, nome, email, telefone, data_nascimento, desconto_aniversario_disponivel, desconto_aniversario_expira_em')
+        .eq('empresa_id', empresaId)
         .not('data_nascimento', 'is', null);
 
       if (error) throw error;
@@ -44,7 +45,8 @@ function Aniversariantes({ t: tProp, idioma: idiomaProp }) {
       const { error } = await supabase
         .from('clientes')
         .update({ desconto_aniversario_disponivel: false })
-        .eq('id', clienteId);
+        .eq('id', clienteId)
+        .eq('empresa_id', empresaId);
 
       if (error) throw error;
       buscar();

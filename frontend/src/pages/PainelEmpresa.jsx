@@ -178,17 +178,17 @@ function PainelPrincipal({ perfil, empresa, aoSair }) {
       )}
 
       <main style={estilos.main}>
-        {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={IDIOMA_ADMIN_PADRAO} />}
-        {abaSelecionada === 'clientes' && <Clientes t={t} idioma={IDIOMA_ADMIN_PADRAO} />}
-        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={IDIOMA_ADMIN_PADRAO} />}
-        {abaSelecionada === 'aniversariantes' && <Aniversariantes t={t} idioma={IDIOMA_ADMIN_PADRAO} />}
+        {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'clientes' && <Clientes t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'aniversariantes' && <Aniversariantes t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'profissionais' && <Profissionais empresa={empresa} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'servicos' && <Servicos empresa={empresa} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'visual' && <Visual empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'horarios' && <HorariosProfissionais />}
-        {abaSelecionada === 'agenda' && <Agenda empresa={empresa} />}
-        {abaSelecionada === 'comandas' && <Comandas empresa={empresa} />}
-        {abaSelecionada === 'caixa' && <Caixa empresa={empresa} />}
+        {abaSelecionada === 'horarios' && <HorariosProfissionais empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'agenda' && <Agenda empresa={empresa} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'comandas' && <Comandas empresa={empresa} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'caixa' && <Caixa empresa={empresa} empresaId={perfil.empresa_id} />}
       </main>
 
       <nav style={estilos.nav}>
@@ -241,7 +241,7 @@ export default function PainelEmpresa() {
       if (perfilData?.empresa_id) {
         const { data: empresaData } = await supabaseSaaS
           .from('empresas')
-          .select('nome, plano, moeda, status, profissionais_extras, observacao_status')
+          .select('id, nome, plano, moeda, status, profissionais_extras, observacao_status')
           .eq('id', perfilData.empresa_id)
           .maybeSingle();
         if (!cancelado) setEmpresa(empresaData);
