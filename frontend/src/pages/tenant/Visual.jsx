@@ -10,7 +10,7 @@ import { enviarImagemTenant } from '../../config/uploadImagemTenant';
 // sempre dentro da pasta da própria empresa; e como empresas.status/plano
 // não podem ser alterados pelo tenant (só o Super Admin/Stripe), salvar
 // logo_url/imagens_local/endereco/contatos passa pela function
-// private.atualizar_visual_empresa em vez de um update direto na tabela.
+// public.atualizar_visual_empresa em vez de um update direto na tabela.
 
 function Visual({ empresaId }) {
   const [logoUrl, setLogoUrl] = useState('');
