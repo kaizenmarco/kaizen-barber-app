@@ -157,7 +157,7 @@ function AgendamentoPublico() {
     (async () => {
       const { data, error } = await supabase
         .from('empresas')
-        .select('id, nome, slug, plano, status, moeda, logo_url, endereco, whatsapp_numero, instagram_usuario, tiktok_usuario')
+        .select('id, nome, slug, plano, status, moeda, logo_url, imagens_local, endereco, whatsapp_numero, instagram_usuario, tiktok_usuario')
         .eq('slug', slug)
         .maybeSingle();
       if (cancelado) return;
@@ -1776,6 +1776,24 @@ function AgendamentoPublico() {
                   </tbody>
                 </table>
               </div>
+
+              {empresa.imagens_local && empresa.imagens_local.length > 0 && (
+                <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 14px rgba(0,0,0,0.35)' }}>
+                  <h3 style={{ color: '#d4af37', marginTop: 0, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    📷 {t('endereco_fotos_titulo')}
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px' }}>
+                    {empresa.imagens_local.map((url) => (
+                      <img
+                        key={url}
+                        src={url}
+                        alt={empresa.nome}
+                        style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid #404040' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         )}

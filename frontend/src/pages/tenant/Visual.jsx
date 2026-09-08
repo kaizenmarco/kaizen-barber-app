@@ -2,22 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
 import { enviarImagemTenant } from '../../config/uploadImagemTenant';
 
-// Personalização visual da empresa: logo e fotos do salão. Antes era
-// pensado como exclusivo do plano Completo (ver migration
+// Personalização visual da empresa: logo, fotos do salão e dados de
+// contato (endereço/WhatsApp/Instagram/TikTok). Antes era pensado como
+// exclusivo do plano Completo (ver migration
 // 009_personalizacao_visual_plano_completo), mas foi liberado pra todos os
 // planos. Os arquivos vão pro bucket compartilhado "empresas-imagens",
 // sempre dentro da pasta da própria empresa; e como empresas.status/plano
 // não podem ser alterados pelo tenant (só o Super Admin/Stripe), salvar
-// logo_url/imagens_local passa pela function private.atualizar_visual_empresa
-// em vez de um update direto na tabela.
+// logo_url/imagens_local/endereco/contatos passa pela function
+// private.atualizar_visual_empresa em vez de um update direto na tabela.
 
 function Visual({ empresaId }) {
   const [logoUrl, setLogoUrl] = useState('');
   const [fotos, setFotos] = useState([]);
+  const [endereco, setEndereco] = useState('');
+  const [whatsappNumero, setWhatsappNumero] = useState('');
+  const [instagramUsuario, setInstagramUsuario] = useState('');
+  const [tiktokUsuario, setTiktokUsuario] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [enviandoLogo, setEnviandoLogo] = useState(false);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [salvandoContato, setSalvandoContato] = useState(false);
   const [erro, setErro] = useState('');
+  const [erroContato, setErroContato] = useState('');
+  const [sucessoContato, setSucessoContato] = useState(false);
 
   useEffect(() => {
     buscarVisual();
@@ -30,12 +38,16 @@ function Visual({ empresaId }) {
     try {
       const { data, error } = await supabase
         .from('empresas')
-        .select('logo_url, imagens_local')
+        .select('logo_url, imagens_local, endereco, whatsapp_numero, instagram_usuario, tiktok_usuario')
         .eq('id', empresaId)
         .maybeSingle();
       if (error) throw error;
       setLogoUrl(data?.logo_url || '');
       setFotos(data?.imagens_local || []);
+      setEndereco(data?.endereco || '');
+      setWhatsappNumero(data?.whatsapp_numero || '');
+      setInstagramUsuario(data?.instagram_usuario || '');
+      setTiktokUsuario(data?.tiktok_usuario || '');
     } catch (e) {
       setErro(`Não consegui carregar a personalização visual: ${e.message}`);
     } finally {
@@ -43,10 +55,18 @@ function Visual({ empresaId }) {
     }
   };
 
-  const salvar = async (novoLogoUrl, novasFotos) => {
+  // Sempre manda todos os campos juntos — a function substitui a linha
+  // inteira, então quem chama precisa passar o valor atual de tudo que não
+  // está mudando agora (senão salvar uma foto nova apagaria o endereço, e
+  // vice-versa).
+  const salvar = async (dados) => {
     const { error } = await supabase.rpc('atualizar_visual_empresa', {
-      p_logo_url: novoLogoUrl,
-      p_imagens_local: novasFotos,
+      p_logo_url: dados.logoUrl,
+      p_imagens_local: dados.fotos,
+      p_endereco: dados.endereco || null,
+      p_whatsapp_numero: dados.whatsappNumero || null,
+      p_instagram_usuario: dados.instagramUsuario || null,
+      p_tiktok_usuario: dados.tiktokUsuario || null,
     });
     if (error) throw error;
   };
@@ -58,7 +78,7 @@ function Visual({ empresaId }) {
     setErro('');
     try {
       const url = await enviarImagemTenant(empresaId, arquivo, 'logo');
-      await salvar(url, fotos);
+      await salvar({ logoUrl: url, fotos, endereco, whatsappNumero, instagramUsuario, tiktokUsuario });
       setLogoUrl(url);
     } catch (e2) {
       setErro(`Não consegui enviar o logo: ${e2.message}`);
@@ -75,7 +95,7 @@ function Visual({ empresaId }) {
     try {
       const url = await enviarImagemTenant(empresaId, arquivo, 'salao');
       const novasFotos = [...fotos, url];
-      await salvar(logoUrl, novasFotos);
+      await salvar({ logoUrl, fotos: novasFotos, endereco, whatsappNumero, instagramUsuario, tiktokUsuario });
       setFotos(novasFotos);
     } catch (e2) {
       setErro(`Não consegui enviar a foto: ${e2.message}`);
@@ -89,10 +109,26 @@ function Visual({ empresaId }) {
     if (!window.confirm('Remover esta foto?')) return;
     const novasFotos = fotos.filter((f) => f !== url);
     try {
-      await salvar(logoUrl, novasFotos);
+      await salvar({ logoUrl, fotos: novasFotos, endereco, whatsappNumero, instagramUsuario, tiktokUsuario });
       setFotos(novasFotos);
     } catch (e) {
       setErro(`Não consegui remover: ${e.message}`);
+    }
+  };
+
+  const handleSalvarContato = async (e) => {
+    e.preventDefault();
+    setSalvandoContato(true);
+    setErroContato('');
+    setSucessoContato(false);
+    try {
+      await salvar({ logoUrl, fotos, endereco, whatsappNumero, instagramUsuario, tiktokUsuario });
+      setSucessoContato(true);
+      setTimeout(() => setSucessoContato(false), 3000);
+    } catch (e2) {
+      setErroContato(`Não consegui salvar: ${e2.message}`);
+    } finally {
+      setSalvandoContato(false);
     }
   };
 
@@ -155,6 +191,64 @@ function Visual({ empresaId }) {
         )}
 
         {erro && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>{erro}</p>}
+      </section>
+
+      <section className="form-section">
+        <h3>Endereço e contato</h3>
+        <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
+          Aparecem na aba "Endereço/Sobre" do site público de agendamento.
+        </p>
+        <form onSubmit={handleSalvarContato}>
+          <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
+            Endereço
+          </label>
+          <textarea
+            value={endereco}
+            onChange={(e) => setEndereco(e.target.value)}
+            placeholder="Rua, número, bairro, cidade..."
+            rows={2}
+            style={{ width: '100%', resize: 'vertical', marginBottom: '10px' }}
+          />
+
+          <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
+            WhatsApp (só números, com código do país. Ex: 5511999999999)
+          </label>
+          <input
+            type="text"
+            value={whatsappNumero}
+            onChange={(e) => setWhatsappNumero(e.target.value.replace(/[^\d]/g, ''))}
+            placeholder="5511999999999"
+            style={{ marginBottom: '10px' }}
+          />
+
+          <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
+            Instagram (usuário, sem @)
+          </label>
+          <input
+            type="text"
+            value={instagramUsuario}
+            onChange={(e) => setInstagramUsuario(e.target.value.replace(/^@/, ''))}
+            placeholder="minhabarbearia"
+            style={{ marginBottom: '10px' }}
+          />
+
+          <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
+            TikTok (usuário, sem @)
+          </label>
+          <input
+            type="text"
+            value={tiktokUsuario}
+            onChange={(e) => setTiktokUsuario(e.target.value.replace(/^@/, ''))}
+            placeholder="minhabarbearia"
+            style={{ marginBottom: '14px' }}
+          />
+
+          <button type="submit" className="btn-primary" disabled={salvandoContato}>
+            {salvandoContato ? 'Salvando...' : 'Salvar'}
+          </button>
+          {sucessoContato && <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '8px' }}>Salvo!</p>}
+          {erroContato && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '8px' }}>{erroContato}</p>}
+        </form>
       </section>
     </div>
   );
