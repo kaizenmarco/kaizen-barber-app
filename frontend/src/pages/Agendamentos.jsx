@@ -1367,7 +1367,11 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       <div className="agenda-dias-semana">
         <button type="button" className="agenda-seta-semana" onClick={() => mudarSemana(-1)} aria-label={t('agendamentos.anterior')}>‹</button>
         {diasDaSemanaAtual.map(d => {
-          const dataStr = d.toISOString().split('T')[0];
+          // formatarDataLocalISO (não toISOString, que converte pra UTC e
+          // "puxa" a data de cada botão um dia pra trás no fuso do Japão,
+          // fazendo o carrossel selecionar/mostrar sempre o dia errado —
+          // ex: clicar em "Sáb" carregava os dados reais de sexta-feira).
+          const dataStr = formatarDataLocalISO(d);
           return (
             <button
               key={dataStr}
@@ -1853,14 +1857,14 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           <button type="submit" className="btn-primary">{t('agendamentos.criarBloqueio')}</button>
         </form>
 
-        {bloqueiosFiltrados.filter(b => b.data >= new Date().toISOString().split('T')[0]).length > 0 && (
+        {bloqueiosFiltrados.filter(b => b.data >= hojeISO).length > 0 && (
           <div style={{ marginTop: '18px' }}>
             <p style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>
               {t('agendamentos.bloqueiosAtivos')}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {bloqueiosFiltrados
-                .filter(b => b.data >= new Date().toISOString().split('T')[0])
+                .filter(b => b.data >= hojeISO)
                 .sort((a, b) => (a.data + a.horaInicio).localeCompare(b.data + b.horaInicio))
                 .map(b => (
                   <div
