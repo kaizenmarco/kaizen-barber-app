@@ -252,6 +252,43 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     buscarHorarioEstendido().then(setHorarioEstendido);
   }, []);
 
+  // Lista de clientes já cadastrados (nome/email/telefone/nascimento) — usada
+  // só pra alimentar o autocomplete de "encontrar cliente já existente" ao
+  // digitar o nome no formulário de Novo Agendamento (tanto pelo botão "+"
+  // quanto pelo agendar-a-partir-do-clique na timeline). Busca uma vez só;
+  // como é uma lista simples de nomes, não precisa recarregar a cada
+  // agendamento criado.
+  const [clientesLista, setClientesLista] = useState([]);
+  useEffect(() => {
+    supabase
+      .from('clientes')
+      .select('id, nome, email, telefone, data_nascimento')
+      .order('nome', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setClientesLista(data);
+      });
+  }, []);
+
+  // Sugestões de nome que COMEÇAM com o texto digitado (não "contém" — é o
+  // que foi pedido: conforme a pessoa vai digitando mais letras, a lista vai
+  // ficando mais específica), no máximo 8 pra não virar uma lista enorme.
+  const [sugestoesClienteAbertas, setSugestoesClienteAbertas] = useState(false);
+  const filtrarClientesPorNome = (texto) => {
+    const alvo = (texto || '').trim().toLowerCase();
+    if (!alvo) return [];
+    return clientesLista.filter(c => (c.nome || '').toLowerCase().startsWith(alvo)).slice(0, 8);
+  };
+  const selecionarClienteSugerido = (cliente) => {
+    setNovoAgendamento(prev => ({
+      ...prev,
+      cliente: cliente.nome || '',
+      email: cliente.email || '',
+      telefone: cliente.telefone || '',
+      dataNascimento: cliente.data_nascimento || ''
+    }));
+    setSugestoesClienteAbertas(false);
+  };
+
   // Buscar agendamentos
   useEffect(() => {
     buscarAgendamentos();
@@ -1631,14 +1668,41 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
               </button>
             </div>
             <form onSubmit={handleAgendar}>
-              <input
-                type="text"
-                name="cliente"
-                placeholder={t('agendamentos.nomeCliente')}
-                value={novoAgendamento.cliente}
-                onChange={handleInputChange}
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  name="cliente"
+                  placeholder={t('agendamentos.nomeCliente')}
+                  value={novoAgendamento.cliente}
+                  onChange={(e) => { handleInputChange(e); setSugestoesClienteAbertas(!!e.target.value); }}
+                  onFocus={() => setSugestoesClienteAbertas(!!novoAgendamento.cliente)}
+                  onBlur={() => setTimeout(() => setSugestoesClienteAbertas(false), 150)}
+                  autoComplete="off"
+                  required
+                />
+                {sugestoesClienteAbertas && filtrarClientesPorNome(novoAgendamento.cliente).length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+                      background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '6px',
+                      marginTop: '2px', maxHeight: '200px', overflowY: 'auto'
+                    }}
+                  >
+                    {filtrarClientesPorNome(novoAgendamento.cliente).map(c => (
+                      <div
+                        key={c.id}
+                        onMouseDown={() => selecionarClienteSugerido(c)}
+                        style={{ padding: '9px 12px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid #404040' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#3a3a3a'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <strong>{c.nome}</strong>
+                        {c.telefone ? <span style={{ color: '#999' }}> — {c.telefone}</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
                 type="email"
                 name="email"
@@ -2615,6 +2679,36 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
             <p style={{ color: '#999', fontSize: '12px', marginBottom: '16px' }}>
               {profissionaisLista.find(p => p.uuid === bloqueioRapido.profissionalId)?.nome} · {new Date(`${bloqueioRapido.data}T00:00:00`).toLocaleDateString(locale)}
             </p>
+
+            {/* Escolha rápida: continuar bloqueando este horário (form abaixo,
+                sem mudar nada) ou virar pro fluxo de Agendar — que reaproveita
+                o mesmo modal/formulário do botão "+", já com profissional,
+                data e horário pré-preenchidos a partir de onde clicou. */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const nomeProf = profissionaisLista.find(p => p.uuid === bloqueioRapido.profissionalId)?.nome || '';
+                  setNovoAgendamento({
+                    cliente: '', email: '', telefone: '', dataNascimento: '',
+                    data: bloqueioRapido.data, horario: bloqueioRapido.horaInicio,
+                    servico: '', profissional: nomeProf
+                  });
+                  setBloqueioRapido(null);
+                  setModalNovoAberto(true);
+                }}
+                style={{ flex: 1, padding: '9px', borderRadius: '6px', border: '1px solid #4ade80', background: 'transparent', color: '#4ade80', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
+              >
+                📅 {t('agendamentos.agendarHorarioRapido')}
+              </button>
+              <button
+                type="button"
+                disabled
+                style={{ flex: 1, padding: '9px', borderRadius: '6px', border: '1px solid #d4af37', background: '#d4af37', color: '#1a1a1a', fontWeight: 'bold', fontSize: '13px', cursor: 'default' }}
+              >
+                🚫 {t('agendamentos.bloquearHorarioRapido')}
+              </button>
+            </div>
 
             <label className="detalhe-campo-label" style={{ display: 'block', marginBottom: '6px' }}>{t('agendamentos.periodoBloqueio')}</label>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
