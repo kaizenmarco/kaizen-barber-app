@@ -161,9 +161,10 @@ function Visual({ empresaId }) {
       </section>
 
       <section className="list-section">
-        <h3>Fotos do salão</h3>
+        <h3>Fotos Ambiente e Fachada</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Fotos do ambiente, usadas no site público de agendamento (aba Endereço/Sobre).
+          Fotos do interior, ambiente e fachada da barbearia — pode adicionar quantas quiser.
+          Aparecem no site público de agendamento (aba Endereço/Sobre).
         </p>
         <input type="file" accept="image/*" onChange={handleAdicionarFoto} disabled={enviandoFoto} />
         {enviandoFoto && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>Enviando...</p>}

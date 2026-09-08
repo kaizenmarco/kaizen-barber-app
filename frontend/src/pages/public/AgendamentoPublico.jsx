@@ -1129,11 +1129,13 @@ function AgendamentoPublico() {
       )}
       <header style={{ borderBottom: '3px solid #d4af37', position: 'relative' }}>
         {empresa.logo_url && (
-          <img
-            src={empresa.logo_url}
-            alt={empresa.nome}
-            style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center' }}
-          />
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '18px' }}>
+            <img
+              src={empresa.logo_url}
+              alt={empresa.nome}
+              style={{ width: '92px', height: '92px', objectFit: 'cover', borderRadius: '12px', border: '2px solid #d4af37', display: 'block' }}
+            />
+          </div>
         )}
         <div style={{ padding: '20px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
@@ -1801,10 +1803,10 @@ function AgendamentoPublico() {
         {abaAtiva === 'profissionais' && (
           <section>
             <h2 style={{ color: '#d4af37', marginBottom: '30px' }}>👥 {t('profissionais_titulo')}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px' }}>
               {profissionais.map((prof) => (
                 <div key={prof.id} style={{ border: '1px solid #d4af37', borderRadius: '8px', overflow: 'hidden', background: '#2d2d2d' }}>
-                  <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', aspectRatio: '2 / 3', objectFit: 'cover', objectPosition: 'center top' }} />
+                  <img src={prof.imagem} alt={prof.nome} style={{ width: '100%', aspectRatio: '3 / 4', objectFit: 'cover', objectPosition: 'center top' }} />
                   <div style={{ padding: '15px' }}>
                     <h3 style={{ color: '#d4af37' }}>{prof.nome}</h3>
                     {prof.especialidade && (
