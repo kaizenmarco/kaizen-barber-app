@@ -1129,11 +1129,11 @@ function AgendamentoPublico() {
       )}
       <header style={{ borderBottom: '3px solid #d4af37', position: 'relative' }}>
         {empresa.logo_url && (
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '18px' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             <img
               src={empresa.logo_url}
               alt={empresa.nome}
-              style={{ width: '92px', height: '92px', objectFit: 'cover', borderRadius: '12px', border: '2px solid #d4af37', display: 'block' }}
+              style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
             />
           </div>
         )}
