@@ -157,7 +157,7 @@ function AgendamentoPublico() {
     (async () => {
       const { data, error } = await supabase
         .from('empresas')
-        .select('id, nome, slug, plano, status, moeda, logo_url, imagens_local, endereco, whatsapp_numero, instagram_usuario, tiktok_usuario')
+        .select('id, nome, slug, plano, status, moeda, logo_url, logo_pequeno_url, imagem_agendar_url, imagens_local, endereco, whatsapp_numero, instagram_usuario, tiktok_usuario')
         .eq('slug', slug)
         .maybeSingle();
       if (cancelado) return;
@@ -1129,15 +1129,33 @@ function AgendamentoPublico() {
       )}
       <header style={{ borderBottom: '3px solid #d4af37', position: 'relative' }}>
         {empresa.logo_url && (
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative' }}>
             <img
               src={empresa.logo_url}
               alt={empresa.nome}
               style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
             />
+            {empresa.logo_pequeno_url && (
+              <img
+                src={empresa.logo_pequeno_url}
+                alt={`Logo ${empresa.nome}`}
+                style={{
+                  position: 'absolute',
+                  left: '24px',
+                  bottom: '-32px',
+                  width: '84px',
+                  height: '84px',
+                  objectFit: 'cover',
+                  borderRadius: '50%',
+                  border: '3px solid #1a1a1a',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+                  background: '#1a1a1a',
+                }}
+              />
+            )}
           </div>
         )}
-        <div style={{ padding: '20px', textAlign: 'center' }}>
+        <div style={{ padding: '20px', textAlign: 'center', paddingTop: empresa.logo_url && empresa.logo_pequeno_url ? '44px' : '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
             {IDIOMAS.map((op) => (
               <button
@@ -1331,13 +1349,22 @@ function AgendamentoPublico() {
         )}
 
         {abaAtiva === 'agendar' && (
-          <section style={{
+          <section style={empresa.imagem_agendar_url ? {
+            backgroundImage: `url(${empresa.imagem_agendar_url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed',
+            border: '1px solid #d4af37',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)',
+          } : {
             background: '#2d2d2d',
             border: '1px solid #d4af37',
             borderRadius: '12px',
             overflow: 'hidden',
           }}>
-            <div style={{ padding: '30px' }}>
+            <div style={empresa.imagem_agendar_url ? { background: 'rgba(26, 26, 26, 0.55)', padding: '30px' } : { padding: '30px' }}>
               <h2 style={{ color: '#d4af37', marginBottom: '20px' }}>📅 {t('agendar_titulo')}</h2>
 
               {profissionais.length === 0 || servicos.length === 0 ? (

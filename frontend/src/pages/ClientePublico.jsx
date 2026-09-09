@@ -1090,9 +1090,25 @@ function ClientePublico() {
         <img
           src="/images/header_banner.jpg"
           alt="Kaizen Barber Shop"
-          style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center' }}
+          style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
         />
-        <div style={{ padding: '20px', textAlign: 'center' }}>
+        <img
+          src="/images/logo.jpg"
+          alt="Logo Kaizen Barber Shop"
+          style={{
+            position: 'absolute',
+            left: '24px',
+            bottom: '-32px',
+            width: '84px',
+            height: '84px',
+            objectFit: 'cover',
+            borderRadius: '50%',
+            border: '3px solid #1a1a1a',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+            background: '#1a1a1a',
+          }}
+        />
+        <div style={{ padding: '20px', textAlign: 'center', paddingTop: '44px' }}>
           {/* Seletor de idioma fica aqui embaixo, e não sobre a foto — no
               iPhone, a área de cima da tela (câmera frontal / Dynamic
               Island) cobria os botões quando eles ficavam por cima da
