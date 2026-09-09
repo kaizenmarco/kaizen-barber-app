@@ -1133,7 +1133,7 @@ function AgendamentoPublico() {
             <img
               src={empresa.logo_url}
               alt={empresa.nome}
-              style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
+              style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center 30%', display: 'block' }}
             />
             {empresa.logo_pequeno_url && (
               <img
@@ -1352,8 +1352,7 @@ function AgendamentoPublico() {
           <section style={empresa.imagem_agendar_url ? {
             backgroundImage: `url(${empresa.imagem_agendar_url})`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed',
+            backgroundPosition: 'center 30%',
             border: '1px solid #d4af37',
             borderRadius: '12px',
             overflow: 'hidden',

@@ -1090,7 +1090,7 @@ function ClientePublico() {
         <img
           src="/images/header_banner.jpg"
           alt="Kaizen Barber Shop"
-          style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
+          style={{ width: '100%', aspectRatio: '16 / 7', objectFit: 'cover', objectPosition: 'center 30%', display: 'block' }}
         />
         <img
           src="/images/logo.jpg"
@@ -1306,8 +1306,7 @@ function ClientePublico() {
           <section style={{
             backgroundImage: 'url(/images/agendar_bg.jpg)',
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed',
+            backgroundPosition: 'center 30%',
             borderRadius: '12px',
             overflow: 'hidden',
             boxShadow: '0 0 30px rgba(212, 175, 55, 0.3)'

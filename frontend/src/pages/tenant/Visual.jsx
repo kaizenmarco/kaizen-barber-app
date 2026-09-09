@@ -193,8 +193,10 @@ function Visual({ empresaId }) {
       <section className="form-section">
         <h3>Foto de capa (cabeçalho)</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Imagem grande no topo do site público de agendamento. Fica melhor com uma foto no
-          formato paisagem (larga) — uma foto quadrada ou vertical pode ficar cortada nas laterais.
+          Imagem grande no topo do site público de agendamento. Tire a foto com o celular na
+          horizontal (deitado), não na vertical — o formato ideal é bem largo, tipo 1600×700px
+          (proporção 16:7). Uma foto tirada na vertical fica bastante cortada, mostrando só uma
+          faixa pequena da imagem.
         </p>
         {logoUrl && (
           <img
@@ -262,7 +264,9 @@ function Visual({ empresaId }) {
         <h3>Imagem de fundo da aba Agendar</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
           Uma foto do ambiente aparece atrás do formulário de agendamento, na aba "Agendar" do
-          site público. Sem essa imagem, a aba usa um fundo liso.
+          site público. Sem essa imagem, a aba usa um fundo liso. Assim como a foto de capa, tire
+          com o celular na horizontal (deitado) — o ideal é uma foto larga, tipo 1600×900px. Uma
+          foto tirada na vertical vai aparecer bem cortada.
         </p>
         {imagemAgendarUrl && (
           <img
