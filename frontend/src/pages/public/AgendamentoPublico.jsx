@@ -1142,9 +1142,9 @@ function AgendamentoPublico() {
                 style={{
                   position: 'absolute',
                   left: '24px',
-                  bottom: '-32px',
-                  width: '84px',
-                  height: '84px',
+                  bottom: '-40px',
+                  width: 'clamp(84px, 10vw, 140px)',
+                  height: 'clamp(84px, 10vw, 140px)',
                   objectFit: 'cover',
                   borderRadius: '50%',
                   border: '3px solid #1a1a1a',
@@ -1155,7 +1155,7 @@ function AgendamentoPublico() {
             )}
           </div>
         )}
-        <div style={{ padding: '20px', textAlign: 'center', paddingTop: empresa.logo_url && empresa.logo_pequeno_url ? '44px' : '20px' }}>
+        <div style={{ padding: '20px', textAlign: 'center', paddingTop: empresa.logo_url && empresa.logo_pequeno_url ? '52px' : '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
             {IDIOMAS.map((op) => (
               <button
