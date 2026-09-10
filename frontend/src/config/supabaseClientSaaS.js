@@ -7,7 +7,7 @@
 // SaaS (Super Admin, futura tela de onboarding) usam este arquivo.
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_SAAS_URL = 'https://bjrrgxfghwumhirvdpmx.supabase.co';
+export const SUPABASE_SAAS_URL = 'https://bjrrgxfghwumhirvdpmx.supabase.co';
 const SUPABASE_SAAS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcnJneGZnaHd1bWhpcnZkcG14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4OTI3MzgsImV4cCI6MjEwMzQ2ODczOH0.WK8s-Q-LGBds2fm9Xtb01X2oNhqelFFzFKb2kfw1Atw';
 
 export const supabaseSaaS = createClient(SUPABASE_SAAS_URL, SUPABASE_SAAS_ANON_KEY);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { supabaseSaaS } from '../config/supabaseClientSaaS';
+import { supabaseSaaS, SUPABASE_SAAS_URL } from '../config/supabaseClientSaaS';
 
 // Painel de controle do Marco sobre TODAS as barbearias clientes do SaaS.
 // Só quem tem role='super_admin' na tabela usuarios (projeto kaizen-saas)
@@ -34,6 +34,8 @@ const estilos = {
   td: { padding: '12px 14px', borderBottom: '1px solid #333', fontSize: '14px' },
   badge: { padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold', display: 'inline-block' },
   selectStatus: { background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: '13px' },
+  inputVinculo: { background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: '13px', width: '170px', marginBottom: '6px', boxSizing: 'border-box' },
+  botaoVinculo: { padding: '6px 10px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
 };
 
 function TelaAcessoRestrito({ email, aoSair }) {
@@ -112,23 +114,71 @@ function TelaLogin() {
 
 function PainelEmpresas({ perfil, aoSair }) {
   const [empresas, setEmpresas] = useState([]);
+  const [usuariosPorEmpresa, setUsuariosPorEmpresa] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [salvandoId, setSalvandoId] = useState(null);
+  const [emailVincular, setEmailVincular] = useState({});
+  const [vinculandoId, setVinculandoId] = useState(null);
+  const [mensagemVinculo, setMensagemVinculo] = useState({});
 
   const carregarEmpresas = useCallback(async () => {
     setCarregando(true);
     setErro('');
-    const { data, error } = await supabaseSaaS
-      .from('empresas')
-      .select('id, nome, email_contato, plano, status, criado_em, stripe_subscription_id')
-      .order('criado_em', { ascending: false });
-    if (error) setErro(error.message);
-    else setEmpresas(data || []);
+    const [{ data: dadosEmpresas, error: erroEmpresas }, { data: dadosUsuarios, error: erroUsuarios }] = await Promise.all([
+      supabaseSaaS
+        .from('empresas')
+        .select('id, nome, email_contato, plano, status, criado_em, stripe_subscription_id')
+        .order('criado_em', { ascending: false }),
+      supabaseSaaS
+        .from('usuarios')
+        .select('id, email, empresa_id')
+        .not('empresa_id', 'is', null),
+    ]);
+    if (erroEmpresas) setErro(erroEmpresas.message);
+    else setEmpresas(dadosEmpresas || []);
+    if (!erroUsuarios) {
+      const mapa = {};
+      (dadosUsuarios || []).forEach((u) => { mapa[u.empresa_id] = u; });
+      setUsuariosPorEmpresa(mapa);
+    }
     setCarregando(false);
   }, []);
 
   useEffect(() => { carregarEmpresas(); }, [carregarEmpresas]);
+
+  // Cria (ou vincula, se já existir) o login do dono dessa empresa — usado
+  // quando o convite automático do stripe-webhook não foi enviado (ex: SMTP
+  // ainda não configurado) ou quando o dono perdeu o e-mail de convite.
+  const handleVincularLogin = async (empresaId) => {
+    const email = (emailVincular[empresaId] || '').trim();
+    if (!email) return;
+    setVinculandoId(empresaId);
+    setMensagemVinculo((atual) => ({ ...atual, [empresaId]: null }));
+    try {
+      const { data: sessao } = await supabaseSaaS.auth.getSession();
+      const token = sessao?.session?.access_token;
+      const resposta = await fetch(
+        `${SUPABASE_SAAS_URL}/functions/v1/vincular-usuario-empresa`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ empresa_id: empresaId, email }),
+        }
+      );
+      const resultado = await resposta.json();
+      if (!resposta.ok || resultado.erro) {
+        setMensagemVinculo((atual) => ({ ...atual, [empresaId]: { erro: true, texto: resultado.erro || 'Erro desconhecido.' } }));
+      } else {
+        setMensagemVinculo((atual) => ({ ...atual, [empresaId]: { erro: false, texto: resultado.mensagem } }));
+        carregarEmpresas();
+      }
+    } catch (e) {
+      setMensagemVinculo((atual) => ({ ...atual, [empresaId]: { erro: true, texto: e.message } }));
+    } finally {
+      setVinculandoId(null);
+    }
+  };
 
   const mudarStatus = async (empresaId, novoStatus) => {
     setSalvandoId(empresaId);
@@ -207,6 +257,7 @@ function PainelEmpresas({ perfil, aoSair }) {
                   <th style={estilos.th}>Plano</th>
                   <th style={estilos.th}>Status</th>
                   <th style={estilos.th}>Desde</th>
+                  <th style={estilos.th}>Login</th>
                   <th style={estilos.th}>Ação</th>
                 </tr>
               </thead>
@@ -224,6 +275,36 @@ function PainelEmpresas({ perfil, aoSair }) {
                         </span>
                       </td>
                       <td style={estilos.td}>{new Date(empresa.criado_em).toLocaleDateString('pt-BR')}</td>
+                      <td style={estilos.td}>
+                        {usuariosPorEmpresa[empresa.id] ? (
+                          <span style={{ color: '#4ade80', fontSize: '13px' }}>
+                            ✓ {usuariosPorEmpresa[empresa.id].email}
+                          </span>
+                        ) : (
+                          <div>
+                            <input
+                              type="email"
+                              placeholder="e-mail do dono"
+                              style={estilos.inputVinculo}
+                              value={emailVincular[empresa.id] ?? empresa.email_contato ?? ''}
+                              onChange={(e) => setEmailVincular((atual) => ({ ...atual, [empresa.id]: e.target.value }))}
+                            />
+                            <br />
+                            <button
+                              style={estilos.botaoVinculo}
+                              disabled={vinculandoId === empresa.id}
+                              onClick={() => handleVincularLogin(empresa.id)}
+                            >
+                              {vinculandoId === empresa.id ? 'Vinculando...' : 'Vincular / criar login'}
+                            </button>
+                            {mensagemVinculo[empresa.id] && (
+                              <div style={{ color: mensagemVinculo[empresa.id].erro ? '#f87171' : '#4ade80', fontSize: '12px', marginTop: '4px', maxWidth: '180px' }}>
+                                {mensagemVinculo[empresa.id].texto}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td style={estilos.td}>
                         <select
                           style={estilos.selectStatus}
