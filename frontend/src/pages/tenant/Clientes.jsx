@@ -1,7 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../../config/traducoesAdmin';
 import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, buscarHorariosPorProfissional, HORARIO_ESTENDIDO_PADRAO } from '../../config/horariosTenant';
+
+// Importar clientes via CSV — parser simples (sem dependência externa) que
+// aceita aspas e vírgulas dentro de campos (padrão RFC4180 básico). O
+// cabeçalho é comparado de forma tolerante (sem acento, minúsculo, espaços
+// viram "_"), então "Telefone", "telefone" ou "Celular" são todos aceitos.
+const ALIASES_COLUNA_IMPORTACAO = {
+  nome: ['nome', 'name', 'cliente'],
+  telefone: ['telefone', 'telephone', 'phone', 'celular', 'whatsapp', 'fone'],
+  email: ['email', 'e-mail', 'e_mail'],
+  data_nascimento: ['data_nascimento', 'nascimento', 'aniversario', 'data_de_nascimento'],
+  data_primeira_visita: ['data_primeira_visita', 'primeira_visita', 'data_primeiro_atendimento', 'primeiro_atendimento', 'data_da_primeira_visita'],
+};
+
+function normalizarCabecalhoImportacao(texto) {
+  return (texto || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/\s+/g, '_');
+}
+
+function normalizarTelefoneImportacao(valor) {
+  return (valor || '').replace(/\D/g, '');
+}
+
+function analisarCsvImportacao(texto) {
+  const linhas = [];
+  let linhaAtual = [];
+  let campoAtual = '';
+  let dentroAspas = false;
+  const t = String(texto || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (dentroAspas) {
+      if (c === '"') {
+        if (t[i + 1] === '"') { campoAtual += '"'; i++; }
+        else dentroAspas = false;
+      } else {
+        campoAtual += c;
+      }
+    } else if (c === '"') {
+      dentroAspas = true;
+    } else if (c === ',') {
+      linhaAtual.push(campoAtual);
+      campoAtual = '';
+    } else if (c === '\n') {
+      linhaAtual.push(campoAtual);
+      linhas.push(linhaAtual);
+      linhaAtual = [];
+      campoAtual = '';
+    } else {
+      campoAtual += c;
+    }
+  }
+  if (campoAtual !== '' || linhaAtual.length > 0) {
+    linhaAtual.push(campoAtual);
+    linhas.push(linhaAtual);
+  }
+  return linhas.filter((linha) => linha.some((campo) => campo.trim() !== ''));
+}
 
 function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
@@ -9,6 +67,14 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
 
   const [clientes, setClientes] = useState([]);
   const [carregando, setCarregando] = useState(true);
+
+  // Importar clientes via CSV — traz uma base existente (planilha) de uma
+  // vez só, em vez de cadastrar cliente por cliente.
+  const inputImportacaoRef = useRef(null);
+  const [previewImportacao, setPreviewImportacao] = useState(null);
+  const [erroImportacao, setErroImportacao] = useState('');
+  const [importandoClientes, setImportandoClientes] = useState(false);
+  const [resultadoImportacao, setResultadoImportacao] = useState('');
 
   // Mesma ideia do rascunho salvo em Agendamentos.jsx: no iPhone, sair pra
   // outro app (Contatos, Telefone) pra conferir um número e voltar pode
@@ -284,6 +350,115 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
     }
   };
 
+  const handleBaixarModeloImportacao = () => {
+    const cabecalho = 'Nome,Telefone,Email,Data de Nascimento,Data da Primeira Visita\n';
+    const exemplo = 'Ana Silva,5511999999999,ana@email.com,1990-05-12,2024-01-10\n';
+    const blob = new Blob([cabecalho + exemplo], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'modelo-importar-clientes.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleArquivoImportacao = (e) => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setErroImportacao('');
+    setResultadoImportacao('');
+    setPreviewImportacao(null);
+
+    const leitor = new FileReader();
+    leitor.onload = (evento) => {
+      try {
+        const linhas = analisarCsvImportacao(evento.target.result);
+        if (linhas.length < 2) {
+          setErroImportacao('O arquivo precisa ter uma linha de cabeçalho e pelo menos um cliente.');
+          return;
+        }
+
+        const cabecalho = linhas[0].map(normalizarCabecalhoImportacao);
+        const indices = {};
+        Object.entries(ALIASES_COLUNA_IMPORTACAO).forEach(([chave, aliases]) => {
+          const posicao = cabecalho.findIndex((coluna) => aliases.includes(coluna));
+          if (posicao !== -1) indices[chave] = posicao;
+        });
+
+        if (indices.nome === undefined || indices.telefone === undefined) {
+          setErroImportacao('Não encontrei as colunas "Nome" e "Telefone" no arquivo — confira se os nomes das colunas batem com o modelo.');
+          return;
+        }
+
+        const telefonesExistentes = new Set(clientes.map((c) => normalizarTelefoneImportacao(c.telefone)));
+        const telefonesNoArquivo = new Set();
+        const validos = [];
+        let duplicados = 0;
+        let semNomeOuTelefone = 0;
+
+        linhas.slice(1).forEach((linha) => {
+          const nome = (linha[indices.nome] || '').trim();
+          const telefone = normalizarTelefoneImportacao(linha[indices.telefone]);
+          if (!nome || !telefone) {
+            semNomeOuTelefone += 1;
+            return;
+          }
+          if (telefonesExistentes.has(telefone) || telefonesNoArquivo.has(telefone)) {
+            duplicados += 1;
+            return;
+          }
+          telefonesNoArquivo.add(telefone);
+          validos.push({
+            nome,
+            telefone,
+            email: indices.email !== undefined ? ((linha[indices.email] || '').trim() || null) : null,
+            data_nascimento: indices.data_nascimento !== undefined ? ((linha[indices.data_nascimento] || '').trim() || null) : null,
+            data_primeiro_atendimento: indices.data_primeira_visita !== undefined
+              ? ((linha[indices.data_primeira_visita] || '').trim() || new Date().toISOString().split('T')[0])
+              : new Date().toISOString().split('T')[0],
+          });
+        });
+
+        setPreviewImportacao({ validos, duplicados, semNomeOuTelefone, totalLinhas: linhas.length - 1 });
+      } catch (err) {
+        setErroImportacao(`Não consegui ler o arquivo: ${err.message}`);
+      }
+    };
+    leitor.readAsText(arquivo, 'UTF-8');
+  };
+
+  const handleCancelarImportacao = () => {
+    setPreviewImportacao(null);
+    setErroImportacao('');
+    if (inputImportacaoRef.current) inputImportacaoRef.current.value = '';
+  };
+
+  const handleConfirmarImportacao = async () => {
+    if (!previewImportacao || previewImportacao.validos.length === 0) return;
+    setImportandoClientes(true);
+    setErroImportacao('');
+    try {
+      const TAMANHO_LOTE = 200;
+      let inseridos = 0;
+      for (let i = 0; i < previewImportacao.validos.length; i += TAMANHO_LOTE) {
+        const lote = previewImportacao.validos.slice(i, i + TAMANHO_LOTE);
+        const { error } = await supabase.from('clientes').insert(lote);
+        if (error) throw error;
+        inseridos += lote.length;
+      }
+      setResultadoImportacao(`${inseridos} cliente(s) importado(s) com sucesso.`);
+      setPreviewImportacao(null);
+      if (inputImportacaoRef.current) inputImportacaoRef.current.value = '';
+      buscarClientes();
+    } catch (err) {
+      setErroImportacao(`Não consegui importar: ${err.message}`);
+    } finally {
+      setImportandoClientes(false);
+    }
+  };
+
   const handleDeletarCliente = async (clienteId) => {
     if (!window.confirm(t('clientes.confirmarDeletar'))) return;
 
@@ -515,6 +690,76 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
           </label>
           <button type="submit" className="btn-primary">{t('clientes.adicionarCliente')}</button>
         </form>
+      </section>
+
+      <section className="form-section">
+        <h3>Importar clientes (CSV)</h3>
+        <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
+          Traga sua base de clientes de uma vez, a partir de uma planilha. Baixe o modelo,
+          preencha (Nome e Telefone são obrigatórios; e-mail e datas são opcionais) e envie o
+          arquivo aqui.
+        </p>
+        <button
+          type="button"
+          onClick={handleBaixarModeloImportacao}
+          style={{ background: 'transparent', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', padding: '10px 18px', borderRadius: '4px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', marginBottom: '12px' }}
+        >
+          Baixar modelo CSV
+        </button>
+        <input type="file" accept=".csv,text/csv" ref={inputImportacaoRef} onChange={handleArquivoImportacao} />
+
+        {erroImportacao && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>{erroImportacao}</p>}
+        {resultadoImportacao && <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '10px' }}>{resultadoImportacao}</p>}
+
+        {previewImportacao && (
+          <div style={{ marginTop: '14px', border: '1px solid #404040', borderRadius: '8px', padding: '14px' }}>
+            <p style={{ fontSize: '13px', color: '#e8e8e8', marginBottom: '10px' }}>
+              {previewImportacao.totalLinhas} linha(s) no arquivo — <strong style={{ color: '#4ade80' }}>{previewImportacao.validos.length} pronto(s) para importar</strong>
+              {previewImportacao.duplicados > 0 && `, ${previewImportacao.duplicados} já existente(s) (ignorado(s))`}
+              {previewImportacao.semNomeOuTelefone > 0 && `, ${previewImportacao.semNomeOuTelefone} sem nome ou telefone (ignorado(s))`}.
+            </p>
+            {previewImportacao.validos.length > 0 && (
+              <div style={{ overflowX: 'auto', marginBottom: '10px' }}>
+                <table className="table">
+                  <thead>
+                    <tr><th>Nome</th><th>Telefone</th><th>Email</th></tr>
+                  </thead>
+                  <tbody>
+                    {previewImportacao.validos.slice(0, 8).map((linha, indice) => (
+                      <tr key={indice}>
+                        <td>{linha.nome}</td>
+                        <td>{linha.telefone}</td>
+                        <td>{linha.email || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {previewImportacao.validos.length > 8 && (
+                  <p style={{ fontSize: '12px', color: '#888', marginTop: '6px' }}>
+                    + {previewImportacao.validos.length - 8} outro(s)...
+                  </p>
+                )}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleConfirmarImportacao}
+                disabled={importandoClientes || previewImportacao.validos.length === 0}
+              >
+                {importandoClientes ? 'Importando...' : `Confirmar importação (${previewImportacao.validos.length})`}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelarImportacao}
+                style={{ background: 'transparent', border: '1px solid #666', color: '#ccc', padding: '10px 18px', borderRadius: '4px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="list-section">
