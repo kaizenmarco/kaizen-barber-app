@@ -393,7 +393,11 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
         }
 
         const telefonesExistentes = new Set(clientes.map((c) => normalizarTelefoneImportacao(c.telefone)));
+        const emailsExistentes = new Set(
+          clientes.map((c) => (c.email || '').trim().toLowerCase()).filter(Boolean)
+        );
         const telefonesNoArquivo = new Set();
+        const emailsNoArquivo = new Set();
         const validos = [];
         let duplicados = 0;
         let semNomeOuTelefone = 0;
@@ -405,15 +409,22 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
             semNomeOuTelefone += 1;
             return;
           }
+          const email = indices.email !== undefined ? (linha[indices.email] || '').trim() : '';
+          const emailNormalizado = email.toLowerCase();
           if (telefonesExistentes.has(telefone) || telefonesNoArquivo.has(telefone)) {
             duplicados += 1;
             return;
           }
+          if (emailNormalizado && (emailsExistentes.has(emailNormalizado) || emailsNoArquivo.has(emailNormalizado))) {
+            duplicados += 1;
+            return;
+          }
           telefonesNoArquivo.add(telefone);
+          if (emailNormalizado) emailsNoArquivo.add(emailNormalizado);
           validos.push({
             nome,
             telefone,
-            email: indices.email !== undefined ? ((linha[indices.email] || '').trim() || null) : null,
+            email: email || null,
             data_nascimento: indices.data_nascimento !== undefined ? ((linha[indices.data_nascimento] || '').trim() || null) : null,
             data_primeiro_atendimento: indices.data_primeira_visita !== undefined
               ? ((linha[indices.data_primeira_visita] || '').trim() || new Date().toISOString().split('T')[0])
@@ -442,13 +453,26 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
     try {
       const TAMANHO_LOTE = 200;
       let inseridos = 0;
+      let falharam = 0;
       for (let i = 0; i < previewImportacao.validos.length; i += TAMANHO_LOTE) {
         const lote = previewImportacao.validos.slice(i, i + TAMANHO_LOTE);
         const { error } = await supabase.from('clientes').insert(lote);
-        if (error) throw error;
-        inseridos += lote.length;
+        if (!error) {
+          inseridos += lote.length;
+          continue;
+        }
+        // Um item do lote pode ter dado conflito (ex.: e-mail já usado por
+        // outro telefone) — tenta cada linha sozinha para não perder o resto.
+        for (const linha of lote) {
+          const { error: erroLinha } = await supabase.from('clientes').insert([linha]);
+          if (erroLinha) falharam += 1;
+          else inseridos += 1;
+        }
       }
-      setResultadoImportacao(`${inseridos} cliente(s) importado(s) com sucesso.`);
+      const resumo = falharam > 0
+        ? `${inseridos} cliente(s) importado(s) com sucesso. ${falharam} não puderam ser importados (conflito de e-mail ou telefone já usado).`
+        : `${inseridos} cliente(s) importado(s) com sucesso.`;
+      setResultadoImportacao(resumo);
       setPreviewImportacao(null);
       if (inputImportacaoRef.current) inputImportacaoRef.current.value = '';
       buscarClientes();
