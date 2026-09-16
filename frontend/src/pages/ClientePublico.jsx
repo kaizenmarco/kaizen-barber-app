@@ -408,14 +408,18 @@ function ClientePublico() {
   };
 
   const buscarPontosCliente = async (emailParam) => {
-    const email = emailParam || dadosAgendamento.email;
+    const email = (emailParam || dadosAgendamento.email || '').trim();
     if (!email) return;
     setCarregandoPontos(true);
     try {
+      // ilike (sem coringas) em vez de eq: compara ignorando maiúsculas/
+      // minúsculas — "Fulano@Gmail.com" tem que achar o mesmo cadastro de
+      // "fulano@gmail.com", já que teclados de celular às vezes capitalizam
+      // a primeira letra do e-mail sem a pessoa perceber.
       const { data: clientes } = await supabase
         .from('clientes')
         .select('id')
-        .eq('email', email);
+        .ilike('email', email);
 
       if (!clientes || clientes.length === 0) {
         setPontosCliente(0);
@@ -478,15 +482,17 @@ function ClientePublico() {
   // (e deixar cancelar) o agendamento de outra pessoa por engano — e-mail
   // sozinho não é garantia suficiente de identidade.
   const buscarAgendamentosCliente = async (emailParam, telefoneParam) => {
-    const email = emailParam || emailConsultaAgendamentos;
+    const email = (emailParam || emailConsultaAgendamentos || '').trim();
     const telefoneAlvo = normalizarTelefoneParaComparar(telefoneParam || telefoneConsultaAgendamentos);
     if (!email || !telefoneAlvo) return;
     setConsultandoAgendamentos(true);
     try {
+      // ilike em vez de eq: e-mail não deve ser sensível a maiúsculas/
+      // minúsculas — ver mesma observação em buscarPontosCliente.
       const { data: clientes } = await supabase
         .from('clientes')
         .select('id, telefone')
-        .eq('email', email);
+        .ilike('email', email);
 
       const clienteEncontrado = (clientes || []).find(c => normalizarTelefoneParaComparar(c.telefone) === telefoneAlvo);
 
@@ -723,10 +729,13 @@ function ClientePublico() {
     try {
       let clienteId = null;
 
+      // ilike em vez de eq: mesmo cuidado de maiúsculas/minúsculas — sem
+      // isso, a mesma pessoa digitando o e-mail com capitalização diferente
+      // de uma vez pra outra virava um cadastro de cliente duplicado.
       const { data: clientesExistentes } = await supabase
         .from('clientes')
         .select('id')
-        .eq('email', dadosAgendamento.email);
+        .ilike('email', dadosAgendamento.email.trim());
 
       if (clientesExistentes && clientesExistentes.length > 0) {
         clienteId = clientesExistentes[0].id;
