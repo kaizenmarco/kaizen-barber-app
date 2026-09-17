@@ -1,8 +1,9 @@
 // ============================================================================
-// Promoções pausáveis/retomáveis (ex: Corte por ¥3.000 em vez de ¥4.000,
-// toda segunda/quarta/quinta das 13:45 às 18h). Genérico o bastante pra
-// qualquer outra campanha futura (Dia dos Pais, Black Friday etc.) sem
-// precisar de código novo — só cadastrar em Cadastros > Promoções no Admin.
+// Promoções pausáveis/retomáveis (ex: -¥1.000 em Corte, Corte+Sobrancelhas
+// e Corte+Barba, toda segunda/quarta/quinta das 13:45 às 17h). Pode cobrir
+// um serviço só, vários (servico_ids) ou todos (servico_ids nulo). Genérico
+// o bastante pra qualquer outra campanha futura (Dia dos Pais, Black Friday
+// etc.) sem precisar de código novo — só cadastrar em Cadastros > Promoções.
 //
 // A elegibilidade de pontos de fidelidade (conta_pontos_fidelidade) é
 // calculada automaticamente no banco (trigger aplicar_promocao_agendamento),
@@ -14,8 +15,9 @@
 import { paraMinutos } from './horarios';
 
 export const TIPOS_DESCONTO = {
-  PRECO_FIXO: 'preco_fixo',
-  PERCENTUAL: 'percentual',
+  PRECO_FIXO: 'preco_fixo', // fixa um preço final único, igual pra todos os serviços cobertos
+  PERCENTUAL: 'percentual', // % de desconto sobre o preço normal de cada serviço
+  DESCONTO_FIXO: 'desconto_fixo', // tira um valor em ¥ do preço normal de cada serviço
 };
 
 // Busca as promoções com ativo=true (a política de RLS pública já garante
@@ -26,7 +28,7 @@ export const buscarPromocoesAtivas = async () => {
     const { supabase } = await import('../supabaseClient');
     const { data, error } = await supabase
       .from('promocoes')
-      .select('id, nome, descricao, servico_id, tipo_desconto, valor_desconto, dias_semana, hora_inicio, hora_fim, pontos_fidelidade, ativo, data_inicio, data_fim')
+      .select('id, nome, descricao, servico_ids, tipo_desconto, valor_desconto, dias_semana, hora_inicio, hora_fim, pontos_fidelidade, ativo, data_inicio, data_fim')
       .eq('ativo', true);
 
     if (error || !data) return [];
@@ -50,7 +52,7 @@ const diaSemanaDeDataStr = (dataStr) => {
 // último corte precisa estar concluído, não o último horário de início.
 export const promocaoAplicavel = (promo, { servicoId, dataStr, horaInicio, duracaoMinutos }) => {
   if (!promo || !promo.ativo) return false;
-  if (promo.servico_id && servicoId && promo.servico_id !== servicoId) return false;
+  if (promo.servico_ids && promo.servico_ids.length > 0 && servicoId && !promo.servico_ids.includes(servicoId)) return false;
   if (promo.data_inicio && dataStr < promo.data_inicio) return false;
   if (promo.data_fim && dataStr > promo.data_fim) return false;
 
@@ -76,6 +78,10 @@ export const calcularPrecoComPromocao = (precoOriginal, promo) => {
   if (promo.tipo_desconto === TIPOS_DESCONTO.PERCENTUAL) {
     return Math.max(0, Math.round(precoOriginal * (1 - Number(promo.valor_desconto) / 100)));
   }
+  if (promo.tipo_desconto === TIPOS_DESCONTO.DESCONTO_FIXO) {
+    return Math.max(0, precoOriginal - Number(promo.valor_desconto));
+  }
+  // preco_fixo: mesmo preço final pra qualquer serviço coberto pela promoção.
   return Math.max(0, Number(promo.valor_desconto));
 };
 

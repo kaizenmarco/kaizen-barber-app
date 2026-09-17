@@ -201,14 +201,14 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
     try {
       const { data, error } = await supabase
         .from('promocoes')
-        .select('id, nome, descricao, servico_id, tipo_desconto, valor_desconto, dias_semana, hora_inicio, hora_fim, pontos_fidelidade, ativo, data_inicio, data_fim')
+        .select('id, nome, descricao, servico_ids, tipo_desconto, valor_desconto, dias_semana, hora_inicio, hora_fim, pontos_fidelidade, ativo, data_inicio, data_fim')
         .order('nome');
       if (error) throw error;
       setPromocoes((data || []).map(row => ({
         id: row.id,
         nome: row.nome,
         descricao: row.descricao || '',
-        servicoId: row.servico_id || '',
+        servicoIds: row.servico_ids || [],
         tipoDesconto: row.tipo_desconto,
         valorDesconto: row.valor_desconto != null ? Number(row.valor_desconto) : 0,
         diasSemana: row.dias_semana || [],
@@ -259,7 +259,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
       setFormModal({ cliente: '', pacote: meusPacotes[0]?.nome || '', dataVenda: new Date().toISOString().split('T')[0], sessoesRestantes: '' });
     } else if (tela === 'promocoes') {
       setFormModal({
-        nome: '', descricao: '', servicoId: '', tipoDesconto: 'preco_fixo', valorDesconto: '',
+        nome: '', descricao: '', servicoIds: [], tipoDesconto: 'preco_fixo', valorDesconto: '',
         diasSemana: [], horaInicio: '', horaFim: '', pontosFidelidade: false, ativo: true,
         dataInicio: '', dataFim: ''
       });
@@ -439,7 +439,7 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
       const payload = {
         nome: formModal.nome.trim(),
         descricao: formModal.descricao || null,
-        servico_id: formModal.servicoId || null,
+        servico_ids: (formModal.servicoIds || []).length > 0 ? formModal.servicoIds : null,
         tipo_desconto: formModal.tipoDesconto || 'preco_fixo',
         valor_desconto: Number(formModal.valorDesconto) || 0,
         dias_semana: formModal.diasSemana || [],
@@ -703,8 +703,14 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
             ) : promocoesFiltradas.length === 0 ? (
               <p className="cadastros-vazio">{t('cadastros.nenhumEncontrado')}</p>
             ) : promocoesFiltradas.map(p => {
-              const servicoNome = servicos.find(s => s.id === p.servicoId)?.nome || t('cadastros.servicoTodos');
-              const precoLabel = p.tipoDesconto === 'percentual' ? `-${p.valorDesconto}%` : `¥${Number(p.valorDesconto).toLocaleString('ja-JP')}`;
+              const servicoNome = (p.servicoIds || []).length > 0
+                ? p.servicoIds.map(id => servicos.find(s => s.id === id)?.nome).filter(Boolean).join(', ')
+                : t('cadastros.servicoTodos');
+              const precoLabel = p.tipoDesconto === 'percentual'
+                ? `-${p.valorDesconto}%`
+                : p.tipoDesconto === 'desconto_fixo'
+                  ? `-¥${Number(p.valorDesconto).toLocaleString('ja-JP')}`
+                  : `¥${Number(p.valorDesconto).toLocaleString('ja-JP')}`;
               return (
                 <ItemLista
                   key={p.id}
@@ -815,13 +821,35 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                   />
 
                   <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.servicoCampo')}</label>
-                  <select
-                    value={formModal.servicoId || ''} onChange={(e) => setFormModal(prev => ({ ...prev, servicoId: e.target.value }))}
-                    style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
-                  >
-                    <option value="">{t('cadastros.servicoTodos')}</option>
-                    {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                  </select>
+                  <p style={{ margin: '-6px 0 0', fontSize: '11px', color: '#777' }}>{t('cadastros.servicoCampoAjuda')}</p>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {servicos.map(s => {
+                      const marcado = (formModal.servicoIds || []).includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setFormModal(prev => {
+                            const atual = prev.servicoIds || [];
+                            const novo = atual.includes(s.id) ? atual.filter(id => id !== s.id) : [...atual, s.id];
+                            return { ...prev, servicoIds: novo };
+                          })}
+                          style={{
+                            padding: '8px 10px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer',
+                            border: '1px solid #d4af37',
+                            background: marcado ? '#d4af37' : 'transparent',
+                            color: marcado ? '#1a1a1a' : '#d4af37',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          {s.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(formModal.servicoIds || []).length === 0 && (
+                    <p style={{ margin: 0, fontSize: '11px', color: '#f97316' }}>{t('cadastros.servicoTodosAviso')}</p>
+                  )}
 
                   <label style={{ fontSize: '12px', color: '#999' }}>{t('cadastros.tipoDescontoCampo')}</label>
                   <select
@@ -829,12 +857,17 @@ function Cadastros({ t: tProp, idioma: idiomaProp }) {
                     style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
                   >
                     <option value="preco_fixo">{t('cadastros.tipoDescontoPrecoFixo')}</option>
+                    <option value="desconto_fixo">{t('cadastros.tipoDescontoDescontoFixo')}</option>
                     <option value="percentual">{t('cadastros.tipoDescontoPercentual')}</option>
                   </select>
 
                   <input
                     type="number"
-                    placeholder={formModal.tipoDesconto === 'percentual' ? t('cadastros.valorDescontoCampoPercentual') : t('cadastros.valorDescontoCampoFixo')}
+                    placeholder={
+                      formModal.tipoDesconto === 'percentual' ? t('cadastros.valorDescontoCampoPercentual')
+                        : formModal.tipoDesconto === 'desconto_fixo' ? t('cadastros.valorDescontoCampoDescontoFixo')
+                        : t('cadastros.valorDescontoCampoFixo')
+                    }
                     value={formModal.valorDesconto ?? ''} onChange={(e) => setFormModal(prev => ({ ...prev, valorDesconto: e.target.value }))}
                     style={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
                   />
