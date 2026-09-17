@@ -37,6 +37,28 @@ const ORDEM_DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sab
 const DIAS_CARROSSEL = 90; // até quantos dias à frente o cliente pode agendar (~3 meses, cobre os períodos de feriados prolongados no Japão)
 const OPCOES_LEMBRETE = [15, 20, 30, 60];
 const CHAVE_IDIOMA_STORAGE = 'kaizen_idioma';
+const CHAVE_AGENDAMENTOS_LOCAIS_STORAGE = 'kaizen_agendamentos_locais';
+const MAX_AGENDAMENTOS_LOCAIS = 15;
+
+// Guarda o id de um agendamento recém-criado neste aparelho (mais recente
+// primeiro, sem duplicar, com um teto de itens pra não crescer pra sempre).
+const salvarIdAgendamentoLocal = (id) => {
+  try {
+    const atuais = JSON.parse(localStorage.getItem(CHAVE_AGENDAMENTOS_LOCAIS_STORAGE) || '[]');
+    const novos = [id, ...atuais.filter((x) => x !== id)].slice(0, MAX_AGENDAMENTOS_LOCAIS);
+    localStorage.setItem(CHAVE_AGENDAMENTOS_LOCAIS_STORAGE, JSON.stringify(novos));
+  } catch {
+    // localStorage indisponível (modo privado etc.) — só não salva o atalho
+  }
+};
+
+const lerIdsAgendamentosLocais = () => {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_AGENDAMENTOS_LOCAIS_STORAGE) || '[]');
+  } catch {
+    return [];
+  }
+};
 
 // Converte um Date "de calendário" (ex: new Date(ano, mes, dia), meia-noite
 // local) para a string AAAA-MM-DD correspondente. NÃO usar .toISOString()
@@ -217,6 +239,14 @@ function ClientePublico() {
   const [consultaAgendamentosFeita, setConsultaAgendamentosFeita] = useState(false);
   const [cancelandoId, setCancelandoId] = useState(null);
 
+  // Agendamentos feitos NESTE aparelho/navegador (guardados só o id, no
+  // localStorage) — permite achar e cancelar sem precisar digitar e-mail e
+  // telefone de novo, que era a reclamação (achar complicado buscar antes
+  // de poder cancelar). Reconsultado sempre no Supabase (nunca confia só no
+  // que está salvo local) pra status/podeCancelar estarem sempre atuais.
+  const [agendamentosLocalDispositivo, setAgendamentosLocalDispositivo] = useState([]);
+  const [carregandoLocais, setCarregandoLocais] = useState(false);
+
   const [dadosAgendamento, setDadosAgendamento] = useState({
     nome: '',
     email: '',
@@ -271,6 +301,13 @@ function ClientePublico() {
         }
       }
     });
+  }, []);
+
+  // Carrega os agendamentos feitos neste aparelho assim que o app abre, pra
+  // já aparecerem prontos em "Meus Agendamentos" sem precisar buscar nada.
+  useEffect(() => {
+    buscarAgendamentosDoDispositivo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const profissionais = [
@@ -541,6 +578,54 @@ function ClientePublico() {
     }
   };
 
+  // Reconsulta no Supabase os agendamentos feitos NESTE aparelho (ids salvos
+  // em localStorage) — mostra status/podeCancelar sempre atualizados, sem
+  // precisar digitar e-mail/telefone. Ordem: mais recente criado primeiro
+  // (ordem dos ids salvos), não por data do horário marcado.
+  const buscarAgendamentosDoDispositivo = async () => {
+    const ids = lerIdsAgendamentosLocais();
+    if (ids.length === 0) {
+      setAgendamentosLocalDispositivo([]);
+      return;
+    }
+    setCarregandoLocais(true);
+    try {
+      const { data, error } = await supabase
+        .from('agendamentos')
+        .select('id, data_hora, status, observacoes, servicos(nome), profissionais(nome)')
+        .in('id', ids);
+
+      if (error) throw error;
+
+      const agoraMs = Date.now();
+      const porId = new Map((data || []).map(a => [a.id, a]));
+      const mapeados = ids
+        .map(id => porId.get(id))
+        .filter(Boolean)
+        .map(a => {
+          const minutosRestantes = (dataHoraJstParaUtcMs(a.data_hora) - agoraMs) / 60000;
+          const futuro = minutosRestantes > 0;
+          return {
+            id: a.id,
+            data: a.data_hora.split('T')[0],
+            hora: a.data_hora.split('T')[1]?.substring(0, 5) || '',
+            status: a.status,
+            observacoes: a.observacoes,
+            servico: a.servicos?.nome || '-',
+            profissional: a.profissionais?.nome || '-',
+            futuro,
+            podeCancelar: futuro && a.status !== 'CANCELADO' && minutosRestantes >= LIMITE_CANCELAMENTO_MINUTOS,
+          };
+        });
+
+      setAgendamentosLocalDispositivo(mapeados);
+    } catch (error) {
+      console.error('Erro ao buscar agendamentos deste aparelho:', error);
+    } finally {
+      setCarregandoLocais(false);
+    }
+  };
+
   // Cancela o agendamento (o profissional é avisado automaticamente por
   // e-mail via trigger do banco — ver notificar-cancelamento). Marca a
   // observação com [CANCELADO PELO CLIENTE] só pra diferenciar, no Admin, de
@@ -565,8 +650,11 @@ function ClientePublico() {
       // Continua na lista (agora como histórico) em vez de sumir, já que a
       // tela virou um relatório completo — só perde a opção de cancelar.
       setAgendamentosDoCliente(prev => prev.map(a => (a.id === agendamento.id ? { ...a, status: 'CANCELADO', podeCancelar: false } : a)));
+      setAgendamentosLocalDispositivo(prev => prev.map(a => (a.id === agendamento.id ? { ...a, status: 'CANCELADO', podeCancelar: false } : a)));
+      return true;
     } catch (error) {
       alert(t('meusAgendamentos_erro_cancelar') + error.message);
+      return false;
     } finally {
       setCancelandoId(null);
     }
@@ -834,6 +922,13 @@ function ClientePublico() {
 
       await buscarHorariosOcupados();
 
+      // Guarda o id deste aparelho pra ele aparecer em "Meus Agendamentos"
+      // sem precisar buscar por e-mail/telefone depois.
+      if (novoAgendamento?.id) {
+        salvarIdAgendamentoLocal(novoAgendamento.id);
+        buscarAgendamentosDoDispositivo();
+      }
+
       setAgendamentoConfirmado({
         id: novoAgendamento?.id,
         numero: Math.floor(Math.random() * 100000),
@@ -961,6 +1056,35 @@ function ClientePublico() {
 
   if (agendamentoConfirmado) {
     const horariosDisponiveisLembrete = OPCOES_LEMBRETE;
+
+    // Mesma regra de 2h usada em "Meus Agendamentos" — aqui já dá pra
+    // cancelar (ou trocar de horário) direto na hora de confirmar, sem
+    // precisar procurar depois (era a reclamação: difícil achar e cancelar).
+    const minutosRestantesConfirmado = agendamentoConfirmado.id
+      ? (dataHoraJstParaUtcMs(`${agendamentoConfirmado.dataStr}T${agendamentoConfirmado.hora}:00`) - Date.now()) / 60000
+      : 0;
+    const podeCancelarConfirmado = agendamentoConfirmado.id && minutosRestantesConfirmado >= LIMITE_CANCELAMENTO_MINUTOS;
+
+    const handleCancelarConfirmado = async () => {
+      const ok = await handleCancelarAgendamento({ id: agendamentoConfirmado.id, observacoes: null });
+      if (ok) {
+        setAgendamentoConfirmado(null);
+        setAbaAtiva('servicos');
+      }
+    };
+
+    const handleTrocarHorarioConfirmado = async () => {
+      const nomeServico = agendamentoConfirmado.servico;
+      const ok = await handleCancelarAgendamento({ id: agendamentoConfirmado.id, observacoes: null });
+      if (ok) {
+        setAgendamentoConfirmado(null);
+        setDadosAgendamento({ nome: '', email: '', telefone: '', dataNascimento: '', profissional: '', hora: '', servico: nomeServico, data: '' });
+        setDiaHorarioSelecionado(null);
+        setDataSelecionada(new Date());
+        setAbaAtiva('agendar');
+      }
+    };
+
     return (
       <div style={{ background: '#1a1a1a', minHeight: '100vh', paddingBottom: '40px' }}>
         <div style={{ background: '#166534', padding: '18px 20px', textAlign: 'center' }}>
@@ -1044,6 +1168,39 @@ function ClientePublico() {
             {presencaConfirmada ? `✓ ${t('conf_presenca_confirmada')}` : t('conf_confirmar_presenca')}
           </button>
 
+          {podeCancelarConfirmado ? (
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <button
+                onClick={handleTrocarHorarioConfirmado}
+                disabled={cancelandoId === agendamentoConfirmado.id}
+                style={{ flex: 1, padding: '12px', background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '6px', fontWeight: 'bold', cursor: cancelandoId === agendamentoConfirmado.id ? 'wait' : 'pointer' }}
+              >
+                🔁 {t('conf_trocar_horario')}
+              </button>
+              <button
+                onClick={handleCancelarConfirmado}
+                disabled={cancelandoId === agendamentoConfirmado.id}
+                aria-label={t('conf_cancelar_agendamento')}
+                title={t('conf_cancelar_agendamento')}
+                style={{ padding: '12px 16px', background: 'transparent', color: '#f87171', border: '1px solid #f87171', borderRadius: '6px', fontWeight: 'bold', cursor: cancelandoId === agendamentoConfirmado.id ? 'wait' : 'pointer' }}
+              >
+                🗑️
+              </button>
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '12px', marginBottom: '20px' }}>
+              <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f97316' }}>{t('meusAgendamentos_menosDe2h')}</p>
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366', display: 'inline-flex' }}
+              >
+                <FaWhatsapp size={16} /> WhatsApp
+              </a>
+            </div>
+          )}
+
           <button
             onClick={() => { setAgendamentoConfirmado(null); setAbaAtiva('servicos'); }}
             style={{ width: '100%', padding: '12px', background: 'transparent', color: '#999', border: '1px solid #404040', borderRadius: '6px', cursor: 'pointer' }}
@@ -1054,6 +1211,79 @@ function ClientePublico() {
       </div>
     );
   }
+
+  // Usados tanto na lista "deste aparelho" (sem precisar buscar nada)
+  // quanto no resultado da busca por e-mail/telefone — mesmo cartão, mesma
+  // regra de cancelamento (lixeira só aparece se ainda der no prazo de 2h).
+  const rotuloStatusAgendamento = (status) => {
+    if (status === 'REALIZADO') return t('meusAgendamentos_statusRealizado');
+    if (status === 'CANCELADO') return t('meusAgendamentos_statusCancelado');
+    if (status === 'NÃO_COMPARECEU') return t('meusAgendamentos_statusNaoCompareceu');
+    if (status === 'CONFIRMADO') return t('meusAgendamentos_statusConfirmado');
+    return t('meusAgendamentos_statusAgendado');
+  };
+  const corStatusAgendamento = (status) => {
+    if (status === 'REALIZADO') return '#4ade80';
+    if (status === 'CANCELADO') return '#f87171';
+    if (status === 'NÃO_COMPARECEU') return '#fb923c';
+    return '#d4af37';
+  };
+  const ativoAgendamento = (a) => a.futuro && a.status !== 'CANCELADO';
+
+  const CardAgendamento = (a) => (
+    <div
+      key={a.id}
+      style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '8px', padding: '16px' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+        <p style={{ margin: '0 0 4px', fontSize: '16px' }}>
+          <strong style={{ color: '#d4af37' }}>{new Date(`${a.data}T00:00:00`).toLocaleDateString(localeAtual)}</strong>
+          {' · '}
+          <strong style={{ color: '#d4af37' }}>{a.hora}</strong>
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: corStatusAgendamento(a.status), fontSize: '11px', fontWeight: 'bold', border: `1px solid ${corStatusAgendamento(a.status)}`, borderRadius: '4px', padding: '2px 8px', whiteSpace: 'nowrap' }}>
+            {rotuloStatusAgendamento(a.status)}
+          </span>
+          {a.podeCancelar && (
+            <button
+              onClick={() => handleCancelarAgendamento(a)}
+              disabled={cancelandoId === a.id}
+              aria-label={t('meusAgendamentos_cancelar_botao')}
+              title={t('meusAgendamentos_cancelar_botao')}
+              style={{
+                background: 'transparent',
+                color: '#f87171',
+                border: '1px solid #f87171',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                cursor: cancelandoId === a.id ? 'wait' : 'pointer',
+                fontSize: '14px',
+                lineHeight: 1
+              }}
+            >
+              {cancelandoId === a.id ? '⏳' : '🗑️'}
+            </button>
+          )}
+        </div>
+      </div>
+      <p style={{ margin: '0 0 4px', color: '#e8e8e8' }}>{a.servico} — {a.profissional}</p>
+
+      {ativoAgendamento(a) && !a.podeCancelar && (
+        <div style={{ marginTop: '10px', background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f97316' }}>{t('meusAgendamentos_menosDe2h')}</p>
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366', display: 'inline-flex' }}
+          >
+            <FaWhatsapp size={16} /> WhatsApp
+          </a>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div style={{ background: '#1a1a1a', color: '#e8e8e8', minHeight: '100vh' }}>
@@ -1546,6 +1776,20 @@ function ClientePublico() {
           <section>
             <h2 style={{ color: '#d4af37' }}>📋 {t('meusAgendamentos_titulo')}</h2>
 
+            {agendamentosLocalDispositivo.length > 0 && (
+              <div style={{ maxWidth: '600px', marginBottom: '26px' }}>
+                <h3 style={{ color: '#d4af37', fontSize: '15px', marginBottom: '4px' }}>📱 {t('meusAgendamentos_desteAparelho')}</h3>
+                <p style={{ color: '#999', fontSize: '12px', margin: '0 0 10px' }}>{t('meusAgendamentos_desteAparelhoAviso')}</p>
+                {carregandoLocais ? (
+                  <p style={{ color: '#999', fontSize: '13px' }}>{t('meusAgendamentos_carregandoLocais')}</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {agendamentosLocalDispositivo.map(CardAgendamento)}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '20px' }}>
               <p style={{ color: '#999', fontSize: '12px', margin: '0 0 10px' }}>{t('meusAgendamentos_identificacaoAviso')}</p>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -1577,74 +1821,8 @@ function ClientePublico() {
               agendamentosDoCliente.length === 0 ? (
                 <p style={{ color: '#999', maxWidth: '600px' }}>{t('meusAgendamentos_nenhum')}</p>
               ) : (() => {
-                const ativo = (a) => a.futuro && a.status !== 'CANCELADO';
-                const proximos = agendamentosDoCliente.filter(ativo).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`));
-                const historico = agendamentosDoCliente.filter(a => !ativo(a));
-
-                const rotuloStatus = (status) => {
-                  if (status === 'REALIZADO') return t('meusAgendamentos_statusRealizado');
-                  if (status === 'CANCELADO') return t('meusAgendamentos_statusCancelado');
-                  if (status === 'NÃO_COMPARECEU') return t('meusAgendamentos_statusNaoCompareceu');
-                  if (status === 'CONFIRMADO') return t('meusAgendamentos_statusConfirmado');
-                  return t('meusAgendamentos_statusAgendado');
-                };
-                const corStatus = (status) => {
-                  if (status === 'REALIZADO') return '#4ade80';
-                  if (status === 'CANCELADO') return '#f87171';
-                  if (status === 'NÃO_COMPARECEU') return '#fb923c';
-                  return '#d4af37';
-                };
-
-                const Card = (a) => (
-                  <div
-                    key={a.id}
-                    style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '8px', padding: '16px' }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
-                      <p style={{ margin: '0 0 4px', fontSize: '16px' }}>
-                        <strong style={{ color: '#d4af37' }}>{new Date(`${a.data}T00:00:00`).toLocaleDateString(localeAtual)}</strong>
-                        {' · '}
-                        <strong style={{ color: '#d4af37' }}>{a.hora}</strong>
-                      </p>
-                      <span style={{ color: corStatus(a.status), fontSize: '11px', fontWeight: 'bold', border: `1px solid ${corStatus(a.status)}`, borderRadius: '4px', padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                        {rotuloStatus(a.status)}
-                      </span>
-                    </div>
-                    <p style={{ margin: '0 0 4px', color: '#e8e8e8' }}>{a.servico} — {a.profissional}</p>
-
-                    {a.podeCancelar && (
-                      <button
-                        onClick={() => handleCancelarAgendamento(a)}
-                        disabled={cancelandoId === a.id}
-                        style={{
-                          marginTop: '10px',
-                          background: 'transparent',
-                          color: '#f87171',
-                          border: '1px solid #f87171',
-                          padding: '8px 16px',
-                          borderRadius: '4px',
-                          fontWeight: 'bold',
-                          cursor: cancelandoId === a.id ? 'wait' : 'pointer'
-                        }}
-                      >
-                        {cancelandoId === a.id ? t('meusAgendamentos_cancelando') : t('meusAgendamentos_cancelar_botao')}
-                      </button>
-                    )}
-                    {ativo(a) && !a.podeCancelar && (
-                      <div style={{ marginTop: '10px', background: 'rgba(249, 115, 22, 0.12)', border: '1px solid #f97316', borderRadius: '6px', padding: '10px' }}>
-                        <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f97316' }}>{t('meusAgendamentos_menosDe2h')}</p>
-                        <a
-                          href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(t('contato_whatsapp_mensagem'))}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ ...botaoContatoStyle, color: '#25D366', border: '1px solid #25D366', display: 'inline-flex' }}
-                        >
-                          <FaWhatsapp size={16} /> WhatsApp
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                );
+                const proximos = agendamentosDoCliente.filter(ativoAgendamento).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`));
+                const historico = agendamentosDoCliente.filter(a => !ativoAgendamento(a));
 
                 return (
                   <div style={{ maxWidth: '600px' }}>
@@ -1652,7 +1830,7 @@ function ClientePublico() {
                       <div style={{ marginBottom: '26px' }}>
                         <h3 style={{ color: '#d4af37', fontSize: '15px', marginBottom: '10px' }}>{t('meusAgendamentos_proximos')}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                          {proximos.map(Card)}
+                          {proximos.map(CardAgendamento)}
                         </div>
                       </div>
                     )}
@@ -1662,7 +1840,7 @@ function ClientePublico() {
                         <p style={{ color: '#999', fontSize: '13px' }}>{t('meusAgendamentos_semHistorico')}</p>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                          {historico.map(Card)}
+                          {historico.map(CardAgendamento)}
                         </div>
                       )}
                     </div>

@@ -41,6 +41,8 @@ const TEXTOS = {
     conf_google_agenda: 'ou adicionar ao Google Agenda',
     conf_presenca_confirmada: 'Presença confirmada',
     conf_confirmar_presenca: 'Confirmar presença',
+    conf_trocar_horario: 'Trocar horário',
+    conf_cancelar_agendamento: 'Cancelar agendamento',
     conf_voltar_site: 'Voltar para o site',
 
     servicos_titulo: 'Nossos Serviços',
@@ -94,6 +96,9 @@ const TEXTOS = {
 
     meusAgendamentos_titulo: 'Meus Agendamentos',
     meusAgendamentos_nenhum: 'Nenhum agendamento encontrado para esse e-mail e telefone.',
+    meusAgendamentos_desteAparelho: 'Agendamentos feitos neste aparelho',
+    meusAgendamentos_desteAparelhoAviso: 'Encontrados automaticamente — não precisa buscar por e-mail/telefone.',
+    meusAgendamentos_carregandoLocais: 'Carregando...',
     meusAgendamentos_identificacaoAviso: 'Informe o e-mail e o telefone usados no agendamento (os dois precisam bater com o mesmo cadastro).',
     meusAgendamentos_proximos: 'Próximos agendamentos',
     meusAgendamentos_historico: 'Histórico completo',
@@ -182,6 +187,8 @@ const TEXTOS = {
     conf_google_agenda: 'or add to Google Calendar',
     conf_presenca_confirmada: 'Attendance confirmed',
     conf_confirmar_presenca: 'Confirm attendance',
+    conf_trocar_horario: 'Change time',
+    conf_cancelar_agendamento: 'Cancel appointment',
     conf_voltar_site: 'Back to site',
 
     servicos_titulo: 'Our Services',
@@ -235,6 +242,9 @@ const TEXTOS = {
 
     meusAgendamentos_titulo: 'My Appointments',
     meusAgendamentos_nenhum: 'No appointments found for that email and phone number.',
+    meusAgendamentos_desteAparelho: 'Appointments made on this device',
+    meusAgendamentos_desteAparelhoAviso: 'Found automatically — no need to search by email/phone.',
+    meusAgendamentos_carregandoLocais: 'Loading...',
     meusAgendamentos_identificacaoAviso: 'Enter the email and phone number used when booking (both need to match the same record).',
     meusAgendamentos_proximos: 'Upcoming appointments',
     meusAgendamentos_historico: 'Full history',
@@ -323,6 +333,8 @@ const TEXTOS = {
     conf_google_agenda: 'またはGoogleカレンダーに追加',
     conf_presenca_confirmada: '来店確認済み',
     conf_confirmar_presenca: '来店を確認する',
+    conf_trocar_horario: '時間を変更する',
+    conf_cancelar_agendamento: '予約をキャンセルする',
     conf_voltar_site: 'サイトに戻る',
 
     servicos_titulo: 'メニュー',
@@ -376,6 +388,9 @@ const TEXTOS = {
 
     meusAgendamentos_titulo: '予約管理',
     meusAgendamentos_nenhum: 'このメールアドレスと電話番号での予約は見つかりませんでした。',
+    meusAgendamentos_desteAparelho: 'この端末で行った予約',
+    meusAgendamentos_desteAparelhoAviso: '自動的に表示されています — メール/電話番号の検索は不要です。',
+    meusAgendamentos_carregandoLocais: '読み込み中...',
     meusAgendamentos_identificacaoAviso: '予約時に使用したメールアドレスと電話番号を入力してください（両方とも同じ登録情報と一致する必要があります）。',
     meusAgendamentos_proximos: '今後のご予約',
     meusAgendamentos_historico: '予約履歴（全期間）',
@@ -464,6 +479,8 @@ const TEXTOS = {
     conf_google_agenda: 'o agregar a Google Calendar',
     conf_presenca_confirmada: 'Asistencia confirmada',
     conf_confirmar_presenca: 'Confirmar asistencia',
+    conf_trocar_horario: 'Cambiar horario',
+    conf_cancelar_agendamento: 'Cancelar turno',
     conf_voltar_site: 'Volver al sitio',
 
     servicos_titulo: 'Nuestros Servicios',
@@ -517,6 +534,9 @@ const TEXTOS = {
 
     meusAgendamentos_titulo: 'Mis Turnos',
     meusAgendamentos_nenhum: 'No se encontraron turnos para ese correo y teléfono.',
+    meusAgendamentos_desteAparelho: 'Turnos hechos en este dispositivo',
+    meusAgendamentos_desteAparelhoAviso: 'Encontrados automáticamente — no hace falta buscar por correo/teléfono.',
+    meusAgendamentos_carregandoLocais: 'Cargando...',
     meusAgendamentos_identificacaoAviso: 'Ingresa el correo y el teléfono usados al reservar (ambos deben coincidir con el mismo registro).',
     meusAgendamentos_proximos: 'Próximos turnos',
     meusAgendamentos_historico: 'Historial completo',
