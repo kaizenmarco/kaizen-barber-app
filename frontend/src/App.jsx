@@ -21,6 +21,17 @@ function ehSubdominioAdmin() {
   return window.location.hostname.startsWith('admin.');
 }
 
+// kaizenflowaplicativo.com é o domínio da página de vendas (Lovable). Os
+// subdomínios cadastro. e painel. apontam pra este mesmo app e abrem direto
+// a tela certa na raiz "/", sem precisar digitar o caminho completo.
+function ehSubdominioCadastro() {
+  return window.location.hostname.startsWith('cadastro.');
+}
+
+function ehSubdominioPainel() {
+  return window.location.hostname.startsWith('painel.');
+}
+
 // Site público e Admin dividem o mesmo index.html, então por padrão
 // teriam o mesmo "ícone instalável". Este componente troca o
 // manifest.json e o ícone/título do iPhone conforme a rota/domínio, pra
@@ -51,7 +62,13 @@ function AtualizarManifestPWA() {
 }
 
 function App() {
-  const raiz = ehSubdominioAdmin() ? <AdminLogin /> : <ClientePublico />;
+  const raiz = ehSubdominioAdmin()
+    ? <AdminLogin />
+    : ehSubdominioCadastro()
+    ? <Cadastro />
+    : ehSubdominioPainel()
+    ? <PainelEmpresa />
+    : <ClientePublico />;
 
   return (
     <Router>
