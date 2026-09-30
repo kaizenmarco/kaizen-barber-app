@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabaseSaaS } from '../config/supabaseClientSaaS';
-import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
+import { IDIOMAS_ADMIN, IDIOMA_ADMIN_PADRAO, idiomaAdminPorNavegador, traduzirAdmin } from '../config/traducoesAdmin';
 import Dashboard from './tenant/Dashboard';
 import Clientes from './tenant/Clientes';
 import Fidelidade from './tenant/Fidelidade';
@@ -23,18 +23,18 @@ import Caixa from './tenant/Caixa';
 // Marco, no projeto de produção antigo) — aqui a autenticação e os dados
 // são sempre do projeto kaizen-saas, isolados por empresa via RLS.
 
-const ABAS = [
-  { key: 'dashboard', label: 'Dashboard', icone: '📊' },
-  { key: 'clientes', label: 'Clientes', icone: '👥' },
-  { key: 'fidelidade', label: 'Fidelidade', icone: '🎁' },
-  { key: 'aniversariantes', label: 'Aniversários', icone: '🎂' },
-  { key: 'profissionais', label: 'Profissionais', icone: '💈' },
-  { key: 'servicos', label: 'Serviços', icone: '✂️' },
-  { key: 'visual', label: 'Identidade Visual', icone: '🎨' },
-  { key: 'horarios', label: 'Horário de Trabalho', icone: '🕒' },
-  { key: 'agenda', label: 'Agenda', icone: '📅' },
-  { key: 'comandas', label: 'Comandas', icone: '🧾' },
-  { key: 'caixa', label: 'Caixa', icone: '💰' },
+const CHAVES_ABAS = [
+  { key: 'dashboard', labelChave: 'nav.dashboard' },
+  { key: 'clientes', labelChave: 'nav.clientes' },
+  { key: 'fidelidade', labelChave: 'nav.fidelidade' },
+  { key: 'aniversariantes', labelChave: 'nav.aniversariantes' },
+  { key: 'profissionais', labelChave: 'nav.profissionais' },
+  { key: 'servicos', labelChave: 'nav.servicos' },
+  { key: 'visual', labelChave: 'nav.visual' },
+  { key: 'horarios', labelChave: 'nav.horarios' },
+  { key: 'agenda', labelChave: 'nav.agenda' },
+  { key: 'comandas', labelChave: 'nav.comandas' },
+  { key: 'caixa', labelChave: 'nav.caixa' },
 ];
 
 const estilos = {
@@ -45,6 +45,9 @@ const estilos = {
   botao: { width: '100%', padding: '12px', background: '#d4af37', color: '#1a1a1a', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' },
   botaoSecundario: { width: '100%', padding: '12px', background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '6px', cursor: 'pointer' },
   header: { padding: '16px 20px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  seletorIdioma: { display: 'flex', justifyContent: 'center', gap: '6px', padding: '10px 0', borderBottom: '1px solid #333' },
+  botaoIdioma: { padding: '4px 10px', borderRadius: '999px', border: '1px solid #d4af37', background: 'transparent', color: '#d4af37', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' },
+  botaoIdiomaAtivo: { background: '#d4af37', color: '#1a1a1a' },
   main: { paddingBottom: '76px' },
   nav: { position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', background: '#2d2d2d', borderTop: '1px solid #333' },
   navItem: { flex: 1, padding: '10px 4px', textAlign: 'center', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '11px' },
@@ -52,47 +55,60 @@ const estilos = {
   navIcone: { display: 'block', fontSize: '18px', marginBottom: '2px' },
 };
 
-function TelaCarregando() {
-  return <div style={{ ...estilos.pagina, ...estilos.centralizado, color: '#d4af37' }}>Carregando...</div>;
+function SeletorIdioma({ idioma, mudarIdioma, estilo }) {
+  return (
+    <div style={{ ...estilos.seletorIdioma, ...estilo }}>
+      {IDIOMAS_ADMIN.map((op) => (
+        <button
+          key={op.codigo}
+          type="button"
+          onClick={() => mudarIdioma(op.codigo)}
+          style={{ ...estilos.botaoIdioma, ...(idioma === op.codigo ? estilos.botaoIdiomaAtivo : {}) }}
+        >
+          {op.rotulo}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-function TelaAguardandoVinculo({ email, aoSair }) {
+function TelaCarregando({ t }) {
+  return <div style={{ ...estilos.pagina, ...estilos.centralizado, color: '#d4af37' }}>{t('login.carregando')}</div>;
+}
+
+function TelaAguardandoVinculo({ email, aoSair, t }) {
   return (
     <div style={{ ...estilos.pagina, ...estilos.centralizado }}>
       <div style={estilos.cartao}>
-        <h2 style={{ color: '#d4af37', marginBottom: '10px' }}>Conta ainda não vinculada</h2>
+        <h2 style={{ color: '#d4af37', marginBottom: '10px' }}>{t('painel.vinculoTitulo')}</h2>
         <p style={{ color: '#ccc', fontSize: '14px', marginBottom: '20px' }}>
-          A conta <strong>{email}</strong> foi criada, mas ainda não está ligada a nenhuma
-          barbearia cadastrada. Isso é feito manualmente logo após a confirmação do
-          pagamento — entre em contato com o suporte se estiver esperando há mais de
-          algumas horas.
+          {t('painel.vinculoCorpo', { email })}
         </p>
-        <button style={estilos.botao} onClick={aoSair}>Sair</button>
+        <button style={estilos.botao} onClick={aoSair}>{t('painel.sair')}</button>
       </div>
     </div>
   );
 }
 
-function TelaAssinaturaCancelada({ empresa, aoSair }) {
+function TelaAssinaturaCancelada({ empresa, aoSair, t }) {
   return (
     <div style={{ ...estilos.pagina, ...estilos.centralizado }}>
       <div style={estilos.cartao}>
-        <h2 style={{ color: '#f87171', marginBottom: '10px' }}>Assinatura cancelada</h2>
+        <h2 style={{ color: '#f87171', marginBottom: '10px' }}>{t('painel.canceladaTitulo')}</h2>
         <p style={{ color: '#ccc', fontSize: '14px', marginBottom: '20px' }}>
-          O acesso da <strong>{empresa?.nome || 'sua barbearia'}</strong> foi suspenso porque a
-          assinatura está cancelada{empresa?.observacao_status ? ` (${empresa.observacao_status})` : ''}.
-          Renove o pagamento para voltar a usar o sistema.
+          {t('painel.canceladaCorpo', { empresa: empresa?.nome || 'sua barbearia' })}
+          {empresa?.observacao_status ? ` (${empresa.observacao_status})` : ''}
         </p>
         <a href="/cadastro" style={{ ...estilos.botao, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
-          Reativar assinatura
+          {t('painel.reativarAssinatura')}
         </a>
-        <button style={estilos.botaoSecundario} onClick={aoSair}>Sair</button>
+        <button style={estilos.botaoSecundario} onClick={aoSair}>{t('painel.sair')}</button>
       </div>
     </div>
   );
 }
 
-function TelaLogin() {
+function TelaLogin({ idioma, mudarIdioma, t }) {
   const navigate = useNavigate();
   const [modo, setModo] = useState('login');
   const [nome, setNome] = useState('');
@@ -119,69 +135,71 @@ function TelaLogin() {
     setEnviando(false);
     if (error) { setErro(error.message); return; }
     if (data.session) return;
-    setMensagem('Conta criada! Se pediu confirmação por e-mail, confirme e entre em seguida.');
+    setMensagem(t('painel.mensagemContaCriada'));
     setModo('login');
   };
 
   return (
     <div style={{ ...estilos.pagina, ...estilos.centralizado }}>
       <div style={estilos.cartao}>
+        <SeletorIdioma idioma={idioma} mudarIdioma={mudarIdioma} estilo={{ borderBottom: 'none', padding: 0, marginBottom: '16px' }} />
         <h2 style={{ color: '#d4af37', textAlign: 'center', marginBottom: '4px' }}>Kaizen Flow App</h2>
         <p style={{ color: '#999', fontSize: '13px', textAlign: 'center', marginBottom: '24px' }}>
-          Painel da sua barbearia
+          {t('painel.subtitulo')}
         </p>
         <form onSubmit={modo === 'login' ? handleLogin : handleCadastro}>
           {modo === 'cadastro' && (
-            <input style={estilos.input} placeholder="Seu nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
+            <input style={estilos.input} placeholder={t('login.nome')} value={nome} onChange={(e) => setNome(e.target.value)} required />
           )}
-          <input style={estilos.input} type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input style={estilos.input} type="password" placeholder="Senha" value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} required />
+          <input style={estilos.input} type="email" placeholder={t('login.email')} value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input style={estilos.input} type="password" placeholder={t('login.senha')} value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} required />
 
           {erro && <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '14px' }}>{erro}</p>}
           {mensagem && <p style={{ color: '#4ade80', fontSize: '13px', marginBottom: '14px' }}>{mensagem}</p>}
 
           <button type="submit" style={estilos.botao} disabled={enviando}>
-            {enviando ? 'Aguarde...' : (modo === 'login' ? 'Entrar' : 'Criar conta')}
+            {enviando ? t('login.aguarde') : (modo === 'login' ? t('login.entrar') : t('login.criarConta'))}
           </button>
           <button type="button" style={estilos.botaoSecundario} onClick={() => { setModo(modo === 'login' ? 'cadastro' : 'login'); setErro(''); setMensagem(''); }}>
-            {modo === 'login' ? 'Ainda não tenho conta' : 'Já tenho conta'}
+            {modo === 'login' ? t('login.criarUmaConta') : t('login.jaTenhoConta')}
           </button>
         </form>
         <button type="button" style={{ ...estilos.botaoSecundario, marginTop: '14px', border: 'none' }} onClick={() => navigate('/')}>
-          ← Voltar
+          {t('painel.voltar')}
         </button>
       </div>
     </div>
   );
 }
 
-function PainelPrincipal({ perfil, empresa, aoSair }) {
+function PainelPrincipal({ perfil, empresa, aoSair, idioma, mudarIdioma, t }) {
   const [abaSelecionada, setAbaSelecionada] = useState('dashboard');
-  const t = (chave, valores) => traduzirAdmin(IDIOMA_ADMIN_PADRAO, chave, valores);
+  const ABAS = CHAVES_ABAS.map((a) => ({ ...a, label: t(a.labelChave) }));
 
   return (
     <div style={estilos.pagina}>
+      <SeletorIdioma idioma={idioma} mudarIdioma={mudarIdioma} />
       <header style={estilos.header}>
         <div>
           <strong style={{ color: '#d4af37' }}>{empresa?.nome || 'Kaizen Flow App'}</strong>
           <div style={{ fontSize: '12px', color: '#999' }}>{perfil.nome || perfil.email}</div>
         </div>
         <button type="button" style={{ ...estilos.botaoSecundario, width: 'auto', padding: '8px 14px', fontSize: '13px' }} onClick={aoSair}>
-          Sair
+          {t('painel.sair')}
         </button>
       </header>
 
       {empresa?.status === 'inadimplente' && (
         <div style={{ background: '#4a2b1a', color: '#fbbf24', fontSize: '13px', padding: '10px 20px', textAlign: 'center' }}>
-          Pagamento pendente — regularize em breve para não perder o acesso ao sistema.
+          {t('painel.pagamentoPendente')}
         </div>
       )}
 
       <main style={estilos.main}>
-        {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'clientes' && <Clientes t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'aniversariantes' && <Aniversariantes t={t} idioma={IDIOMA_ADMIN_PADRAO} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'aniversariantes' && <Aniversariantes t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'profissionais' && <Profissionais empresa={empresa} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'servicos' && <Servicos empresa={empresa} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'visual' && <Visual empresaId={perfil.empresa_id} />}
@@ -208,11 +226,36 @@ function PainelPrincipal({ perfil, empresa, aoSair }) {
   );
 }
 
+const CHAVE_IDIOMA_PAINEL_STORAGE = 'kaizen_painel_idioma';
+
 export default function PainelEmpresa() {
   const [carregando, setCarregando] = useState(true);
   const [session, setSession] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [empresa, setEmpresa] = useState(null);
+
+  // Idioma: detecta automaticamente pt-BR / en / ja pelo idioma do
+  // navegador na primeira visita; depois disso, a escolha manual (seletor
+  // no topo) tem prioridade e fica salva no localStorage. Vale tanto pra
+  // tela de login quanto pro painel depois de entrar.
+  const [idioma, setIdioma] = useState(() => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_IDIOMA_PAINEL_STORAGE);
+      if (salvo) return salvo;
+    } catch {
+      // localStorage indisponível — segue pra detecção pelo navegador.
+    }
+    return idiomaAdminPorNavegador() || IDIOMA_ADMIN_PADRAO;
+  });
+  const t = (chave, valores) => traduzirAdmin(idioma, chave, valores);
+  const mudarIdioma = (novoIdioma) => {
+    setIdioma(novoIdioma);
+    try {
+      localStorage.setItem(CHAVE_IDIOMA_PAINEL_STORAGE, novoIdioma);
+    } catch {
+      // sem localStorage, só não persiste entre sessões.
+    }
+  };
 
   useEffect(() => {
     supabaseSaaS.auth.getSession().then(({ data }) => {
@@ -255,11 +298,11 @@ export default function PainelEmpresa() {
     await supabaseSaaS.auth.signOut();
   };
 
-  if (carregando) return <TelaCarregando />;
-  if (!session) return <TelaLogin />;
-  if (!perfil) return <TelaCarregando />;
-  if (!perfil.empresa_id) return <TelaAguardandoVinculo email={perfil.email} aoSair={handleSair} />;
-  if (empresa?.status === 'cancelado') return <TelaAssinaturaCancelada empresa={empresa} aoSair={handleSair} />;
+  if (carregando) return <TelaCarregando t={t} />;
+  if (!session) return <TelaLogin idioma={idioma} mudarIdioma={mudarIdioma} t={t} />;
+  if (!perfil) return <TelaCarregando t={t} />;
+  if (!perfil.empresa_id) return <TelaAguardandoVinculo email={perfil.email} aoSair={handleSair} t={t} />;
+  if (empresa?.status === 'cancelado') return <TelaAssinaturaCancelada empresa={empresa} aoSair={handleSair} t={t} />;
 
-  return <PainelPrincipal perfil={perfil} empresa={empresa} aoSair={handleSair} />;
+  return <PainelPrincipal perfil={perfil} empresa={empresa} aoSair={handleSair} idioma={idioma} mudarIdioma={mudarIdioma} t={t} />;
 }

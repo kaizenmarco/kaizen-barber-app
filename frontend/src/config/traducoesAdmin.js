@@ -33,6 +33,24 @@ export const LOCALE_POR_IDIOMA_ADMIN = {
   ja: 'ja-JP',
 };
 
+// Detecta o idioma preferido do navegador (ex: "ja-JP", "en-US", "pt-BR")
+// e mapeia pro nosso conjunto de 3 idiomas suportados. Usado como segundo
+// critério (depois de uma escolha manual salva) pra abrir /cadastro e
+// /painel já no idioma certo pra quem chega de fora do Brasil.
+export const idiomaAdminPorNavegador = () => {
+  if (typeof navigator === 'undefined') return null;
+  const candidatos = navigator.languages && navigator.languages.length
+    ? navigator.languages
+    : [navigator.language];
+  for (const cand of candidatos) {
+    const low = (cand || '').toLowerCase();
+    if (low.startsWith('pt')) return 'pt-BR';
+    if (low.startsWith('ja')) return 'ja';
+    if (low.startsWith('en')) return 'en';
+  }
+  return null;
+};
+
 const TEXTOS = {
   'pt-BR': {
     // Login / cadastro
@@ -603,6 +621,57 @@ const TEXTOS = {
     'cadastros.erroSalvarPromocao': '❌ Erro ao salvar promoção: {msg}',
     'cadastros.confirmarPausarPromocao': 'Pausar esta promoção? Ela deixa de aparecer no site público e de aplicar o desconto até você retomar.',
     'cadastros.confirmarRetomarPromocao': 'Retomar esta promoção? Ela volta a valer e a aparecer no site público.',
+
+    // Painel SaaS (/painel) e Cadastro self-service (/cadastro) — Kaizen Flow App
+    'nav.servicos': '✂️ Serviços',
+    'nav.visual': '🎨 Identidade Visual',
+    'nav.horarios': '🕒 Horário de Trabalho',
+    'nav.agenda': '📅 Agenda',
+    'painel.subtitulo': 'Painel da sua barbearia',
+    'painel.sair': 'Sair',
+    'painel.voltar': '← Voltar',
+    'painel.pagamentoPendente': 'Pagamento pendente — regularize em breve para não perder o acesso ao sistema.',
+    'painel.mensagemContaCriada': 'Conta criada! Se pediu confirmação por e-mail, confirme e entre em seguida.',
+    'painel.vinculoTitulo': 'Conta ainda não vinculada',
+    'painel.vinculoCorpo': 'A conta {email} foi criada, mas ainda não está ligada a nenhuma barbearia cadastrada. Isso é feito manualmente logo após a confirmação do pagamento — entre em contato com o suporte se estiver esperando há mais de algumas horas.',
+    'painel.canceladaTitulo': 'Assinatura cancelada',
+    'painel.canceladaCorpo': 'O acesso da {empresa} foi suspenso porque a assinatura está cancelada. Renove o pagamento para voltar a usar o sistema.',
+    'painel.reativarAssinatura': 'Reativar assinatura',
+    'cadastroSaas.titulo': 'Kaizen Flow App — Assine agora',
+    'cadastroSaas.subtitulo': 'Escolha o país, o plano da sua barbearia e comece hoje mesmo.',
+    'cadastroSaas.nomeBarbearia': 'Nome da barbearia',
+    'cadastroSaas.nomeBarbeariaPlaceholder': 'Ex: Barbearia Silva',
+    'cadastroSaas.emailContato': 'E-mail de contato',
+    'cadastroSaas.emailPlaceholder': 'contato@suabarbearia.com',
+    'cadastroSaas.telefone': 'Telefone / WhatsApp',
+    'cadastroSaas.telefonePlaceholder': '+55 11 99999-9999',
+    'cadastroSaas.paisMoeda': 'País / moeda',
+    'cadastroSaas.paisBrasil': 'Brasil (R$)',
+    'cadastroSaas.paisJapao': 'Japão (¥)',
+    'cadastroSaas.escolhaPlano': 'Escolha o plano',
+    'cadastroSaas.planoBasicoNome': 'Básico',
+    'cadastroSaas.planoBasicoItem1': 'Agenda online',
+    'cadastroSaas.planoBasicoItem2': 'Cadastro de clientes',
+    'cadastroSaas.planoBasicoItem3': '1 profissional incluído',
+    'cadastroSaas.planoIntermediarioNome': 'Intermediário',
+    'cadastroSaas.planoIntermediarioItem1': 'Tudo do Básico',
+    'cadastroSaas.planoIntermediarioItem2': 'Controle de caixa',
+    'cadastroSaas.planoIntermediarioItem3': '1 profissional incluído',
+    'cadastroSaas.planoCompletoNome': 'Completo',
+    'cadastroSaas.planoCompletoItem1': 'Tudo do Intermediário',
+    'cadastroSaas.planoCompletoItem2': 'Vários profissionais incluídos',
+    'cadastroSaas.planoCompletoItem3': 'Relatórios completos',
+    'cadastroSaas.planoCompletoItem4': 'Suporte prioritário',
+    'cadastroSaas.porMes': '/mês',
+    'cadastroSaas.profissionaisAdicionais': 'Profissionais adicionais',
+    'cadastroSaas.adicionalPorMes': '× {preco}/mês cada',
+    'cadastroSaas.ajudaAdicional': 'O plano {plano} já inclui 1 profissional. Some aqui quantos profissionais a mais vão usar o sistema.',
+    'cadastroSaas.total': 'Total:',
+    'cadastroSaas.redirecionando': 'Redirecionando para o pagamento...',
+    'cadastroSaas.continuarPagamento': 'Continuar para pagamento',
+    'cadastroSaas.erroCamposObrigatorios': 'Preencha o nome da barbearia, o e-mail de contato e o telefone/WhatsApp.',
+    'cadastroSaas.erroIniciarPagamento': 'Não consegui iniciar o pagamento. Tente novamente em instantes.',
+    'cadastroSaas.erroRespostaInesperada': 'Resposta inesperada ao criar o checkout. Tente novamente.',
   },
 
   en: {
@@ -1161,6 +1230,57 @@ const TEXTOS = {
     'cadastros.erroSalvarPromocao': '❌ Error saving promotion: {msg}',
     'cadastros.confirmarPausarPromocao': 'Pause this promotion? It stops showing on the public site and applying the discount until you resume it.',
     'cadastros.confirmarRetomarPromocao': 'Resume this promotion? It becomes active and shows on the public site again.',
+
+    // Painel SaaS (/painel) and self-service Sign up (/cadastro) — Kaizen Flow App
+    'nav.servicos': '✂️ Services',
+    'nav.visual': '🎨 Brand Identity',
+    'nav.horarios': '🕒 Work Schedule',
+    'nav.agenda': '📅 Schedule',
+    'painel.subtitulo': 'Your barbershop panel',
+    'painel.sair': 'Sign out',
+    'painel.voltar': '← Back',
+    'painel.pagamentoPendente': 'Payment pending — settle it soon to avoid losing access to the system.',
+    'painel.mensagemContaCriada': 'Account created! If email confirmation was requested, confirm it and then sign in.',
+    'painel.vinculoTitulo': 'Account not linked yet',
+    'painel.vinculoCorpo': 'The account {email} was created, but is not linked to any registered barbershop yet. This is done manually right after payment confirmation — contact support if you have been waiting more than a few hours.',
+    'painel.canceladaTitulo': 'Subscription cancelled',
+    'painel.canceladaCorpo': "{empresa}'s access was suspended because the subscription is cancelled. Renew the payment to use the system again.",
+    'painel.reativarAssinatura': 'Reactivate subscription',
+    'cadastroSaas.titulo': 'Kaizen Flow App — Subscribe now',
+    'cadastroSaas.subtitulo': "Choose your country and your barbershop's plan, and get started today.",
+    'cadastroSaas.nomeBarbearia': 'Barbershop name',
+    'cadastroSaas.nomeBarbeariaPlaceholder': 'E.g. Silva Barbershop',
+    'cadastroSaas.emailContato': 'Contact email',
+    'cadastroSaas.emailPlaceholder': 'contact@yourbarbershop.com',
+    'cadastroSaas.telefone': 'Phone / WhatsApp',
+    'cadastroSaas.telefonePlaceholder': '+1 555 123-4567',
+    'cadastroSaas.paisMoeda': 'Country / currency',
+    'cadastroSaas.paisBrasil': 'Brazil (R$)',
+    'cadastroSaas.paisJapao': 'Japan (¥)',
+    'cadastroSaas.escolhaPlano': 'Choose your plan',
+    'cadastroSaas.planoBasicoNome': 'Basic',
+    'cadastroSaas.planoBasicoItem1': 'Online scheduling',
+    'cadastroSaas.planoBasicoItem2': 'Client records',
+    'cadastroSaas.planoBasicoItem3': '1 staff member included',
+    'cadastroSaas.planoIntermediarioNome': 'Standard',
+    'cadastroSaas.planoIntermediarioItem1': 'Everything in Basic',
+    'cadastroSaas.planoIntermediarioItem2': 'Cash register control',
+    'cadastroSaas.planoIntermediarioItem3': '1 staff member included',
+    'cadastroSaas.planoCompletoNome': 'Complete',
+    'cadastroSaas.planoCompletoItem1': 'Everything in Standard',
+    'cadastroSaas.planoCompletoItem2': 'Multiple staff members included',
+    'cadastroSaas.planoCompletoItem3': 'Full reports',
+    'cadastroSaas.planoCompletoItem4': 'Priority support',
+    'cadastroSaas.porMes': '/month',
+    'cadastroSaas.profissionaisAdicionais': 'Additional staff',
+    'cadastroSaas.adicionalPorMes': '× {preco}/month each',
+    'cadastroSaas.ajudaAdicional': 'The {plano} plan already includes 1 staff member. Add here how many more staff will use the system.',
+    'cadastroSaas.total': 'Total:',
+    'cadastroSaas.redirecionando': 'Redirecting to payment...',
+    'cadastroSaas.continuarPagamento': 'Continue to payment',
+    'cadastroSaas.erroCamposObrigatorios': 'Fill in the barbershop name, contact email, and phone/WhatsApp.',
+    'cadastroSaas.erroIniciarPagamento': 'Could not start the payment. Please try again in a moment.',
+    'cadastroSaas.erroRespostaInesperada': 'Unexpected response while creating the checkout. Please try again.',
   },
 
   ja: {
@@ -1719,6 +1839,57 @@ const TEXTOS = {
     'cadastros.erroSalvarPromocao': '❌ プロモーションの保存エラー: {msg}',
     'cadastros.confirmarPausarPromocao': 'このプロモーションを一時停止しますか？再開するまで公開サイトに表示されず、割引も適用されません。',
     'cadastros.confirmarRetomarPromocao': 'このプロモーションを再開しますか？再度有効になり、公開サイトに表示されます。',
+
+    // Painel SaaS（/painel）と セルフサービス登録（/cadastro）— Kaizen Flow App
+    'nav.servicos': '✂️ サービス',
+    'nav.visual': '🎨 ブランドデザイン',
+    'nav.horarios': '🕒 勤務時間',
+    'nav.agenda': '📅 予約表',
+    'painel.subtitulo': 'あなたの理容室パネル',
+    'painel.sair': 'ログアウト',
+    'painel.voltar': '← 戻る',
+    'painel.pagamentoPendente': 'お支払いが保留中です — システムへのアクセスを失わないよう、早めにご対応ください。',
+    'painel.mensagemContaCriada': 'アカウントを作成しました！メール確認が必要な場合は確認してからログインしてください。',
+    'painel.vinculoTitulo': 'アカウントがまだ連携されていません',
+    'painel.vinculoCorpo': 'アカウント {email} は作成されましたが、まだ登録された理容室に連携されていません。これは決済確認後に手動で行われます — 数時間以上お待ちの場合はサポートへご連絡ください。',
+    'painel.canceladaTitulo': 'サブスクリプションが解約されました',
+    'painel.canceladaCorpo': '{empresa} のアクセスは、サブスクリプションが解約されたため停止されました。システムを再度利用するには、お支払いを更新してください。',
+    'painel.reativarAssinatura': 'サブスクリプションを再開する',
+    'cadastroSaas.titulo': 'Kaizen Flow App — 今すぐ登録',
+    'cadastroSaas.subtitulo': '国と理容室のプランを選んで、今日から始めましょう。',
+    'cadastroSaas.nomeBarbearia': '店舗名',
+    'cadastroSaas.nomeBarbeariaPlaceholder': '例：シルバ理容室',
+    'cadastroSaas.emailContato': '連絡先メールアドレス',
+    'cadastroSaas.emailPlaceholder': 'contact@yourbarbershop.com',
+    'cadastroSaas.telefone': '電話番号 / WhatsApp',
+    'cadastroSaas.telefonePlaceholder': '+81 90-1234-5678',
+    'cadastroSaas.paisMoeda': '国・通貨',
+    'cadastroSaas.paisBrasil': 'ブラジル (R$)',
+    'cadastroSaas.paisJapao': '日本 (¥)',
+    'cadastroSaas.escolhaPlano': 'プランを選択',
+    'cadastroSaas.planoBasicoNome': 'ベーシック',
+    'cadastroSaas.planoBasicoItem1': 'オンライン予約',
+    'cadastroSaas.planoBasicoItem2': '顧客管理',
+    'cadastroSaas.planoBasicoItem3': 'スタッフ1名を含む',
+    'cadastroSaas.planoIntermediarioNome': 'スタンダード',
+    'cadastroSaas.planoIntermediarioItem1': 'ベーシックの全機能',
+    'cadastroSaas.planoIntermediarioItem2': 'レジ管理',
+    'cadastroSaas.planoIntermediarioItem3': 'スタッフ1名を含む',
+    'cadastroSaas.planoCompletoNome': 'コンプリート',
+    'cadastroSaas.planoCompletoItem1': 'スタンダードの全機能',
+    'cadastroSaas.planoCompletoItem2': '複数スタッフを含む',
+    'cadastroSaas.planoCompletoItem3': '詳細レポート',
+    'cadastroSaas.planoCompletoItem4': '優先サポート',
+    'cadastroSaas.porMes': '/月',
+    'cadastroSaas.profissionaisAdicionais': '追加スタッフ',
+    'cadastroSaas.adicionalPorMes': '× {preco}/月（1名につき）',
+    'cadastroSaas.ajudaAdicional': '{plano}プランにはすでにスタッフ1名が含まれています。追加で利用するスタッフの人数をここに入力してください。',
+    'cadastroSaas.total': '合計:',
+    'cadastroSaas.redirecionando': '決済ページへ移動中...',
+    'cadastroSaas.continuarPagamento': '決済へ進む',
+    'cadastroSaas.erroCamposObrigatorios': '店舗名、連絡先メールアドレス、電話番号（WhatsApp）を入力してください。',
+    'cadastroSaas.erroIniciarPagamento': '決済を開始できませんでした。しばらくしてからもう一度お試しください。',
+    'cadastroSaas.erroRespostaInesperada': 'チェックアウト作成時に予期しない応答がありました。もう一度お試しください。',
   },
 };
 

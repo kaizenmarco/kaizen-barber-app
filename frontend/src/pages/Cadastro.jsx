@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabaseSaaS } from '../config/supabaseClientSaaS';
+import { IDIOMAS_ADMIN, IDIOMA_ADMIN_PADRAO, idiomaAdminPorNavegador, traduzirAdmin } from '../config/traducoesAdmin';
 
 // Página pública de cadastro self-service: a barbearia escolhe o país (que
 // define a moeda e os valores praticados nesse mercado), o plano e, se for
@@ -11,38 +12,12 @@ import { supabaseSaaS } from '../config/supabaseClientSaaS';
 // Os valores são preço PRÓPRIO de cada mercado (não é conversão automática
 // de câmbio) — Brasil e Japão têm tabelas de preço competitivas e
 // independentes entre si.
+//
+// Idioma: detecta automaticamente pt-BR / en / ja pelo idioma do navegador
+// na primeira visita; depois disso, a escolha manual (seletor no topo) tem
+// prioridade e fica salva no localStorage.
 
-const PAISES = [
-  { moeda: 'brl', bandeira: '🇧🇷', label: 'Brasil (R$)' },
-  { moeda: 'jpy', bandeira: '🇯🇵', label: 'Japão (¥)' },
-];
-
-const PLANOS = [
-  {
-    id: 'basico',
-    nome: 'Básico',
-    preco: { brl: 49.90, jpy: 3900 },
-    permiteAdicional: true,
-    destaque: false,
-    itens: ['Agenda online', 'Cadastro de clientes', '1 profissional incluído'],
-  },
-  {
-    id: 'intermediario',
-    nome: 'Intermediário',
-    preco: { brl: 99.90, jpy: 9900 },
-    permiteAdicional: true,
-    destaque: true,
-    itens: ['Tudo do Básico', 'Controle de caixa', '1 profissional incluído'],
-  },
-  {
-    id: 'completo',
-    nome: 'Completo',
-    preco: { brl: 169.90, jpy: 14900 },
-    permiteAdicional: false,
-    destaque: false,
-    itens: ['Tudo do Intermediário', 'Vários profissionais incluídos', 'Relatórios completos', 'Suporte prioritário'],
-  },
-];
+const CHAVE_IDIOMA_STORAGE = 'kaizen_cadastro_idioma';
 
 const PRECO_ADICIONAL = { brl: 9.90, jpy: 1800 };
 const MAXIMO_PROFISSIONAIS_ADICIONAIS = 50;
@@ -55,6 +30,9 @@ function formatarPreco(valor, moeda) {
 const estilos = {
   pagina: { minHeight: '100vh', background: '#1a1a1a', color: '#e8e8e8', fontFamily: 'system-ui, sans-serif', padding: '40px 20px' },
   container: { maxWidth: '820px', margin: '0 auto' },
+  seletorIdioma: { display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '20px' },
+  botaoIdioma: { padding: '4px 10px', borderRadius: '999px', border: '1px solid #d4af37', background: 'transparent', color: '#d4af37', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer' },
+  botaoIdiomaAtivo: { background: '#d4af37', color: '#1a1a1a' },
   titulo: { fontSize: '28px', fontWeight: 'bold', color: '#d4af37', marginBottom: '6px', textAlign: 'center' },
   subtitulo: { color: '#999', textAlign: 'center', marginBottom: '36px' },
   cartao: { background: '#2d2d2d', border: '1px solid #333', borderRadius: '12px', padding: '28px', marginBottom: '28px' },
@@ -80,6 +58,57 @@ const estilos = {
 };
 
 export default function Cadastro() {
+  const [idioma, setIdioma] = useState(() => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_IDIOMA_STORAGE);
+      if (salvo) return salvo;
+    } catch {
+      // localStorage indisponível — segue pra detecção pelo navegador.
+    }
+    return idiomaAdminPorNavegador() || IDIOMA_ADMIN_PADRAO;
+  });
+  const t = (chave, valores) => traduzirAdmin(idioma, chave, valores);
+  const mudarIdioma = (novoIdioma) => {
+    setIdioma(novoIdioma);
+    try {
+      localStorage.setItem(CHAVE_IDIOMA_STORAGE, novoIdioma);
+    } catch {
+      // sem localStorage, só não persiste entre sessões.
+    }
+  };
+
+  const PAISES = [
+    { moeda: 'brl', bandeira: '🇧🇷', label: t('cadastroSaas.paisBrasil') },
+    { moeda: 'jpy', bandeira: '🇯🇵', label: t('cadastroSaas.paisJapao') },
+  ];
+
+  const PLANOS = [
+    {
+      id: 'basico',
+      nome: t('cadastroSaas.planoBasicoNome'),
+      preco: { brl: 49.90, jpy: 3900 },
+      permiteAdicional: true,
+      destaque: false,
+      itens: [t('cadastroSaas.planoBasicoItem1'), t('cadastroSaas.planoBasicoItem2'), t('cadastroSaas.planoBasicoItem3')],
+    },
+    {
+      id: 'intermediario',
+      nome: t('cadastroSaas.planoIntermediarioNome'),
+      preco: { brl: 99.90, jpy: 9900 },
+      permiteAdicional: true,
+      destaque: true,
+      itens: [t('cadastroSaas.planoIntermediarioItem1'), t('cadastroSaas.planoIntermediarioItem2'), t('cadastroSaas.planoIntermediarioItem3')],
+    },
+    {
+      id: 'completo',
+      nome: t('cadastroSaas.planoCompletoNome'),
+      preco: { brl: 169.90, jpy: 14900 },
+      permiteAdicional: false,
+      destaque: false,
+      itens: [t('cadastroSaas.planoCompletoItem1'), t('cadastroSaas.planoCompletoItem2'), t('cadastroSaas.planoCompletoItem3'), t('cadastroSaas.planoCompletoItem4')],
+    },
+  ];
+
   const [nomeEmpresa, setNomeEmpresa] = useState('');
   const [emailContato, setEmailContato] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -115,7 +144,7 @@ export default function Cadastro() {
     setErro('');
 
     if (!nomeEmpresa.trim() || !emailContato.trim() || !telefone.trim()) {
-      setErro('Preencha o nome da barbearia, o e-mail de contato e o telefone/WhatsApp.');
+      setErro(t('cadastroSaas.erroCamposObrigatorios'));
       return;
     }
 
@@ -133,7 +162,7 @@ export default function Cadastro() {
     setEnviando(false);
 
     if (error) {
-      setErro('Não consegui iniciar o pagamento. Tente novamente em instantes.');
+      setErro(t('cadastroSaas.erroIniciarPagamento'));
       console.error(error);
       return;
     }
@@ -144,44 +173,57 @@ export default function Cadastro() {
     if (data?.checkout_url) {
       window.location.href = data.checkout_url;
     } else {
-      setErro('Resposta inesperada ao criar o checkout. Tente novamente.');
+      setErro(t('cadastroSaas.erroRespostaInesperada'));
     }
   };
 
   return (
     <div style={estilos.pagina}>
       <div style={estilos.container}>
-        <h1 style={estilos.titulo}>Kaizen Flow App — Assine agora</h1>
-        <p style={estilos.subtitulo}>Escolha o país, o plano da sua barbearia e comece hoje mesmo.</p>
+        <div style={estilos.seletorIdioma}>
+          {IDIOMAS_ADMIN.map((op) => (
+            <button
+              key={op.codigo}
+              type="button"
+              onClick={() => mudarIdioma(op.codigo)}
+              style={{ ...estilos.botaoIdioma, ...(idioma === op.codigo ? estilos.botaoIdiomaAtivo : {}) }}
+            >
+              {op.rotulo}
+            </button>
+          ))}
+        </div>
+
+        <h1 style={estilos.titulo}>{t('cadastroSaas.titulo')}</h1>
+        <p style={estilos.subtitulo}>{t('cadastroSaas.subtitulo')}</p>
 
         <form style={estilos.cartao} onSubmit={handleSubmit}>
-          <label style={estilos.label}>Nome da barbearia</label>
+          <label style={estilos.label}>{t('cadastroSaas.nomeBarbearia')}</label>
           <input
             style={estilos.input}
             value={nomeEmpresa}
             onChange={(e) => setNomeEmpresa(e.target.value)}
-            placeholder="Ex: Barbearia Silva"
+            placeholder={t('cadastroSaas.nomeBarbeariaPlaceholder')}
           />
 
-          <label style={estilos.label}>E-mail de contato</label>
+          <label style={estilos.label}>{t('cadastroSaas.emailContato')}</label>
           <input
             style={estilos.input}
             type="email"
             value={emailContato}
             onChange={(e) => setEmailContato(e.target.value)}
-            placeholder="contato@suabarbearia.com"
+            placeholder={t('cadastroSaas.emailPlaceholder')}
           />
 
-          <label style={estilos.label}>Telefone / WhatsApp</label>
+          <label style={estilos.label}>{t('cadastroSaas.telefone')}</label>
           <input
             style={estilos.input}
             type="tel"
             value={telefone}
             onChange={(e) => setTelefone(e.target.value)}
-            placeholder="+55 11 99999-9999"
+            placeholder={t('cadastroSaas.telefonePlaceholder')}
           />
 
-          <label style={estilos.label}>País / moeda</label>
+          <label style={estilos.label}>{t('cadastroSaas.paisMoeda')}</label>
           <div style={estilos.gradePaises}>
             {PAISES.map((pais) => (
               <div
@@ -194,7 +236,7 @@ export default function Cadastro() {
             ))}
           </div>
 
-          <label style={estilos.label}>Escolha o plano</label>
+          <label style={estilos.label}>{t('cadastroSaas.escolhaPlano')}</label>
           <div style={estilos.gradePlanos}>
             {PLANOS.map((p) => (
               <div
@@ -203,7 +245,7 @@ export default function Cadastro() {
                 onClick={() => handleSelecionarPlano(p.id)}
               >
                 <div style={estilos.nomePlano}>{p.nome} {p.destaque ? '★' : ''}</div>
-                <div style={estilos.precoPlano}>{formatarPreco(p.preco[moeda], moeda)}/mês</div>
+                <div style={estilos.precoPlano}>{formatarPreco(p.preco[moeda], moeda)}{t('cadastroSaas.porMes')}</div>
                 {p.itens.map((item) => (
                   <div key={item} style={estilos.itemPlano}>• {item}</div>
                 ))}
@@ -213,7 +255,7 @@ export default function Cadastro() {
 
           {permiteAdicional && (
             <>
-              <label style={estilos.label}>Profissionais adicionais</label>
+              <label style={estilos.label}>{t('cadastroSaas.profissionaisAdicionais')}</label>
               <div style={estilos.linhaAdicional}>
                 <input
                   type="number"
@@ -223,16 +265,16 @@ export default function Cadastro() {
                   value={profissionaisAdicionais}
                   onChange={(e) => handleAdicionaisChange(e.target.value)}
                 />
-                <span>× {formatarPreco(precoAdicionalUnitario, moeda)}/mês cada</span>
+                <span>{t('cadastroSaas.adicionalPorMes', { preco: formatarPreco(precoAdicionalUnitario, moeda) })}</span>
               </div>
               <p style={estilos.ajudaAdicional}>
-                O plano {planoSelecionado.nome} já inclui 1 profissional. Some aqui quantos profissionais a mais vão usar o sistema.
+                {t('cadastroSaas.ajudaAdicional', { plano: planoSelecionado.nome })}
               </p>
             </>
           )}
 
           <p style={estilos.resumoTotal}>
-            Total: <span style={estilos.resumoTotalValor}>{formatarPreco(precoTotal, moeda)}/mês</span>
+            {t('cadastroSaas.total')} <span style={estilos.resumoTotalValor}>{formatarPreco(precoTotal, moeda)}{t('cadastroSaas.porMes')}</span>
           </p>
 
           <button
@@ -240,7 +282,7 @@ export default function Cadastro() {
             style={{ ...estilos.botao, ...(enviando ? estilos.botaoDesabilitado : {}) }}
             disabled={enviando}
           >
-            {enviando ? 'Redirecionando para o pagamento...' : 'Continuar para pagamento'}
+            {enviando ? t('cadastroSaas.redirecionando') : t('cadastroSaas.continuarPagamento')}
           </button>
 
           {erro && <p style={estilos.erro}>{erro}</p>}
