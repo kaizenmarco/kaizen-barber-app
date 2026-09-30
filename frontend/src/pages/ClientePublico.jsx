@@ -802,6 +802,16 @@ function ClientePublico() {
       return;
     }
 
+    // Telefone é obrigatório e precisa ter dígitos suficientes pra ser um
+    // número de verdade (mesmo critério de 8 dígitos já usado nas consultas
+    // de pontos/agendamentos por telefone, mais acima neste arquivo) — sem
+    // isso, qualquer coisa tipo "5" ou "6" passava e depois não dava pra
+    // avisar o cliente sobre confirmação, atraso ou cancelamento.
+    if (!dadosAgendamento.telefone || dadosAgendamento.telefone.replace(/\D/g, '').length < 8) {
+      alert('⚠️ ' + t('alerta_telefone_invalido'));
+      return;
+    }
+
     if (!dadosAgendamento.servico) {
       alert('⚠️ ' + t('alerta_selecione_servico'));
       return;
@@ -2121,7 +2131,10 @@ function ClientePublico() {
 
             <input type="text" placeholder={t('modal_nome_placeholder')} value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <input type="email" placeholder={t('modal_email_placeholder')} value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-            <input type="tel" placeholder={t('modal_telefone_placeholder')} value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <input type="tel" placeholder={t('modal_telefone_placeholder')} value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '6px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <p style={{ margin: '0 0 10px 0', fontSize: '11px', color: '#d4af37', lineHeight: '1.4' }}>
+              {t('modal_aviso_dados_corretos')}
+            </p>
             <label style={{ display: 'block', fontSize: '12px', color: '#d4af37', marginBottom: '4px' }}>
               {t('modal_data_nascimento_placeholder')}
             </label>

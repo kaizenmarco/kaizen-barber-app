@@ -139,7 +139,8 @@ const TEXTOS = {
 
     modal_nome_placeholder: 'Nome',
     modal_email_placeholder: 'Email',
-    modal_telefone_placeholder: 'Telefone',
+    modal_telefone_placeholder: 'Telefone *',
+    modal_aviso_dados_corretos: '⚠️ Use seu telefone e e-mail reais. Agendamentos com dados falsos ou incorretos serão cancelados e o cliente poderá ser bloqueado de futuros agendamentos.',
     modal_data_nascimento_placeholder: 'Data de Nascimento (opcional — ganhe 40% de desconto no seu aniversário!)',
     modal_obs_placeholder: 'Alguma observação? (Ex: Não precisa lavar, etc...)',
     modal_consultando_pontos: 'Consultando seus pontos de fidelidade...',
@@ -154,6 +155,7 @@ const TEXTOS = {
 
     alerta_preencha_nome_email: 'Preencha seu nome e email!',
     alerta_selecione_servico: 'Selecione um serviço!',
+    alerta_telefone_invalido: 'Informe um telefone válido (com DDD) — não conseguimos confirmar agendamentos sem um telefone real de contato.',
     alerta_pontos_insuficientes: 'Você não tem pontos suficientes para resgatar desconto!',
     alerta_cliente_ja_tem_horario: 'Você já tem um agendamento marcado nesse mesmo dia e horário. Cancele o anterior em "Meus Agendamentos" antes de marcar um novo.',
     alerta_erro_agendar: 'Erro ao agendar: ',
@@ -285,7 +287,8 @@ const TEXTOS = {
 
     modal_nome_placeholder: 'Name',
     modal_email_placeholder: 'Email',
-    modal_telefone_placeholder: 'Phone',
+    modal_telefone_placeholder: 'Phone *',
+    modal_aviso_dados_corretos: "⚠️ Please use your real phone number and email. Bookings with fake or incorrect information will be cancelled and the client may be blocked from future bookings.",
     modal_data_nascimento_placeholder: 'Date of Birth (optional — get 40% off on your birthday!)',
     modal_obs_placeholder: 'Any notes? (e.g. no shampoo needed, etc.)',
     modal_consultando_pontos: 'Checking your reward points...',
@@ -300,6 +303,7 @@ const TEXTOS = {
 
     alerta_preencha_nome_email: 'Please fill in your name and email!',
     alerta_selecione_servico: 'Please select a service!',
+    alerta_telefone_invalido: "Please enter a valid phone number (with area code) — we can't confirm bookings without a real contact number.",
     alerta_pontos_insuficientes: "You don't have enough points to redeem a discount!",
     alerta_cliente_ja_tem_horario: 'You already have an appointment booked on that same day and time. Cancel the previous one in "My Appointments" before booking a new one.',
     alerta_erro_agendar: 'Booking error: ',
@@ -431,7 +435,8 @@ const TEXTOS = {
 
     modal_nome_placeholder: 'お名前',
     modal_email_placeholder: 'メールアドレス',
-    modal_telefone_placeholder: '電話番号',
+    modal_telefone_placeholder: '電話番号 *',
+    modal_aviso_dados_corretos: '⚠️ 実際の電話番号とメールアドレスをご入力ください。虚偽または誤った情報でのご予約はキャンセルされ、今後のご予約をお断りする場合があります。',
     modal_data_nascimento_placeholder: '生年月日（任意 — 誕生日に40%割引！）',
     modal_obs_placeholder: 'ご要望があればご記入ください（例:シャンプー不要 等）',
     modal_consultando_pontos: 'ポイントを確認しています...',
@@ -446,6 +451,7 @@ const TEXTOS = {
 
     alerta_preencha_nome_email: 'お名前とメールアドレスを入力してください!',
     alerta_selecione_servico: 'サービスを選択してください!',
+    alerta_telefone_invalido: '有効な電話番号を入力してください(市外局番を含む) — 実際の連絡先電話番号がないと予約を確定できません。',
     alerta_pontos_insuficientes: '割引に必要なポイントが不足しています!',
     alerta_cliente_ja_tem_horario: '同じ日時にすでにご予約があります。新しい予約をする前に「予約管理」で以前の予約をキャンセルしてください。',
     alerta_erro_agendar: '予約エラー: ',
@@ -577,7 +583,8 @@ const TEXTOS = {
 
     modal_nome_placeholder: 'Nombre',
     modal_email_placeholder: 'Correo electrónico',
-    modal_telefone_placeholder: 'Teléfono',
+    modal_telefone_placeholder: 'Teléfono *',
+    modal_aviso_dados_corretos: '⚠️ Usa tu teléfono y correo electrónico reales. Las reservas con datos falsos o incorrectos serán canceladas y el cliente podrá ser bloqueado de futuras reservas.',
     modal_data_nascimento_placeholder: 'Fecha de Nacimiento (opcional — ¡gana 40% de descuento en tu cumpleaños!)',
     modal_obs_placeholder: '¿Alguna observación? (Ej: No es necesario lavar, etc...)',
     modal_consultando_pontos: 'Consultando tus puntos de fidelidad...',
@@ -592,6 +599,7 @@ const TEXTOS = {
 
     alerta_preencha_nome_email: '¡Completa tu nombre y correo electrónico!',
     alerta_selecione_servico: '¡Selecciona un servicio!',
+    alerta_telefone_invalido: 'Ingresa un teléfono válido (con código de área) — no podemos confirmar reservas sin un número de contacto real.',
     alerta_pontos_insuficientes: '¡No tienes suficientes puntos para canjear el descuento!',
     alerta_cliente_ja_tem_horario: 'Ya tienes un turno reservado ese mismo día y horario. Cancela el anterior en "Mis Turnos" antes de reservar uno nuevo.',
     alerta_erro_agendar: 'Error al reservar: ',
