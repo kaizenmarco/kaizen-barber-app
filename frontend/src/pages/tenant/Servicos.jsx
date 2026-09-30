@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
 import { enviarImagemTenant } from '../../config/uploadImagemTenant';
+import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../../config/traducoesAdmin';
 
 // Cadastro de serviços MULTI-TENANT: cada empresa cadastra seu próprio
 // catálogo (nome, preço, duração, foto) — empresa_id é preenchido
@@ -57,7 +58,10 @@ const NOVO_VAZIO = {
   validade_dias: '',
 };
 
-function Servicos({ empresa, empresaId }) {
+function Servicos({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+
   const moeda = empresa?.moeda === 'jpy' ? 'jpy' : 'brl';
   const simbolo = SIMBOLO_MOEDA[moeda];
   const casasDecimais = moeda === 'jpy' ? '1' : '0.01';
@@ -99,7 +103,7 @@ function Servicos({ empresa, empresaId }) {
       setServicos(dadosServicos || []);
       setPacotes(dadosPacotes || []);
     } catch (e) {
-      setErro(`Não consegui carregar os serviços: ${e.message}`);
+      setErro(`${t('servicosEmpresa.erroCarregar')}${e.message}`);
     } finally {
       setCarregando(false);
     }
@@ -113,15 +117,15 @@ function Servicos({ empresa, empresaId }) {
   const handleAdicionar = async (e) => {
     e.preventDefault();
     if (!novo.nome.trim()) {
-      setErro('Preencha ao menos o nome do serviço.');
+      setErro(t('servicosEmpresa.erroNomeObrigatorio'));
       return;
     }
     if (novo.preco_minimo === '' || Number(novo.preco_minimo) < 0) {
-      setErro('Informe o preço.');
+      setErro(t('servicosEmpresa.erroPrecoObrigatorio'));
       return;
     }
     if (!novo.eh_pacote && novo.preco_maximo !== '' && Number(novo.preco_maximo) < Number(novo.preco_minimo)) {
-      setErro('O preço máximo não pode ser menor que o preço mínimo.');
+      setErro(t('servicosEmpresa.erroPrecoMaximoMenor'));
       return;
     }
 
@@ -160,7 +164,7 @@ function Servicos({ empresa, empresaId }) {
       setArquivoImagem(null);
       buscarCatalogo();
     } catch (e) {
-      setErro(`Não consegui adicionar: ${e.message}`);
+      setErro(`${t('servicosEmpresa.erroAdicionar')}${e.message}`);
     } finally {
       setSalvando(false);
     }
@@ -176,20 +180,20 @@ function Servicos({ empresa, empresaId }) {
       if (error) throw error;
       buscarCatalogo();
     } catch (e) {
-      setErro(`Não consegui trocar a foto: ${e.message}`);
+      setErro(`${t('servicosEmpresa.erroTrocarFoto')}${e.message}`);
     } finally {
       setTrocandoFotoId(null);
     }
   };
 
   const handleDeletar = async (id) => {
-    if (!window.confirm('Remover este item?')) return;
+    if (!window.confirm(t('servicosEmpresa.confirmarRemover'))) return;
     try {
       const { error } = await supabase.from('servicos').delete().eq('id', id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarCatalogo();
     } catch (e) {
-      setErro(`Não consegui remover: ${e.message}`);
+      setErro(`${t('servicosEmpresa.erroRemover')}${e.message}`);
     }
   };
 
@@ -199,21 +203,18 @@ function Servicos({ empresa, empresaId }) {
       if (error) throw error;
       buscarCatalogo();
     } catch (e) {
-      setErro(`Não consegui atualizar o pacote: ${e.message}`);
+      setErro(`${t('servicosEmpresa.erroAtualizarPacote')}${e.message}`);
     }
   };
 
   return (
     <div className="page-container">
-      <h2>Serviços</h2>
+      <h2>{t('servicosEmpresa.titulo')}</h2>
 
       <section className="form-section">
-        <h3>Adicionar</h3>
+        <h3>{t('servicosEmpresa.adicionarTitulo')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Cadastre aqui os serviços que sua barbearia oferece (corte, barba, coloração
-          etc.), ou marque a caixa abaixo para cadastrar um pacote (ex: "5 cortes por
-          {` ${simbolo}15.000`}, válido por 90 dias"). É esse catálogo que aparece na
-          Agenda e no site público de agendamento.
+          {t('servicosEmpresa.adicionarDesc', { simbolo })}
         </p>
         <form onSubmit={handleAdicionar}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#d4af37', marginBottom: '10px', cursor: 'pointer' }}>
@@ -223,12 +224,12 @@ function Servicos({ empresa, empresaId }) {
               checked={novo.eh_pacote}
               onChange={handleInputChange}
             />
-            É um pacote?
+            {t('servicosEmpresa.ehPacote')}
           </label>
           <input
             type="text"
             name="nome"
-            placeholder={novo.eh_pacote ? 'Nome do pacote' : 'Nome do serviço'}
+            placeholder={novo.eh_pacote ? t('servicosEmpresa.nomePacotePlaceholder') : t('servicosEmpresa.nomeServicoPlaceholder')}
             value={novo.nome}
             onChange={handleInputChange}
             required
@@ -236,14 +237,14 @@ function Servicos({ empresa, empresaId }) {
           <input
             type="text"
             name="descricao"
-            placeholder="Descrição (opcional)"
+            placeholder={t('servicosEmpresa.descricaoPlaceholder')}
             value={novo.descricao}
             onChange={handleInputChange}
           />
           <input
             type="number"
             name="preco_minimo"
-            placeholder={`Preço (${simbolo})`}
+            placeholder={t('servicosEmpresa.precoPlaceholder', { simbolo })}
             min="0"
             step={casasDecimais}
             value={novo.preco_minimo}
@@ -255,7 +256,7 @@ function Servicos({ empresa, empresaId }) {
               <input
                 type="number"
                 name="quantidade_sessoes"
-                placeholder="Quantidade de sessões (vazio = ilimitado)"
+                placeholder={t('servicosEmpresa.qtdSessoesPlaceholder')}
                 min="0"
                 value={novo.quantidade_sessoes}
                 onChange={handleInputChange}
@@ -263,7 +264,7 @@ function Servicos({ empresa, empresaId }) {
               <input
                 type="number"
                 name="validade_dias"
-                placeholder="Validade em dias (opcional)"
+                placeholder={t('servicosEmpresa.validadeDiasPlaceholder')}
                 min="0"
                 value={novo.validade_dias}
                 onChange={handleInputChange}
@@ -274,7 +275,7 @@ function Servicos({ empresa, empresaId }) {
               <input
                 type="number"
                 name="preco_maximo"
-                placeholder={`Preço máximo em ${simbolo} (opcional, se variar)`}
+                placeholder={t('servicosEmpresa.precoMaximoPlaceholder', { simbolo })}
                 min="0"
                 step={casasDecimais}
                 value={novo.preco_maximo}
@@ -283,7 +284,7 @@ function Servicos({ empresa, empresaId }) {
               <input
                 type="number"
                 name="duracao_minutos"
-                placeholder="Duração em minutos (opcional)"
+                placeholder={t('servicosEmpresa.duracaoPlaceholder')}
                 min="0"
                 value={novo.duracao_minutos}
                 onChange={handleInputChange}
@@ -291,7 +292,7 @@ function Servicos({ empresa, empresaId }) {
             </>
           )}
           <label style={{ display: 'block', fontSize: '12px', color: '#999', marginTop: '10px', marginBottom: '4px' }}>
-            Foto (opcional)
+            {t('comum.fotoOpcional')}
           </label>
           <input
             type="file"
@@ -299,29 +300,29 @@ function Servicos({ empresa, empresaId }) {
             onChange={(e) => setArquivoImagem(e.target.files?.[0] || null)}
           />
           <button type="submit" className="btn-primary" disabled={salvando}>
-            {salvando ? 'Salvando...' : (novo.eh_pacote ? 'Adicionar pacote' : 'Adicionar serviço')}
+            {salvando ? t('comum.salvando') : (novo.eh_pacote ? t('servicosEmpresa.adicionarPacoteBtn') : t('servicosEmpresa.adicionarServicoBtn'))}
           </button>
         </form>
         {erro && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>{erro}</p>}
       </section>
 
       <section className="list-section">
-        <h3>Seus serviços</h3>
+        <h3>{t('servicosEmpresa.listaServicosTitulo')}</h3>
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : servicos.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum serviço cadastrado ainda.</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('servicosEmpresa.nenhumServico')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Foto</th>
-                  <th>Nome</th>
-                  <th>Descrição</th>
-                  <th>Preço ({simbolo})</th>
-                  <th>Duração</th>
-                  <th>Ação</th>
+                  <th>{t('comum.foto')}</th>
+                  <th>{t('comum.nome')}</th>
+                  <th>{t('comum.descricao')}</th>
+                  <th>{t('servicosEmpresa.colPreco', { simbolo })}</th>
+                  <th>{t('servicosEmpresa.colDuracao')}</th>
+                  <th>{t('comum.acao')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -339,7 +340,7 @@ function Servicos({ empresa, empresaId }) {
                       )}
                       <br />
                       <label style={{ fontSize: '11px', color: '#d4af37', cursor: 'pointer' }}>
-                        {trocandoFotoId === s.id ? 'Enviando...' : 'Trocar foto'}
+                        {trocandoFotoId === s.id ? t('comum.enviando') : t('comum.trocarFoto')}
                         <input
                           type="file"
                           accept="image/*"
@@ -355,7 +356,7 @@ function Servicos({ empresa, empresaId }) {
                     <td>{s.duracao_minutos ? `${s.duracao_minutos} min` : '-'}</td>
                     <td>
                       <button className="btn-delete" onClick={() => handleDeletar(s.id)}>
-                        🗑️ Remover
+                        🗑️ {t('comum.remover')}
                       </button>
                     </td>
                   </tr>
@@ -367,24 +368,24 @@ function Servicos({ empresa, empresaId }) {
       </section>
 
       <section className="list-section">
-        <h3>Seus pacotes</h3>
+        <h3>{t('servicosEmpresa.listaPacotesTitulo')}</h3>
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : pacotes.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum pacote cadastrado ainda.</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('servicosEmpresa.nenhumPacote')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Foto</th>
-                  <th>Nome</th>
-                  <th>Descrição</th>
-                  <th>Preço ({simbolo})</th>
-                  <th>Sessões</th>
-                  <th>Validade</th>
-                  <th>Status</th>
-                  <th>Ação</th>
+                  <th>{t('comum.foto')}</th>
+                  <th>{t('comum.nome')}</th>
+                  <th>{t('comum.descricao')}</th>
+                  <th>{t('servicosEmpresa.colPreco', { simbolo })}</th>
+                  <th>{t('servicosEmpresa.colSessoes')}</th>
+                  <th>{t('servicosEmpresa.colValidade')}</th>
+                  <th>{t('comum.status')}</th>
+                  <th>{t('comum.acao')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -402,7 +403,7 @@ function Servicos({ empresa, empresaId }) {
                       )}
                       <br />
                       <label style={{ fontSize: '11px', color: '#d4af37', cursor: 'pointer' }}>
-                        {trocandoFotoId === p.id ? 'Enviando...' : 'Trocar foto'}
+                        {trocandoFotoId === p.id ? t('comum.enviando') : t('comum.trocarFoto')}
                         <input
                           type="file"
                           accept="image/*"
@@ -415,8 +416,8 @@ function Servicos({ empresa, empresaId }) {
                     <td style={{ fontWeight: 'bold' }}>{p.nome}</td>
                     <td>{p.descricao || '-'}</td>
                     <td>{formatarValor(p.preco_minimo, moeda)}</td>
-                    <td>{p.quantidade_sessoes == null ? 'Ilimitado' : p.quantidade_sessoes}</td>
-                    <td>{p.validade_dias == null ? '-' : `${p.validade_dias} dias`}</td>
+                    <td>{p.quantidade_sessoes == null ? t('servicosEmpresa.ilimitado') : p.quantidade_sessoes}</td>
+                    <td>{p.validade_dias == null ? '-' : t('servicosEmpresa.diasSufixo', { dias: p.validade_dias })}</td>
                     <td>
                       <button
                         onClick={() => handleAlternarAtivoPacote(p.id, p.ativo)}
@@ -430,12 +431,12 @@ function Servicos({ empresa, empresaId }) {
                           cursor: 'pointer',
                         }}
                       >
-                        {p.ativo ? 'Ativo' : 'Pausado'}
+                        {p.ativo ? t('servicosEmpresa.ativoBtn') : t('servicosEmpresa.pausadoBtn')}
                       </button>
                     </td>
                     <td>
                       <button className="btn-delete" onClick={() => handleDeletar(p.id)}>
-                        🗑️ Remover
+                        🗑️ {t('comum.remover')}
                       </button>
                     </td>
                   </tr>

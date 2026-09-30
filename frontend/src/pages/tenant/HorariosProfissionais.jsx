@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
 import { paraMinutos } from '../../config/horariosTenant';
+import { IDIOMA_ADMIN_PADRAO, DIAS_SEMANA_ADMIN, traduzirAdmin } from '../../config/traducoesAdmin';
 
 // Configuração de horário de trabalho POR PROFISSIONAL — cada um define seus
 // próprios dias e blocos de horário (ex: seg-sex 09:00-12:00 e 13:00-19:00,
@@ -13,17 +14,14 @@ import { paraMinutos } from '../../config/horariosTenant';
 // nenhum horário livre na Agenda — por isso essa tela precisa ser preenchida
 // antes de a Agenda funcionar de verdade pra cada profissional.
 
-const DIAS = [
-  { chave: 'domingo', label: 'Domingo' },
-  { chave: 'segunda', label: 'Segunda' },
-  { chave: 'terca', label: 'Terça' },
-  { chave: 'quarta', label: 'Quarta' },
-  { chave: 'quinta', label: 'Quinta' },
-  { chave: 'sexta', label: 'Sexta' },
-  { chave: 'sabado', label: 'Sábado' },
-];
+const CHAVES_DIAS = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
 
-function HorariosProfissionais({ empresaId }) {
+function HorariosProfissionais({ t: tProp, idioma: idiomaProp, empresaId }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+  const nomesDias = DIAS_SEMANA_ADMIN[idioma] || DIAS_SEMANA_ADMIN['pt-BR'];
+  const DIAS = CHAVES_DIAS.map((chave, i) => ({ chave, label: nomesDias[i] }));
+
   const [profissionais, setProfissionais] = useState([]);
   const [profissionalId, setProfissionalId] = useState('');
   const [horarios, setHorarios] = useState([]); // linhas da tabela horarios_profissional do profissional selecionado
@@ -56,7 +54,7 @@ function HorariosProfissionais({ empresaId }) {
       if (data && data.length > 0) setProfissionalId(data[0].id);
       else setCarregando(false);
     } catch (e) {
-      setErro(`Não consegui carregar os profissionais: ${e.message}`);
+      setErro(`${t('horariosEmpresa.erroCarregarProfissionais')}${e.message}`);
       setCarregando(false);
     }
   };
@@ -74,7 +72,7 @@ function HorariosProfissionais({ empresaId }) {
       if (error) throw error;
       setHorarios(data || []);
     } catch (e) {
-      setErro(`Não consegui carregar os horários: ${e.message}`);
+      setErro(`${t('horariosEmpresa.erroCarregarHorarios')}${e.message}`);
     } finally {
       setCarregando(false);
     }
@@ -88,11 +86,11 @@ function HorariosProfissionais({ empresaId }) {
   const handleAdicionarBloco = async (e) => {
     e.preventDefault();
     if (!profissionalId) {
-      setErro('Selecione um profissional primeiro.');
+      setErro(t('horariosEmpresa.erroSelecioneProfissional'));
       return;
     }
     if (paraMinutos(novoBloco.fim) <= paraMinutos(novoBloco.inicio)) {
-      setErro('O horário final precisa ser depois do horário inicial.');
+      setErro(t('horariosEmpresa.erroHorarioFinalAntes'));
       return;
     }
     const conflito = blocosPorDia(novoBloco.dia).some(b => {
@@ -101,7 +99,7 @@ function HorariosProfissionais({ empresaId }) {
       return paraMinutos(novoBloco.inicio) < fimExistente && paraMinutos(novoBloco.fim) > inicioExistente;
     });
     if (conflito) {
-      setErro('Esse horário se sobrepõe a um bloco já cadastrado nesse dia.');
+      setErro(t('horariosEmpresa.erroConflito'));
       return;
     }
 
@@ -117,7 +115,7 @@ function HorariosProfissionais({ empresaId }) {
       if (error) throw error;
       buscarHorarios(profissionalId);
     } catch (e) {
-      setErro(`Não consegui adicionar: ${e.message}`);
+      setErro(`${t('horariosEmpresa.erroAdicionar')}${e.message}`);
     } finally {
       setSalvando(false);
     }
@@ -129,15 +127,15 @@ function HorariosProfissionais({ empresaId }) {
       if (error) throw error;
       buscarHorarios(profissionalId);
     } catch (e) {
-      setErro(`Não consegui remover: ${e.message}`);
+      setErro(`${t('horariosEmpresa.erroRemover')}${e.message}`);
     }
   };
 
   if (carregando && profissionais.length === 0) {
     return (
       <div className="page-container">
-        <h2>Horário de Trabalho</h2>
-        <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+        <h2>{t('horariosEmpresa.titulo')}</h2>
+        <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
       </div>
     );
   }
@@ -145,9 +143,9 @@ function HorariosProfissionais({ empresaId }) {
   if (profissionais.length === 0) {
     return (
       <div className="page-container">
-        <h2>Horário de Trabalho</h2>
+        <h2>{t('horariosEmpresa.titulo')}</h2>
         <p style={{ textAlign: 'center', color: '#999' }}>
-          Cadastre pelo menos um profissional na aba "Profissionais" antes de configurar horários.
+          {t('horariosEmpresa.semProfissionais', { aba: t('nav.profissionais') })}
         </p>
       </div>
     );
@@ -155,17 +153,14 @@ function HorariosProfissionais({ empresaId }) {
 
   return (
     <div className="page-container">
-      <h2>Horário de Trabalho</h2>
+      <h2>{t('horariosEmpresa.titulo')}</h2>
       <p style={{ fontSize: '12px', color: '#999', marginBottom: '14px' }}>
-        Cada profissional configura seus próprios dias e horários de trabalho aqui. Um dia sem
-        nenhum bloco cadastrado é considerado folga. Pra ter um intervalo de almoço, cadastre dois
-        blocos no mesmo dia (ex: 09:00–12:00 e 13:00–19:00) — o espaço entre eles já fica de fora
-        dos horários oferecidos na Agenda.
+        {t('horariosEmpresa.desc')}
       </p>
 
       <section className="form-section">
         <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '6px' }}>
-          Profissional
+          {t('comum.profissional')}
         </label>
         <select
           value={profissionalId}
@@ -177,7 +172,7 @@ function HorariosProfissionais({ empresaId }) {
           ))}
         </select>
 
-        <h3>Adicionar bloco de horário</h3>
+        <h3>{t('horariosEmpresa.adicionarBlocoTitulo')}</h3>
         <form onSubmit={handleAdicionarBloco}>
           <select
             value={novoBloco.dia}
@@ -200,16 +195,16 @@ function HorariosProfissionais({ empresaId }) {
             required
           />
           <button type="submit" className="btn-primary" disabled={salvando}>
-            {salvando ? 'Salvando...' : 'Adicionar bloco'}
+            {salvando ? t('comum.salvando') : t('horariosEmpresa.adicionarBlocoBtn')}
           </button>
         </form>
         {erro && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>{erro}</p>}
       </section>
 
       <section className="list-section">
-        <h3>Semana atual</h3>
+        <h3>{t('horariosEmpresa.semanaAtualTitulo')}</h3>
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {DIAS.map(d => {
@@ -218,7 +213,7 @@ function HorariosProfissionais({ empresaId }) {
                 <div key={d.chave} style={{ border: '1px solid #404040', borderRadius: '8px', padding: '10px 14px' }}>
                   <strong style={{ color: '#d4af37' }}>{d.label}</strong>
                   {blocos.length === 0 ? (
-                    <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>Folga</div>
+                    <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>{t('horariosEmpresa.folga')}</div>
                   ) : (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
                       {blocos.map(b => (
@@ -239,7 +234,7 @@ function HorariosProfissionais({ empresaId }) {
                           <button
                             onClick={() => handleRemoverBloco(b.id)}
                             style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '13px' }}
-                            title="Remover"
+                            title={t('horariosEmpresa.removerTooltip')}
                           >
                             ✕
                           </button>

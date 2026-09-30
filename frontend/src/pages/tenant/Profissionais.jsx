@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
 import { enviarImagemTenant } from '../../config/uploadImagemTenant';
+import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../../config/traducoesAdmin';
 
 // Cadastro de profissionais MULTI-TENANT: cada empresa vê e gerencia só os
 // seus próprios profissionais (empresa_id preenchido automaticamente pelo
@@ -30,7 +31,10 @@ function calcularLimite(empresa) {
   return incluidos + (empresa?.profissionais_extras || 0);
 }
 
-function Profissionais({ empresa, empresaId }) {
+function Profissionais({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+
   const [profissionais, setProfissionais] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -59,7 +63,7 @@ function Profissionais({ empresa, empresaId }) {
       if (error) throw error;
       setProfissionais(data || []);
     } catch (e) {
-      setErro(`Não consegui carregar os profissionais: ${e.message}`);
+      setErro(`${t('profissionaisEmpresa.erroCarregar')}${e.message}`);
     } finally {
       setCarregando(false);
     }
@@ -73,11 +77,11 @@ function Profissionais({ empresa, empresaId }) {
   const handleAdicionar = async (e) => {
     e.preventDefault();
     if (!novo.nome.trim()) {
-      setErro('Preencha ao menos o nome do profissional.');
+      setErro(t('profissionaisEmpresa.erroNomeObrigatorio'));
       return;
     }
     if (limiteAtingido) {
-      setErro('Você já usou todas as vagas de profissionais do seu plano. Adicione mais vagas ou faça upgrade para cadastrar mais.');
+      setErro(t('profissionaisEmpresa.erroLimiteAtingido'));
       return;
     }
 
@@ -101,7 +105,7 @@ function Profissionais({ empresa, empresaId }) {
       setArquivoImagem(null);
       buscarProfissionais();
     } catch (e) {
-      setErro(`Não consegui adicionar: ${e.message}`);
+      setErro(`${t('profissionaisEmpresa.erroAdicionar')}${e.message}`);
     } finally {
       setSalvando(false);
     }
@@ -117,51 +121,47 @@ function Profissionais({ empresa, empresaId }) {
       if (error) throw error;
       buscarProfissionais();
     } catch (e) {
-      setErro(`Não consegui trocar a foto: ${e.message}`);
+      setErro(`${t('profissionaisEmpresa.erroTrocarFoto')}${e.message}`);
     } finally {
       setTrocandoFotoId(null);
     }
   };
 
   const handleDeletar = async (id) => {
-    if (!window.confirm('Remover este profissional?')) return;
+    if (!window.confirm(t('profissionaisEmpresa.confirmarRemover'))) return;
     try {
       const { error } = await supabase.from('profissionais').delete().eq('id', id).eq('empresa_id', empresaId);
       if (error) throw error;
       buscarProfissionais();
     } catch (e) {
-      setErro(`Não consegui remover: ${e.message}`);
+      setErro(`${t('profissionaisEmpresa.erroRemover')}${e.message}`);
     }
   };
 
   return (
     <div className="page-container">
-      <h2>Profissionais</h2>
+      <h2>{t('profissionaisEmpresa.titulo')}</h2>
 
       <section className="form-section">
-        <h3>Adicionar profissional</h3>
+        <h3>{t('profissionaisEmpresa.adicionarTitulo')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Cadastre aqui cada profissional que trabalha com você. Isso ainda não cria um
-          login separado para ele — é só o registro que a Agenda e o Caixa vão usar mais
-          adiante.
+          {t('profissionaisEmpresa.adicionarDesc')}
         </p>
         <p style={{ fontSize: '13px', color: limiteAtingido ? '#f87171' : '#d4af37', marginBottom: '10px' }}>
           {Number.isFinite(limite)
-            ? `${profissionais.length} de ${limite} vaga(s) de profissionais usada(s)`
-            : `${profissionais.length} profissional(is) cadastrado(s) — seu plano não tem limite`}
+            ? t('profissionaisEmpresa.vagasUsadas', { usado: profissionais.length, limite })
+            : t('profissionaisEmpresa.semLimite', { qtd: profissionais.length })}
         </p>
         {Number.isFinite(limite) && (
           <p style={{ fontSize: '12px', color: '#888', marginBottom: '14px', fontStyle: 'italic' }}>
-            ⚠️ Atenção: essas vagas já contam você mesmo, caso também atenda clientes — não são
-            vagas extras além do dono/comprador da assinatura. Ou seja, o limite de {limite} vaga(s)
-            já inclui você, se for o caso (não soma +1 só por você ser o proprietário).
+            {t('profissionaisEmpresa.avisoVagas', { limite })}
           </p>
         )}
         <form onSubmit={handleAdicionar}>
           <input
             type="text"
             name="nome"
-            placeholder="Nome do profissional"
+            placeholder={t('profissionaisEmpresa.nomePlaceholder')}
             value={novo.nome}
             onChange={handleInputChange}
             required
@@ -170,7 +170,7 @@ function Profissionais({ empresa, empresaId }) {
           <input
             type="tel"
             name="telefone"
-            placeholder="Telefone (opcional)"
+            placeholder={t('profissionaisEmpresa.telefonePlaceholder')}
             value={novo.telefone}
             onChange={handleInputChange}
             disabled={limiteAtingido}
@@ -178,7 +178,7 @@ function Profissionais({ empresa, empresaId }) {
           <input
             type="number"
             name="comissao_percentual"
-            placeholder="Comissão % (opcional)"
+            placeholder={t('profissionaisEmpresa.comissaoPlaceholder')}
             min="0"
             max="100"
             value={novo.comissao_percentual}
@@ -186,7 +186,7 @@ function Profissionais({ empresa, empresaId }) {
             disabled={limiteAtingido}
           />
           <label style={{ display: 'block', fontSize: '12px', color: '#999', marginTop: '10px', marginBottom: '4px' }}>
-            Foto (opcional)
+            {t('comum.fotoOpcional')}
           </label>
           <input
             type="file"
@@ -195,34 +195,33 @@ function Profissionais({ empresa, empresaId }) {
             disabled={limiteAtingido}
           />
           <button type="submit" className="btn-primary" disabled={salvando || limiteAtingido}>
-            {salvando ? 'Salvando...' : 'Adicionar profissional'}
+            {salvando ? t('comum.salvando') : t('profissionaisEmpresa.adicionarBtn')}
           </button>
         </form>
         {limiteAtingido && (
           <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>
-            Você atingiu o limite de profissionais do seu plano atual. Para cadastrar mais,
-            adicione vagas extras ou faça upgrade de plano.
+            {t('profissionaisEmpresa.limiteAtingidoAviso')}
           </p>
         )}
         {erro && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '10px' }}>{erro}</p>}
       </section>
 
       <section className="list-section">
-        <h3>Seus profissionais</h3>
+        <h3>{t('profissionaisEmpresa.listaTitulo')}</h3>
         {carregando ? (
-          <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+          <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : profissionais.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>Nenhum profissional cadastrado ainda.</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('profissionaisEmpresa.nenhumCadastrado')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Foto</th>
-                  <th>Nome</th>
-                  <th>Telefone</th>
-                  <th>Comissão</th>
-                  <th>Ação</th>
+                  <th>{t('comum.foto')}</th>
+                  <th>{t('comum.nome')}</th>
+                  <th>{t('comum.telefone')}</th>
+                  <th>{t('profissionaisEmpresa.colComissao')}</th>
+                  <th>{t('comum.acao')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,7 +239,7 @@ function Profissionais({ empresa, empresaId }) {
                       )}
                       <br />
                       <label style={{ fontSize: '11px', color: '#d4af37', cursor: 'pointer' }}>
-                        {trocandoFotoId === p.id ? 'Enviando...' : 'Trocar foto'}
+                        {trocandoFotoId === p.id ? t('comum.enviando') : t('comum.trocarFoto')}
                         <input
                           type="file"
                           accept="image/*"
@@ -255,7 +254,7 @@ function Profissionais({ empresa, empresaId }) {
                     <td>{p.comissao_percentual != null ? `${p.comissao_percentual}%` : '-'}</td>
                     <td>
                       <button className="btn-delete" onClick={() => handleDeletar(p.id)}>
-                        🗑️ Remover
+                        🗑️ {t('comum.remover')}
                       </button>
                     </td>
                   </tr>

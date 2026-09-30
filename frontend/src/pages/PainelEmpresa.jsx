@@ -200,13 +200,13 @@ function PainelPrincipal({ perfil, empresa, aoSair, idioma, mudarIdioma, t }) {
         {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'aniversariantes' && <Aniversariantes t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'profissionais' && <Profissionais empresa={empresa} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'servicos' && <Servicos empresa={empresa} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'visual' && <Visual empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'horarios' && <HorariosProfissionais empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'agenda' && <Agenda empresa={empresa} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'comandas' && <Comandas empresa={empresa} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'caixa' && <Caixa empresa={empresa} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'profissionais' && <Profissionais empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
+        {abaSelecionada === 'servicos' && <Servicos empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
+        {abaSelecionada === 'visual' && <Visual empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
+        {abaSelecionada === 'horarios' && <HorariosProfissionais empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
+        {abaSelecionada === 'agenda' && <Agenda empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
+        {abaSelecionada === 'comandas' && <Comandas empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
+        {abaSelecionada === 'caixa' && <Caixa empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
       </main>
 
       <nav style={estilos.nav}>

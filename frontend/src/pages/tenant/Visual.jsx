@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabaseClientTenant';
 import { enviarImagemTenant } from '../../config/uploadImagemTenant';
+import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../../config/traducoesAdmin';
 
 // Personalização visual da empresa: foto de capa (cabeçalho), logo pequena
 // (canto da capa, estilo Facebook), fotos do ambiente/fachada, imagem de
@@ -13,7 +14,10 @@ import { enviarImagemTenant } from '../../config/uploadImagemTenant';
 // Admin/Stripe), salvar essas colunas passa pela function
 // public.atualizar_visual_empresa em vez de um update direto na tabela.
 
-function Visual({ empresaId }) {
+function Visual({ t: tProp, idioma: idiomaProp, empresaId }) {
+  const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
+  const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
+
   const [logoUrl, setLogoUrl] = useState('');
   const [logoPequenoUrl, setLogoPequenoUrl] = useState('');
   const [imagemAgendarUrl, setImagemAgendarUrl] = useState('');
@@ -56,7 +60,7 @@ function Visual({ empresaId }) {
       setInstagramUsuario(data?.instagram_usuario || '');
       setTiktokUsuario(data?.tiktok_usuario || '');
     } catch (e) {
-      setErro(`Não consegui carregar a personalização visual: ${e.message}`);
+      setErro(`${t('visualEmpresa.erroCarregar')}${e.message}`);
     } finally {
       setCarregando(false);
     }
@@ -95,7 +99,7 @@ function Visual({ empresaId }) {
       await salvar(dadosAtuais({ logoUrl: url }));
       setLogoUrl(url);
     } catch (e2) {
-      setErro(`Não consegui enviar a foto de capa: ${e2.message}`);
+      setErro(`${t('visualEmpresa.erroCapa')}${e2.message}`);
     } finally {
       setEnviandoLogo(false);
     }
@@ -111,7 +115,7 @@ function Visual({ empresaId }) {
       await salvar(dadosAtuais({ logoPequenoUrl: url }));
       setLogoPequenoUrl(url);
     } catch (e2) {
-      setErro(`Não consegui enviar o logo: ${e2.message}`);
+      setErro(`${t('visualEmpresa.erroLogo')}${e2.message}`);
     } finally {
       setEnviandoLogoPequeno(false);
     }
@@ -127,7 +131,7 @@ function Visual({ empresaId }) {
       await salvar(dadosAtuais({ imagemAgendarUrl: url }));
       setImagemAgendarUrl(url);
     } catch (e2) {
-      setErro(`Não consegui enviar a imagem: ${e2.message}`);
+      setErro(`${t('visualEmpresa.erroImagemAgendar')}${e2.message}`);
     } finally {
       setEnviandoImagemAgendar(false);
     }
@@ -144,7 +148,7 @@ function Visual({ empresaId }) {
       await salvar(dadosAtuais({ fotos: novasFotos }));
       setFotos(novasFotos);
     } catch (e2) {
-      setErro(`Não consegui enviar a foto: ${e2.message}`);
+      setErro(`${t('visualEmpresa.erroFoto')}${e2.message}`);
     } finally {
       setEnviandoFoto(false);
       e.target.value = '';
@@ -152,13 +156,13 @@ function Visual({ empresaId }) {
   };
 
   const handleRemoverFoto = async (url) => {
-    if (!window.confirm('Remover esta foto?')) return;
+    if (!window.confirm(t('visualEmpresa.confirmarRemoverFoto'))) return;
     const novasFotos = fotos.filter((f) => f !== url);
     try {
       await salvar(dadosAtuais({ fotos: novasFotos }));
       setFotos(novasFotos);
     } catch (e) {
-      setErro(`Não consegui remover: ${e.message}`);
+      setErro(`${t('visualEmpresa.erroRemoverFoto')}${e.message}`);
     }
   };
 
@@ -172,7 +176,7 @@ function Visual({ empresaId }) {
       setSucessoContato(true);
       setTimeout(() => setSucessoContato(false), 3000);
     } catch (e2) {
-      setErroContato(`Não consegui salvar: ${e2.message}`);
+      setErroContato(`${t('visualEmpresa.erroSalvarContato')}${e2.message}`);
     } finally {
       setSalvandoContato(false);
     }
@@ -181,69 +185,64 @@ function Visual({ empresaId }) {
   if (carregando) {
     return (
       <div className="page-container">
-        <p style={{ textAlign: 'center', color: '#d4af37' }}>Carregando...</p>
+        <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
       </div>
     );
   }
 
   return (
     <div className="page-container">
-      <h2>Identidade visual</h2>
+      <h2>{t('visualEmpresa.titulo')}</h2>
 
       <section className="form-section">
-        <h3>Foto de capa (cabeçalho)</h3>
+        <h3>{t('visualEmpresa.capaTitulo')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Imagem grande no topo do site público de agendamento. Tire a foto com o celular na
-          horizontal (deitado), não na vertical — o formato ideal é bem largo, tipo 1600×700px
-          (proporção 16:7). Uma foto tirada na vertical fica bastante cortada, mostrando só uma
-          faixa pequena da imagem.
+          {t('visualEmpresa.capaDesc')}
         </p>
         {logoUrl && (
           <img
             src={logoUrl}
-            alt="Capa atual"
+            alt={t('visualEmpresa.capaAlt')}
             style={{ width: '100%', maxWidth: '360px', aspectRatio: '16 / 7', objectFit: 'cover', borderRadius: '8px', border: '1px solid #333', marginBottom: '12px', display: 'block' }}
           />
         )}
         <input type="file" accept="image/*" onChange={handleTrocarLogo} disabled={enviandoLogo} />
-        {enviandoLogo && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>Enviando...</p>}
+        {enviandoLogo && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>{t('comum.enviando')}</p>}
       </section>
 
       <section className="form-section">
-        <h3>Logo</h3>
+        <h3>{t('visualEmpresa.logoTitulo')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Aparece pequena, no canto inferior esquerdo da foto de capa (igual o Facebook faz com
-          foto de capa + foto de perfil). Fica melhor com uma imagem quadrada.
+          {t('visualEmpresa.logoDesc')}
         </p>
         {logoPequenoUrl && (
           <img
             src={logoPequenoUrl}
-            alt="Logo atual"
+            alt={t('visualEmpresa.logoAlt')}
             style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '50%', border: '2px solid #d4af37', marginBottom: '12px', display: 'block' }}
           />
         )}
         <input type="file" accept="image/*" onChange={handleTrocarLogoPequeno} disabled={enviandoLogoPequeno} />
-        {enviandoLogoPequeno && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>Enviando...</p>}
+        {enviandoLogoPequeno && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>{t('comum.enviando')}</p>}
       </section>
 
       <section className="list-section">
-        <h3>Fotos Ambiente e Fachada</h3>
+        <h3>{t('visualEmpresa.fotosTitulo')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Fotos do interior, ambiente e fachada da barbearia — pode adicionar quantas quiser.
-          Aparecem no site público de agendamento (aba Endereço/Sobre).
+          {t('visualEmpresa.fotosDesc')}
         </p>
         <input type="file" accept="image/*" onChange={handleAdicionarFoto} disabled={enviandoFoto} />
-        {enviandoFoto && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>Enviando...</p>}
+        {enviandoFoto && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>{t('comum.enviando')}</p>}
 
         {fotos.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999', marginTop: '14px' }}>Nenhuma foto adicionada ainda.</p>
+          <p style={{ textAlign: 'center', color: '#999', marginTop: '14px' }}>{t('visualEmpresa.nenhumaFoto')}</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '14px' }}>
             {fotos.map((url) => (
               <div key={url} style={{ position: 'relative' }}>
                 <img
                   src={url}
-                  alt="Foto do salão"
+                  alt={t('visualEmpresa.fotoAmbienteAlt')}
                   style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid #333' }}
                 />
                 <button
@@ -261,43 +260,40 @@ function Visual({ empresaId }) {
       </section>
 
       <section className="form-section">
-        <h3>Imagem de fundo da aba Agendar</h3>
+        <h3>{t('visualEmpresa.imagemAgendarTitulo')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Uma foto do ambiente aparece atrás do formulário de agendamento, na aba "Agendar" do
-          site público. Sem essa imagem, a aba usa um fundo liso. Assim como a foto de capa, tire
-          com o celular na horizontal (deitado) — o ideal é uma foto larga, tipo 1600×900px. Uma
-          foto tirada na vertical vai aparecer bem cortada.
+          {t('visualEmpresa.imagemAgendarDesc')}
         </p>
         {imagemAgendarUrl && (
           <img
             src={imagemAgendarUrl}
-            alt="Imagem da aba Agendar atual"
+            alt={t('visualEmpresa.imagemAgendarAlt')}
             style={{ width: '100%', maxWidth: '360px', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: '8px', border: '1px solid #333', marginBottom: '12px', display: 'block' }}
           />
         )}
         <input type="file" accept="image/*" onChange={handleTrocarImagemAgendar} disabled={enviandoImagemAgendar} />
-        {enviandoImagemAgendar && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>Enviando...</p>}
+        {enviandoImagemAgendar && <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '8px' }}>{t('comum.enviando')}</p>}
       </section>
 
       <section className="form-section">
-        <h3>Endereço e contato</h3>
+        <h3>{t('visualEmpresa.enderecoContatoTitulo')}</h3>
         <p style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-          Aparecem na aba "Endereço/Sobre" do site público de agendamento.
+          {t('visualEmpresa.enderecoContatoDesc')}
         </p>
         <form onSubmit={handleSalvarContato}>
           <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
-            Endereço
+            {t('visualEmpresa.enderecoLabel')}
           </label>
           <textarea
             value={endereco}
             onChange={(e) => setEndereco(e.target.value)}
-            placeholder="Rua, número, bairro, cidade..."
+            placeholder={t('visualEmpresa.enderecoPlaceholder')}
             rows={2}
             style={{ width: '100%', resize: 'vertical', marginBottom: '10px' }}
           />
 
           <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
-            WhatsApp (só números, com código do país. Ex: 5511999999999)
+            {t('visualEmpresa.whatsappLabel')}
           </label>
           <input
             type="text"
@@ -308,7 +304,7 @@ function Visual({ empresaId }) {
           />
 
           <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
-            Instagram (usuário, sem @)
+            {t('visualEmpresa.instagramLabel')}
           </label>
           <input
             type="text"
@@ -319,7 +315,7 @@ function Visual({ empresaId }) {
           />
 
           <label style={{ display: 'block', fontSize: '12px', color: '#999', marginBottom: '4px' }}>
-            TikTok (usuário, sem @)
+            {t('visualEmpresa.tiktokLabel')}
           </label>
           <input
             type="text"
@@ -330,9 +326,9 @@ function Visual({ empresaId }) {
           />
 
           <button type="submit" className="btn-primary" disabled={salvandoContato}>
-            {salvandoContato ? 'Salvando...' : 'Salvar'}
+            {salvandoContato ? t('comum.salvando') : t('comum.salvar')}
           </button>
-          {sucessoContato && <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '8px' }}>Salvo!</p>}
+          {sucessoContato && <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '8px' }}>{t('visualEmpresa.salvoMsg')}</p>}
           {erroContato && <p style={{ color: '#f87171', fontSize: '13px', marginTop: '8px' }}>{erroContato}</p>}
         </form>
       </section>
