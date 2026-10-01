@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { supabase } from '../supabaseClient';
 import {
@@ -13,6 +13,7 @@ import {
 import { SERVICOS, getNomeServico, buscarServicosCompletos, buscarPacotesAtivos } from '../config/servicos';
 import { buscarPromocoesAtivas, encontrarPromocaoAplicavel, calcularPrecoComPromocao } from '../config/promocoes';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
+import { PAISES_TELEFONE, PAIS_TELEFONE_PADRAO, montarTelefoneInternacional, telefoneInternacionalValido } from '../config/paisesTelefone';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
@@ -51,6 +52,37 @@ const salvarIdAgendamentoLocal = (id) => {
     // localStorage indisponível (modo privado etc.) — só não salva o atalho
   }
 };
+
+// Comprovante de telefone confirmado por SMS (ver Edge Function
+// verificar-telefone). Fica guardado neste aparelho até expirar, pra pessoa
+// não precisar receber outro código a cada agendamento/troca de horário.
+const CHAVE_TELEFONE_VERIFICADO_STORAGE = 'kaizen_telefone_verificado';
+
+const salvarVerificacaoLocal = (verificacao) => {
+  try {
+    localStorage.setItem(CHAVE_TELEFONE_VERIFICADO_STORAGE, JSON.stringify(verificacao));
+  } catch {
+    // localStorage indisponível — vale só enquanto a página estiver aberta
+  }
+};
+
+const lerVerificacaoLocal = () => {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_TELEFONE_VERIFICADO_STORAGE) || 'null');
+  } catch {
+    return null;
+  }
+};
+
+const limparVerificacaoLocal = () => {
+  try {
+    localStorage.removeItem(CHAVE_TELEFONE_VERIFICADO_STORAGE);
+  } catch {
+    // nada a limpar
+  }
+};
+
+const SEGUNDOS_PARA_REENVIAR_SMS = 30;
 
 const lerIdsAgendamentosLocais = () => {
   try {
@@ -246,6 +278,17 @@ function ClientePublico() {
   // que está salvo local) pra status/podeCancelar estarem sempre atuais.
   const [agendamentosLocalDispositivo, setAgendamentosLocalDispositivo] = useState([]);
   const [carregandoLocais, setCarregandoLocais] = useState(false);
+
+  // Confirmação do telefone por SMS antes de agendar (só quando
+  // configuracoes_horario.verificacao_telefone_ativa = true no banco).
+  // etapaSms: 'form' (preenchendo dados) | 'codigo' (esperando o código).
+  const [paisTelefone, setPaisTelefone] = useState(PAIS_TELEFONE_PADRAO);
+  const [etapaSms, setEtapaSms] = useState('form');
+  const [codigoSms, setCodigoSms] = useState('');
+  const [telefoneSms, setTelefoneSms] = useState('');
+  const [verificandoSms, setVerificandoSms] = useState(false);
+  const [segundosReenvioSms, setSegundosReenvioSms] = useState(0);
+  const verificacaoSessaoRef = useRef(null);
 
   const [dadosAgendamento, setDadosAgendamento] = useState({
     nome: '',
@@ -796,18 +839,121 @@ function ClientePublico() {
     setModalAberto(true);
   };
 
+  // Contagem regressiva do botão "Reenviar código".
+  useEffect(() => {
+    if (segundosReenvioSms <= 0) return undefined;
+    const id = setTimeout(() => setSegundosReenvioSms(s => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [segundosReenvioSms]);
+
+  const voltarEtapaSmsParaForm = () => {
+    setEtapaSms('form');
+    setCodigoSms('');
+  };
+
+  // Lido na hora de confirmar (e não só ao abrir a página), pra valer na
+  // mesma hora que for ligado/desligado no banco.
+  const verificacaoTelefoneAtiva = async () => {
+    const { data } = await supabase
+      .from('configuracoes_horario')
+      .select('verificacao_telefone_ativa')
+      .eq('id', 1)
+      .maybeSingle();
+    return !!data?.verificacao_telefone_ativa;
+  };
+
+  // Comprovante ainda válido pra ESTE telefone (o da sessão tem prioridade,
+  // pra funcionar mesmo sem localStorage).
+  const verificacaoValidaPara = (telefone) => {
+    const v = verificacaoSessaoRef.current || lerVerificacaoLocal();
+    if (!v || v.telefone !== telefone || new Date(v.expira_em).getTime() <= Date.now()) return null;
+    return v;
+  };
+
+  const esquecerVerificacao = () => {
+    verificacaoSessaoRef.current = null;
+    limparVerificacaoLocal();
+  };
+
+  const mensagemErroSms = (erro) => {
+    const chaves = {
+      telefone_invalido: 'sms_erro_telefone_invalido',
+      muitas_tentativas: 'sms_erro_muitas_tentativas',
+      codigo_incorreto: 'sms_erro_codigo_incorreto',
+      codigo_expirado: 'sms_erro_codigo_expirado',
+      cliente_bloqueado: 'alerta_cliente_bloqueado',
+    };
+    return t(chaves[erro] || 'sms_erro_falha');
+  };
+
+  const enviarCodigoSms = async (telefone) => {
+    const { data, error } = await supabase.functions.invoke('verificar-telefone', {
+      body: { acao: 'enviar', telefone, idioma },
+    });
+    if (error || !data?.ok) {
+      alert('⚠️ ' + mensagemErroSms(data?.erro));
+      return false;
+    }
+    setTelefoneSms(telefone);
+    setCodigoSms('');
+    setEtapaSms('codigo');
+    setSegundosReenvioSms(SEGUNDOS_PARA_REENVIAR_SMS);
+    return true;
+  };
+
+  const handleReenviarCodigoSms = async () => {
+    if (segundosReenvioSms > 0 || verificandoSms) return;
+    setVerificandoSms(true);
+    try {
+      await enviarCodigoSms(telefoneSms);
+    } finally {
+      setVerificandoSms(false);
+    }
+  };
+
+  const handleConfirmarCodigoSms = async () => {
+    if (codigoSms.replace(/\D/g, '').length < 4 || verificandoSms) return;
+    setVerificandoSms(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verificar-telefone', {
+        body: {
+          acao: 'confirmar',
+          telefone: telefoneSms,
+          codigo: codigoSms,
+          nome: dadosAgendamento.nome,
+          email: dadosAgendamento.email.trim(),
+          data_nascimento: dadosAgendamento.dataNascimento || null,
+        },
+      });
+      if (error || !data?.ok) {
+        alert('⚠️ ' + mensagemErroSms(data?.erro));
+        return;
+      }
+      const verificacao = { telefone: telefoneSms, token: data.token, cliente_id: data.cliente_id, expira_em: data.expira_em };
+      verificacaoSessaoRef.current = verificacao;
+      salvarVerificacaoLocal(verificacao);
+      setEtapaSms('form');
+      setCodigoSms('');
+    } finally {
+      setVerificandoSms(false);
+    }
+    // Telefone confirmado — segue direto pro agendamento.
+    if (verificacaoSessaoRef.current?.telefone === telefoneSms) {
+      await handleConfirmarAgendamento();
+    }
+  };
+
   const handleConfirmarAgendamento = async () => {
     if (!dadosAgendamento.nome || !dadosAgendamento.email) {
       alert('⚠️ ' + t('alerta_preencha_nome_email'));
       return;
     }
 
-    // Telefone é obrigatório e precisa ter dígitos suficientes pra ser um
-    // número de verdade (mesmo critério de 8 dígitos já usado nas consultas
-    // de pontos/agendamentos por telefone, mais acima neste arquivo) — sem
-    // isso, qualquer coisa tipo "5" ou "6" passava e depois não dava pra
-    // avisar o cliente sobre confirmação, atraso ou cancelamento.
-    if (!dadosAgendamento.telefone || dadosAgendamento.telefone.replace(/\D/g, '').length < 8) {
+    // Telefone é obrigatório, com o país escolhido no seletor, e salvo no
+    // formato internacional (+81..., +55...) — assim o Admin abre o WhatsApp
+    // do cliente no país certo, e o SMS de confirmação chega no número certo.
+    const telefoneCompleto = montarTelefoneInternacional(paisTelefone, dadosAgendamento.telefone);
+    if (!telefoneInternacionalValido(telefoneCompleto)) {
       alert('⚠️ ' + t('alerta_telefone_invalido'));
       return;
     }
@@ -826,44 +972,60 @@ function ClientePublico() {
 
     try {
       let clienteId = null;
+      let tokenVerificacao = null;
 
-      // ilike em vez de eq: mesmo cuidado de maiúsculas/minúsculas — sem
-      // isso, a mesma pessoa digitando o e-mail com capitalização diferente
-      // de uma vez pra outra virava um cadastro de cliente duplicado.
-      const { data: clientesExistentes } = await supabase
-        .from('clientes')
-        .select('id')
-        .ilike('email', dadosAgendamento.email.trim());
+      const exigeVerificacao = await verificacaoTelefoneAtiva();
 
-      if (clientesExistentes && clientesExistentes.length > 0) {
-        clienteId = clientesExistentes[0].id;
-        // Cliente já cadastrado — se faltava telefone ou data de nascimento,
-        // aproveita o que a pessoa preencheu agora pra completar o cadastro
-        // (sem sobrescrever o que já existia).
-        await supabase
-          .from('clientes')
-          .update({
-            telefone: dadosAgendamento.telefone || undefined,
-            data_nascimento: dadosAgendamento.dataNascimento || undefined
-          })
-          .eq('id', clienteId)
-          .or('telefone.is.null,data_nascimento.is.null');
+      if (exigeVerificacao) {
+        // Com a confirmação por SMS ligada, quem acha/cria o cliente é a
+        // Edge Function (depois do código certo) — e o banco só aceita o
+        // agendamento com o comprovante (token) dela.
+        const verificacao = verificacaoValidaPara(telefoneCompleto);
+        if (!verificacao) {
+          await enviarCodigoSms(telefoneCompleto);
+          return;
+        }
+        clienteId = verificacao.cliente_id;
+        tokenVerificacao = verificacao.token;
       } else {
-        const { data: novoCliente, error: erroClienteInsert } = await supabase
+        // ilike em vez de eq: mesmo cuidado de maiúsculas/minúsculas — sem
+        // isso, a mesma pessoa digitando o e-mail com capitalização diferente
+        // de uma vez pra outra virava um cadastro de cliente duplicado.
+        const { data: clientesExistentes } = await supabase
           .from('clientes')
-          .insert([
-            {
-              nome: dadosAgendamento.nome,
-              email: dadosAgendamento.email,
-              telefone: dadosAgendamento.telefone || null,
-              data_nascimento: dadosAgendamento.dataNascimento || null
-            }
-          ])
           .select('id')
-          .single();
+          .ilike('email', dadosAgendamento.email.trim());
 
-        if (erroClienteInsert) throw erroClienteInsert;
-        clienteId = novoCliente.id;
+        if (clientesExistentes && clientesExistentes.length > 0) {
+          clienteId = clientesExistentes[0].id;
+          // Cliente já cadastrado — se faltava telefone ou data de nascimento,
+          // aproveita o que a pessoa preencheu agora pra completar o cadastro
+          // (sem sobrescrever o que já existia).
+          await supabase
+            .from('clientes')
+            .update({
+              telefone: telefoneCompleto,
+              data_nascimento: dadosAgendamento.dataNascimento || undefined
+            })
+            .eq('id', clienteId)
+            .or('telefone.is.null,data_nascimento.is.null');
+        } else {
+          const { data: novoCliente, error: erroClienteInsert } = await supabase
+            .from('clientes')
+            .insert([
+              {
+                nome: dadosAgendamento.nome,
+                email: dadosAgendamento.email,
+                telefone: telefoneCompleto,
+                data_nascimento: dadosAgendamento.dataNascimento || null
+              }
+            ])
+            .select('id')
+            .single();
+
+          if (erroClienteInsert) throw erroClienteInsert;
+          clienteId = novoCliente.id;
+        }
       }
 
       // Trava de segurança: a checagem de horário livre (getHorariosProfissional)
@@ -922,12 +1084,25 @@ function ClientePublico() {
             data_hora: `${dadosAgendamento.data}T${dadosAgendamento.hora}:00`,
             status: 'CONFIRMADO',
             preco_final: precoFinal,
-            observacoes: notas
+            observacoes: notas,
+            token_verificacao: tokenVerificacao
           }
         ])
         .select('id')
         .single();
 
+      // Recusas da trava do banco (trigger exigir_telefone_verificado):
+      // comprovante vencido/inválido -> pede um código novo; cliente
+      // bloqueado pela equipe -> avisa pra falar pelo WhatsApp.
+      if (error?.message?.includes('TELEFONE_NAO_VERIFICADO')) {
+        esquecerVerificacao();
+        await enviarCodigoSms(telefoneCompleto);
+        return;
+      }
+      if (error?.message?.includes('CLIENTE_BLOQUEADO')) {
+        alert('⚠️ ' + t('alerta_cliente_bloqueado'));
+        return;
+      }
       if (error) throw error;
 
       await buscarHorariosOcupados();
@@ -958,6 +1133,7 @@ function ClientePublico() {
 
       setPresencaConfirmada(false);
       setModalAberto(false);
+      voltarEtapaSmsParaForm();
       setDadosAgendamento({ nome: '', email: '', telefone: '', dataNascimento: '', profissional: '', hora: '', servico: '', data: '' });
       setUsarPontos(false);
       setObservacoesCliente('');
@@ -2078,7 +2254,7 @@ function ClientePublico() {
       {modalAberto && diaHorarioSelecionado && (
         <div
           className="kaizen-modal-overlay"
-          onClick={() => setModalAberto(false)}
+          onClick={() => { setModalAberto(false); voltarEtapaSmsParaForm(); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
         >
           <div
@@ -2131,7 +2307,19 @@ function ClientePublico() {
 
             <input type="text" placeholder={t('modal_nome_placeholder')} value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <input type="email" placeholder={t('modal_email_placeholder')} value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
-            <input type="tel" placeholder={t('modal_telefone_placeholder')} value={dadosAgendamento.telefone} onChange={(e) => setDadosAgendamento({...dadosAgendamento, telefone: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '6px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+              <select
+                aria-label={t('modal_pais_telefone')}
+                value={paisTelefone}
+                onChange={(e) => { setPaisTelefone(e.target.value); voltarEtapaSmsParaForm(); }}
+                style={{ flex: '0 0 auto', maxWidth: '45%', padding: '10px 6px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8' }}
+              >
+                {PAISES_TELEFONE.map(p => (
+                  <option key={p.codigo} value={p.codigo}>{p.bandeira} +{p.codigo} {p.nome}</option>
+                ))}
+              </select>
+              <input type="tel" autoComplete="tel-national" placeholder={t('modal_telefone_placeholder')} value={dadosAgendamento.telefone} onChange={(e) => { setDadosAgendamento({...dadosAgendamento, telefone: e.target.value}); voltarEtapaSmsParaForm(); }} style={{ flex: 1, minWidth: 0, padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            </div>
             <p style={{ margin: '0 0 10px 0', fontSize: '11px', color: '#d4af37', lineHeight: '1.4' }}>
               {t('modal_aviso_dados_corretos')}
             </p>
@@ -2166,10 +2354,42 @@ function ClientePublico() {
               </div>
             )}
 
-            <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ width: '100%', background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '14px', borderRadius: '6px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer', fontSize: '15px' }}>
-              {carregando ? `⏳ ${t('modal_agendando')}` : `✅ ${t('modal_confirmar')}`}
-            </button>
-            <button onClick={() => setModalAberto(false)} style={{ width: '100%', background: 'transparent', color: '#999', border: 'none', padding: '10px', marginTop: '6px', cursor: 'pointer' }}>
+            {etapaSms === 'codigo' ? (
+              <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '8px', padding: '14px' }}>
+                <p style={{ margin: '0 0 6px 0', color: '#d4af37', fontWeight: 'bold' }}>📱 {t('sms_titulo')}</p>
+                <p style={{ margin: '0 0 12px 0', color: '#e8e8e8', fontSize: '13px', lineHeight: '1.4' }}>
+                  {t('sms_enviado', { telefone: telefoneSms })}
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={8}
+                  autoFocus
+                  placeholder={t('sms_codigo_placeholder')}
+                  value={codigoSms}
+                  onChange={(e) => setCodigoSms(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmarCodigoSms(); }}
+                  style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', fontSize: '20px', letterSpacing: '6px', textAlign: 'center' }}
+                />
+                <button onClick={handleConfirmarCodigoSms} disabled={verificandoSms || carregando || codigoSms.length < 4} style={{ width: '100%', background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '14px', borderRadius: '6px', fontWeight: 'bold', cursor: (verificandoSms || carregando) ? 'wait' : 'pointer', fontSize: '15px', opacity: codigoSms.length < 4 ? 0.6 : 1 }}>
+                  {(verificandoSms || carregando) ? `⏳ ${t('sms_verificando')}` : `✅ ${t('sms_confirmar')}`}
+                </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '13px' }}>
+                  <button onClick={voltarEtapaSmsParaForm} style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', padding: 0 }}>
+                    ✏️ {t('sms_trocar_numero')}
+                  </button>
+                  <button onClick={handleReenviarCodigoSms} disabled={segundosReenvioSms > 0 || verificandoSms} style={{ background: 'transparent', border: 'none', color: segundosReenvioSms > 0 ? '#666' : '#d4af37', cursor: segundosReenvioSms > 0 ? 'default' : 'pointer', padding: 0 }}>
+                    {segundosReenvioSms > 0 ? t('sms_reenviar_em', { s: segundosReenvioSms }) : `🔁 ${t('sms_reenviar')}`}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={handleConfirmarAgendamento} disabled={carregando} style={{ width: '100%', background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '14px', borderRadius: '6px', fontWeight: 'bold', cursor: carregando ? 'wait' : 'pointer', fontSize: '15px' }}>
+                {carregando ? `⏳ ${t('modal_agendando')}` : `✅ ${t('modal_confirmar')}`}
+              </button>
+            )}
+            <button onClick={() => { setModalAberto(false); voltarEtapaSmsParaForm(); }} style={{ width: '100%', background: 'transparent', color: '#999', border: 'none', padding: '10px', marginTop: '6px', cursor: 'pointer' }}>
               {t('modal_cancelar')}
             </button>
           </div>

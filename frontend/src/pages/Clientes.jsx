@@ -563,6 +563,9 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
   const normalizarTelefoneParaWhatsapp = (telefone) => {
     const digitos = (telefone || '').replace(/\D/g, '');
     if (!digitos) return '';
+    // Salvo com "+país" (cadastro novo do site público) — já está completo,
+    // seja Japão, Brasil ou outro país.
+    if ((telefone || '').trim().startsWith('+')) return digitos;
     if (digitos.startsWith('81')) return digitos;
     if (digitos.startsWith('0')) return `81${digitos.slice(1)}`;
     return `81${digitos}`;
