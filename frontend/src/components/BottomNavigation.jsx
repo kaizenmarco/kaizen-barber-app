@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 // Menu inferior fixo do Admin (estilo app de celular). Substitui a barra
 // lateral longa por 4 botões sempre visíveis, iguais em todas as telas
@@ -18,6 +18,15 @@ function BottomNavigation({ abaAtiva, aoSelecionar, t, itemMaisEmDestaque, chave
   const itensVisiveis = chavesVisiveis
     ? ITENS.filter(item => item.key === 'mais' || chavesVisiveis.includes(item.key))
     : ITENS;
+
+  // iPhone: ao fechar o teclado, o Safari às vezes deixa a tela "deslocada"
+  // e o menu fixo fica flutuando no meio até a pessoa rolar tudo de novo.
+  // Um scroll de 0px depois que o campo perde o foco força o reajuste.
+  useEffect(() => {
+    const reajustar = () => setTimeout(() => window.scrollTo(window.scrollX, window.scrollY), 100);
+    document.addEventListener('focusout', reajustar);
+    return () => document.removeEventListener('focusout', reajustar);
+  }, []);
 
   return (
     <nav className="bottom-nav" role="navigation">

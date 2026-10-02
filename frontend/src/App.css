@@ -296,6 +296,21 @@ body {
   background: var(--primary-dark);
   display: flex;
   flex-direction: column;
+  /* Nada pode deixar a página mais larga que a tela: no iPhone isso solta a
+     página pros lados e o menu inferior (fixed) aparece no meio da tela ao
+     rolar. clip (e não hidden) pra não virar um container de rolagem. */
+  overflow-x: clip;
+}
+
+/* No iPhone, campo com letra menor que 16px faz o Safari dar zoom sozinho
+   ao tocar nele — e com a página "zoomada" o menu inferior fixo sobe pro
+   meio da tela. !important porque vários campos têm fontSize inline. */
+@media (max-width: 768px) {
+  .admin-shell-mobile input,
+  .admin-shell-mobile select,
+  .admin-shell-mobile textarea {
+    font-size: 16px !important;
+  }
 }
 
 .admin-header-mobile {

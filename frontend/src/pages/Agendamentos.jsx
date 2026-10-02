@@ -343,19 +343,24 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   // agendamento em edição da lista de ocupados (senão ele "colidiria" consigo
   // mesmo e nenhum horário apareceria livre, nem o horário atual dele).
   const duracaoEdicao = agendamentoEditando
-    ? (servicosLista.find(s => s.nome === agendamentoEditando.servico)?.duracaoMinutos || 60)
+    ? (agendamentoEditando.duracaoMinutosManual || servicosLista.find(s => s.nome === agendamentoEditando.servico)?.duracaoMinutos || 60)
     : 60;
+
+  // Profissional escolhido na edição (pode ser outro que o atual) — os
+  // horários livres e o almoço são os DELE.
+  const profissionalEdicaoId = edicaoForm.profissionalId || agendamentoEditando?.profissionalId;
+  const profissionalEdicaoNome = profissionaisLista.find(p => p.uuid === profissionalEdicaoId)?.nome || agendamentoEditando?.profissional;
 
   const intervalosOcupadosEdicao = (!agendamentoEditando || !edicaoForm.data) ? [] : [
     ...agendamentos
-      .filter(a => a.id !== agendamentoEditando.id && a.profissionalId === agendamentoEditando.profissionalId && a.data === edicaoForm.data && a.status !== 'CANCELADO')
+      .filter(a => a.id !== agendamentoEditando.id && a.profissionalId === profissionalEdicaoId && a.data === edicaoForm.data && a.status !== 'CANCELADO')
       .map(a => {
         const inicioMin = paraMinutos(a.hora);
         const duracao = a.duracaoMinutosManual || servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
         return { inicioMin, fimMin: inicioMin + duracao, cliente: a.cliente, hora: a.hora, servico: a.servico };
       }),
     ...bloqueios
-      .filter(b => b.profissionalId === agendamentoEditando.profissionalId && b.data === edicaoForm.data)
+      .filter(b => b.profissionalId === profissionalEdicaoId && b.data === edicaoForm.data)
       .map(b => ({
         inicioMin: paraMinutos(b.horaInicio),
         fimMin: paraMinutos(b.horaFim),
@@ -367,7 +372,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const slotsDisponiveisEdicao = (!agendamentoEditando || !edicaoForm.data) ? [] : (() => {
     const dataObj = new Date(`${edicaoForm.data}T00:00:00`);
-    return getSlotsLivresNoDia(dataObj, duracaoEdicao, intervalosOcupadosEdicao, horarioEstendido, horariosAlmoco[agendamentoEditando.profissionalId] || HORARIO_ALMOCO);
+    return getSlotsLivresNoDia(dataObj, duracaoEdicao, intervalosOcupadosEdicao, horarioEstendido, horariosAlmoco[profissionalEdicaoId] || HORARIO_ALMOCO);
   })();
 
   const conflitosEncaixeEdicao = (!edicaoForm.encaixe || !edicaoForm.horario) ? [] : (() => {
@@ -807,14 +812,14 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     }
   };
 
-  const abrirEdicao = (agendamento) => {
+  const abrirEdicao = (agendamento, profissionalId = agendamento.profissionalId) => {
     setAgendamentoEditando(agendamento);
-    setEdicaoForm({ data: agendamento.data, horario: agendamento.hora, encaixe: false });
+    setEdicaoForm({ data: agendamento.data, horario: agendamento.hora, encaixe: false, profissionalId });
   };
 
   const fecharEdicao = () => {
     setAgendamentoEditando(null);
-    setEdicaoForm({ data: '', horario: '', encaixe: false });
+    setEdicaoForm({ data: '', horario: '', encaixe: false, profissionalId: '' });
   };
 
   const handleEdicaoInputChange = (e) => {
@@ -999,7 +1004,15 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const abrirEdicaoDataHoraDeDetalhes = () => {
     if (!detalhesAgendamento) return;
-    abrirEdicao(detalhesAgendamento);
+    // Se a pessoa já tinha escolhido outro profissional no campo rápido mas
+    // não tocou no ✓, leva a escolha junto pra edição (antes ela se perdia
+    // e só o horário era salvo).
+    const profPendente = campoRapidoEditando === 'profissional'
+      ? profissionaisLista.find(p => p.nome === valorCampoRapido)?.uuid
+      : null;
+    abrirEdicao(detalhesAgendamento, profPendente || detalhesAgendamento.profissionalId);
+    setCampoRapidoEditando(null);
+    setValorCampoRapido('');
     fecharDetalhesAgendamento();
   };
 
@@ -1123,7 +1136,8 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       return;
     }
 
-    const semMudanca = edicaoForm.data === agendamentoEditando.data && edicaoForm.horario === agendamentoEditando.hora;
+    const mudouProfissional = profissionalEdicaoId !== agendamentoEditando.profissionalId;
+    const semMudanca = edicaoForm.data === agendamentoEditando.data && edicaoForm.horario === agendamentoEditando.hora && !mudouProfissional;
     if (semMudanca) {
       fecharEdicao();
       return;
@@ -1139,7 +1153,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
         .map(c => `${c.hora} - ${c.cliente} (${c.servico})`)
         .join('\n');
       const confirmou = window.confirm(
-        t('agendamentos.confirmarEncaixe', { horario: edicaoForm.horario, prof: agendamentoEditando.profissional, resumo: resumoConflito })
+        t('agendamentos.confirmarEncaixe', { horario: edicaoForm.horario, prof: profissionalEdicaoNome, resumo: resumoConflito })
       );
       if (!confirmou) return;
     }
@@ -1148,7 +1162,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     try {
       const { error } = await supabase
         .from('agendamentos')
-        .update({ data_hora: `${edicaoForm.data}T${edicaoForm.horario}:00` })
+        .update({ data_hora: `${edicaoForm.data}T${edicaoForm.horario}:00`, profissional_id: profissionalEdicaoId })
         .eq('id', agendamentoEditando.id);
 
       if (error) throw error;
@@ -2340,10 +2354,20 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
             <div style={{ marginBottom: '16px', fontSize: '14px', color: '#e8e8e8' }}>
               <div><span style={{ color: '#666' }}>{t('comum.cliente')}: </span><strong>{agendamentoEditando.cliente}</strong></div>
               <div><span style={{ color: '#666' }}>{t('comum.servico')}: </span><strong>{agendamentoEditando.servico}</strong></div>
-              <div><span style={{ color: '#666' }}>{t('comum.profissional')}: </span><strong>{agendamentoEditando.profissional}</strong></div>
             </div>
 
             <form onSubmit={handleSalvarEdicao}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999', marginBottom: '12px' }}>
+                {t('comum.profissional')}
+                <select
+                  value={profissionalEdicaoId || ''}
+                  onChange={(e) => setEdicaoForm(prev => ({ ...prev, profissionalId: e.target.value, horario: '' }))}
+                  style={{ width: '100%', padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                >
+                  {profissionaisLista.map(p => <option key={p.uuid} value={p.uuid}>{p.nome}</option>)}
+                </select>
+              </label>
+
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
                 {t('agendamentos.escolhaData')}
                 <div className="campo-data-wrapper">
