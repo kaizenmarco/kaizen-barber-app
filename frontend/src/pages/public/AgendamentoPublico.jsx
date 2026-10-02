@@ -12,6 +12,56 @@ import {
 import { encontrarPromocaoAplicavel, calcularPrecoComPromocao } from '../../config/promocoesTenant';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../../config/traducoes';
 
+// Textos do modal de código de confirmação por e-mail. Fica aqui (em vez de
+// config/traducoes.js) por ser um recurso novo e pequeno, isolado — evita
+// editar o arquivo grande de traduções compartilhado com o resto da página.
+const TEXTOS_CODIGO_EMAIL = {
+  'pt-BR': {
+    titulo: 'Confirme seu e-mail',
+    instrucao: (email) => `Enviamos um código de 6 dígitos para ${email}. Digite abaixo para confirmar seu agendamento.`,
+    placeholder: 'Código de 6 dígitos',
+    confirmar: 'Confirmar código',
+    confirmando: 'Confirmando...',
+    reenviar: 'Reenviar código',
+    reenviarEm: (s) => `Reenviar em ${s}s`,
+    cancelar: 'Cancelar',
+    invalido: 'Código inválido ou expirado. Tente de novo.',
+  },
+  en: {
+    titulo: 'Confirm your email',
+    instrucao: (email) => `We sent a 6-digit code to ${email}. Enter it below to confirm your booking.`,
+    placeholder: '6-digit code',
+    confirmar: 'Confirm code',
+    confirmando: 'Confirming...',
+    reenviar: 'Resend code',
+    reenviarEm: (s) => `Resend in ${s}s`,
+    cancelar: 'Cancel',
+    invalido: 'Invalid or expired code. Please try again.',
+  },
+  ja: {
+    titulo: 'メールを確認してください',
+    instrucao: (email) => `${email} 宛に6桁のコードを送信しました。下に入力して予約を確定してください。`,
+    placeholder: '6桁のコード',
+    confirmar: 'コードを確認',
+    confirmando: '確認中...',
+    reenviar: 'コードを再送信',
+    reenviarEm: (s) => `${s}秒後に再送信`,
+    cancelar: 'キャンセル',
+    invalido: 'コードが無効または期限切れです。もう一度お試しください。',
+  },
+  es: {
+    titulo: 'Confirma tu correo',
+    instrucao: (email) => `Enviamos un código de 6 dígitos a ${email}. Ingrésalo abajo para confirmar tu cita.`,
+    placeholder: 'Código de 6 dígitos',
+    confirmar: 'Confirmar código',
+    confirmando: 'Confirmando...',
+    reenviar: 'Reenviar código',
+    reenviarEm: (s) => `Reenviar en ${s}s`,
+    cancelar: 'Cancelar',
+    invalido: 'Código inválido o expirado. Intenta de nuevo.',
+  },
+};
+
 // ============================================================================
 // Página pública de agendamento, MULTI-TENANT — cada empresa acessa a sua
 // pela URL /b/:slug (ver App.jsx). Porte do ClientePublico.jsx original
@@ -242,6 +292,24 @@ function AgendamentoPublico() {
   // aqui, começando vazio (nenhum depoimento inventado).
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [novaAvaliacao, setNovaAvaliacao] = useState({ nome: '', estrelas: 5, texto: '' });
+
+  // ---------------------------------------------------------------------
+  // Confirmação do agendamento por e-mail (anti-fake, sem depender de
+  // SMS/Twilio). Ver Edge Functions enviar-codigo-confirmacao e
+  // verificar-codigo-confirmacao no projeto kaizen-saas.
+  // ---------------------------------------------------------------------
+  const [modalCodigoAberto, setModalCodigoAberto] = useState(false);
+  const [codigoDigitado, setCodigoDigitado] = useState('');
+  const [enviandoCodigo, setEnviandoCodigo] = useState(false);
+  const [verificandoCodigo, setVerificandoCodigo] = useState(false);
+  const [erroCodigo, setErroCodigo] = useState('');
+  const [segundosParaReenviar, setSegundosParaReenviar] = useState(0);
+
+  useEffect(() => {
+    if (segundosParaReenviar <= 0) return;
+    const id = setTimeout(() => setSegundosParaReenviar((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(id);
+  }, [segundosParaReenviar]);
 
   const [servicos, setServicos] = useState([]);
   const [pacotes, setPacotes] = useState([]);
@@ -706,7 +774,7 @@ function AgendamentoPublico() {
     setModalAberto(true);
   };
 
-  const handleConfirmarAgendamento = async () => {
+  const efetivarAgendamentoNoBanco = async () => {
     if (!dadosAgendamento.nome || !dadosAgendamento.email) {
       alert('⚠️ ' + t('alerta_preencha_nome_email'));
       return;
@@ -858,6 +926,95 @@ function AgendamentoPublico() {
       alert('❌ ' + t('alerta_erro_agendar') + error.message);
     } finally {
       setCarregando(false);
+    }
+  };
+
+  // Textos do modal de código no idioma atual (volta pro pt-BR se o idioma
+  // não tiver tradução própria aqui, embora todos os 4 tenham).
+  const textosCodigo = TEXTOS_CODIGO_EMAIL[idioma] || TEXTOS_CODIGO_EMAIL['pt-BR'];
+
+  // Ponto de entrada do botão "Confirmar" do modal de agendamento: valida os
+  // campos como antes e, em vez de gravar direto no banco, pede um código de
+  // confirmação por e-mail (gerado por enviar-codigo-confirmacao). Se esse
+  // e-mail já foi confirmado há menos de 1 ano para esta empresa, a Edge
+  // Function devolve ja_verificado=true e pulamos direto pra gravação —
+  // cliente recorrente não precisa confirmar de novo a cada agendamento.
+  const handleConfirmarAgendamento = async () => {
+    if (!dadosAgendamento.nome || !dadosAgendamento.email) {
+      alert('⚠️ ' + t('alerta_preencha_nome_email'));
+      return;
+    }
+    if (!dadosAgendamento.servico) {
+      alert('⚠️ ' + t('alerta_selecione_servico'));
+      return;
+    }
+    if (usarPontos && pontosCliente < PONTOS_PARA_RESGATE) {
+      alert('⚠️ ' + t('alerta_pontos_insuficientes'));
+      return;
+    }
+
+    setEnviandoCodigo(true);
+    setErroCodigo('');
+    try {
+      const { data, error } = await supabase.functions.invoke('enviar-codigo-confirmacao', {
+        body: { empresa_id: empresaId, email: dadosAgendamento.email },
+      });
+      if (error) throw error;
+      if (data?.erro) throw new Error(data.erro);
+
+      if (data?.ja_verificado) {
+        await efetivarAgendamentoNoBanco();
+        return;
+      }
+
+      setCodigoDigitado('');
+      setSegundosParaReenviar(60);
+      setModalCodigoAberto(true);
+    } catch (erro) {
+      alert('❌ ' + (erro.message || t('alerta_erro_agendar')));
+    } finally {
+      setEnviandoCodigo(false);
+    }
+  };
+
+  const reenviarCodigoConfirmacao = async () => {
+    if (segundosParaReenviar > 0 || enviandoCodigo) return;
+    setEnviandoCodigo(true);
+    setErroCodigo('');
+    try {
+      const { data, error } = await supabase.functions.invoke('enviar-codigo-confirmacao', {
+        body: { empresa_id: empresaId, email: dadosAgendamento.email },
+      });
+      if (error) throw error;
+      if (data?.erro) throw new Error(data.erro);
+      setSegundosParaReenviar(60);
+    } catch (erro) {
+      setErroCodigo(erro.message || textosCodigo.invalido);
+    } finally {
+      setEnviandoCodigo(false);
+    }
+  };
+
+  const confirmarCodigoEAgendar = async () => {
+    if (!codigoDigitado || codigoDigitado.trim().length < 6) {
+      setErroCodigo(textosCodigo.invalido);
+      return;
+    }
+    setVerificandoCodigo(true);
+    setErroCodigo('');
+    try {
+      const { data, error } = await supabase.functions.invoke('verificar-codigo-confirmacao', {
+        body: { empresa_id: empresaId, email: dadosAgendamento.email, codigo: codigoDigitado.trim() },
+      });
+      if (error) throw error;
+      if (!data?.verificado) throw new Error(data?.erro || textosCodigo.invalido);
+
+      setModalCodigoAberto(false);
+      await efetivarAgendamentoNoBanco();
+    } catch (erro) {
+      setErroCodigo(erro.message || textosCodigo.invalido);
+    } finally {
+      setVerificandoCodigo(false);
     }
   };
 
@@ -2039,6 +2196,76 @@ function AgendamentoPublico() {
             </button>
             <button onClick={() => setModalAberto(false)} style={{ width: '100%', background: 'transparent', color: '#999', border: 'none', padding: '10px', marginTop: '6px', cursor: 'pointer' }}>
               {t('modal_cancelar')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {modalCodigoAberto && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', zIndex: 1100, padding: '20px',
+          }}
+          onClick={() => !verificandoCodigo && setModalCodigoAberto(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1a1a1a', border: '1px solid #404040', borderRadius: '12px',
+              padding: '24px', width: '100%', maxWidth: '380px', textAlign: 'center',
+            }}
+          >
+            <h3 style={{ color: '#d4af37', margin: '0 0 10px 0' }}>{textosCodigo.titulo}</h3>
+            <p style={{ color: '#999', fontSize: '13px', margin: '0 0 18px 0' }}>
+              {textosCodigo.instrucao(dadosAgendamento.email)}
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder={textosCodigo.placeholder}
+              value={codigoDigitado}
+              onChange={(e) => setCodigoDigitado(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '6px', border: '1px solid #404040',
+                background: '#2d2d2d', color: '#e8e8e8', fontSize: '22px', letterSpacing: '6px',
+                textAlign: 'center', boxSizing: 'border-box', marginBottom: '14px',
+              }}
+            />
+            {erroCodigo && (
+              <p style={{ color: '#f87171', fontSize: '13px', margin: '0 0 14px 0' }}>{erroCodigo}</p>
+            )}
+            <button
+              onClick={confirmarCodigoEAgendar}
+              disabled={verificandoCodigo || codigoDigitado.length < 6}
+              style={{
+                width: '100%', background: '#d4af37', color: '#1a1a1a', border: 'none',
+                padding: '14px', borderRadius: '6px', fontWeight: 'bold', fontSize: '15px',
+                cursor: verificandoCodigo ? 'wait' : 'pointer', marginBottom: '8px',
+                opacity: codigoDigitado.length < 6 ? 0.6 : 1,
+              }}
+            >
+              {verificandoCodigo ? textosCodigo.confirmando : textosCodigo.confirmar}
+            </button>
+            <button
+              onClick={reenviarCodigoConfirmacao}
+              disabled={segundosParaReenviar > 0 || enviandoCodigo}
+              style={{
+                width: '100%', background: 'transparent', color: segundosParaReenviar > 0 ? '#666' : '#d4af37',
+                border: 'none', padding: '8px', fontSize: '13px',
+                cursor: segundosParaReenviar > 0 ? 'default' : 'pointer', marginBottom: '4px',
+              }}
+            >
+              {segundosParaReenviar > 0 ? textosCodigo.reenviarEm(segundosParaReenviar) : textosCodigo.reenviar}
+            </button>
+            <button
+              onClick={() => setModalCodigoAberto(false)}
+              disabled={verificandoCodigo}
+              style={{ width: '100%', background: 'transparent', color: '#999', border: 'none', padding: '8px', cursor: 'pointer' }}
+            >
+              {textosCodigo.cancelar}
             </button>
           </div>
         </div>
