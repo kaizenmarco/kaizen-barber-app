@@ -18,18 +18,28 @@ import AgendamentoPublico from './pages/public/AgendamentoPublico';
 // Com domínios diferentes, cada um vira um site totalmente separado pro
 // celular, sem essa ambiguidade.
 function ehSubdominioAdmin() {
-  return window.location.hostname.startsWith('admin.');
+  // Domínio completo, não só o prefixo — "admin." só conta se for
+  // exatamente admin.kaizenbarbershop.com, nunca um subdomínio parecido
+  // criado por engano em outro domínio (ex: kaizenflowaplicativo.com).
+  return window.location.hostname === 'admin.kaizenbarbershop.com';
 }
 
 // kaizenflowaplicativo.com é o domínio da página de vendas (Lovable). Os
 // subdomínios cadastro. e painel. apontam pra este mesmo app e abrem direto
 // a tela certa na raiz "/", sem precisar digitar o caminho completo.
+//
+// Checagem por domínio COMPLETO (não só prefixo) — evita que um subdomínio
+// "cadastro."/"painel." criado por engano em kaizenbarbershop.com (ou um
+// "admin." criado em kaizenflowaplicativo.com) acabe abrindo a tela errada
+// na raiz. As rotas explícitas /admin, /cadastro e /painel continuam
+// funcionando em qualquer domínio, sem essa restrição — isso aqui só afeta
+// o atalho da raiz "/".
 function ehSubdominioCadastro() {
-  return window.location.hostname.startsWith('cadastro.');
+  return window.location.hostname === 'cadastro.kaizenflowaplicativo.com';
 }
 
 function ehSubdominioPainel() {
-  return window.location.hostname.startsWith('painel.');
+  return window.location.hostname === 'painel.kaizenflowaplicativo.com';
 }
 
 // Site público e Admin dividem o mesmo index.html, então por padrão
