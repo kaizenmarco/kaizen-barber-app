@@ -29,8 +29,10 @@ const MAX_POR_TELEFONE_24H = 8;
 const MAX_POR_IP_1H = 10;
 
 // Por quanto tempo o telefone confirmado vale neste aparelho, sem pedir
-// código de novo (ex.: pra "trocar horário" logo depois de agendar).
-const VALIDADE_TOKEN_HORAS = 12;
+// código de novo. 1 ano = na prática "confirma uma vez só" (pedido do
+// Marco, pra economizar SMS); só pede de novo se trocar de celular ou
+// limpar os dados do navegador.
+const VALIDADE_TOKEN_DIAS = 365;
 
 const LOCALE_TWILIO: Record<string, string> = { "pt-BR": "pt-BR", en: "en", ja: "ja", es: "es" };
 
@@ -178,7 +180,7 @@ Deno.serve(async (req: Request) => {
         cliente = novo;
       }
 
-      const expiraEm = new Date(Date.now() + VALIDADE_TOKEN_HORAS * 3600_000).toISOString();
+      const expiraEm = new Date(Date.now() + VALIDADE_TOKEN_DIAS * 24 * 3600_000).toISOString();
       const { data: token, error: erroToken } = await supabase
         .from("telefones_verificados")
         .insert({ cliente_id: cliente!.id, telefone, expira_em: expiraEm })
