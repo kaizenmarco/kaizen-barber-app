@@ -158,7 +158,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     setCarregandoOcupados(true);
     supabase
       .from('agendamentos')
-      .select('data_hora, servico_id, status')
+      .select('data_hora, servico_id, status, duracao_minutos_manual')
       .eq('profissional_id', profObj.uuid)
       .gte('data_hora', `${novoAgendamentoForm.data}T00:00:00`)
       .lt('data_hora', `${novoAgendamentoForm.data}T23:59:59`)
@@ -170,7 +170,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
           setOcupadosNoDia((data || []).map(a => {
             const hora = a.data_hora.split('T')[1].substring(0, 5);
             const inicioMin = paraMinutos(hora);
-            const duracao = servicosLista.find(s => s.uuid === a.servico_id)?.duracaoMinutos || 60;
+            const duracao = a.duracao_minutos_manual || servicosLista.find(s => s.uuid === a.servico_id)?.duracaoMinutos || 60;
             return { inicioMin, fimMin: inicioMin + duracao };
           }));
         }

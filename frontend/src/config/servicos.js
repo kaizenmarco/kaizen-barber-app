@@ -14,7 +14,7 @@
 // nomeEn/nomeJa/descricaoEn/descricaoJa são só para exibição no App Público
 // quando o cliente troca o idioma (ver getNomeServico/getDescricaoServico).
 export const SERVICOS = [
-  { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', nomeEn: 'Haircut', nomeJa: 'カット', nomeEs: 'Corte', preco: 4000, duracao: '40 min', duracaoMinutos: 40, descricao: 'Corte de cabelo masculino', descricaoEn: "Men's haircut", descricaoJa: 'メンズカット', descricaoEs: 'Corte de cabello masculino', imagem: '/images/servico_corte.jpg', profissionaisIds: [1, 2] },
+  { id: 1, uuid: '3f905b1f-61b6-4749-870a-cbe485e39fec', nome: 'Corte', nomeEn: 'Haircut', nomeJa: 'カット', nomeEs: 'Corte', preco: 4000, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte de cabelo masculino', descricaoEn: "Men's haircut", descricaoJa: 'メンズカット', descricaoEs: 'Corte de cabello masculino', imagem: '/images/servico_corte.jpg', profissionaisIds: [1, 2] },
   { id: 2, uuid: '68b86906-5816-4532-a4ac-6487531f872f', nome: 'Corte + Sobrancelhas', nomeEn: 'Haircut + Eyebrows', nomeJa: 'カット+眉毛', nomeEs: 'Corte + Cejas', preco: 4500, duracao: '45 min', duracaoMinutos: 45, descricao: 'Corte completo com design de sobrancelhas', descricaoEn: 'Full haircut with eyebrow shaping', descricaoJa: '眉毛デザイン付きのフルカット', descricaoEs: 'Corte completo con diseño de cejas', imagem: '/images/servico_corte_sobrancelhas.jpg', profissionaisIds: [1, 2] },
   { id: 3, uuid: 'b38f864d-e4f6-44e3-a03b-4706c7984306', nome: 'Corte + Barba', nomeEn: 'Haircut + Beard', nomeJa: 'カット+ひげ', nomeEs: 'Corte + Barba', preco: 6500, duracao: '60 min', duracaoMinutos: 60, descricao: 'Corte e modelagem profissional de barba', descricaoEn: 'Haircut with professional beard styling', descricaoJa: 'プロによるひげ整え付きカット', descricaoEs: 'Corte y modelado profesional de barba', imagem: '/images/servico_corte_barba.jpg', profissionaisIds: [1, 2] },
   { id: 9, uuid: '952520f0-c52d-4c9e-b6c5-5a663051f0be', nome: 'Barba', nomeEn: 'Beard', nomeJa: 'ひげ', nomeEs: 'Barba', preco: 4000, duracao: '40 min', duracaoMinutos: 40, descricao: 'Modelagem e acabamento profissional de barba', descricaoEn: 'Professional beard styling and finishing', descricaoJa: 'プロによるひげ整え・仕上げ', descricaoEs: 'Modelado y acabado profesional de barba', imagem: '/images/servico_corte_barba.jpg', profissionaisIds: [1, 2] },
@@ -49,7 +49,8 @@ export const buscarServicosCompletos = async () => {
       .from('servicos')
       .select('id, nome, descricao, preco, duracao_minutos, imagem_url, ativo')
       .eq('ativo', true)
-      .eq('eh_pacote', false);
+      .eq('eh_pacote', false)
+      .order('criado_em');
 
     if (error || !data) return SERVICOS;
 
@@ -95,7 +96,15 @@ export const buscarServicosCompletos = async () => {
     const idsNoBanco = new Set(data.map(r => r.id));
     const faltantes = SERVICOS.filter(s => !idsNoBanco.has(s.uuid));
 
-    return [...mesclados, ...faltantes];
+    // Sem isso a ordem seguia a ordem física das linhas no banco, que muda
+    // quando um serviço é editado (o Corte foi parar no fim da lista ao
+    // mudar de 40 pra 45 min). Os conhecidos seguem a ordem de SERVICOS; os
+    // criados depois no Admin vêm em seguida, por data de criação.
+    const posicao = (servico) => {
+      const i = SERVICOS.findIndex(s => s.uuid === servico.uuid);
+      return i === -1 ? SERVICOS.length : i;
+    };
+    return [...mesclados, ...faltantes].sort((a, b) => posicao(a) - posicao(b));
   } catch {
     return SERVICOS;
   }

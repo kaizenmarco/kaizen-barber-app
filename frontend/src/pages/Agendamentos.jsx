@@ -313,7 +313,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       .filter(a => a.profissionalId === profissionalNovoObj.uuid && a.data === novoAgendamento.data && a.status !== 'CANCELADO')
       .map(a => {
         const inicioMin = paraMinutos(a.hora);
-        const duracao = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+        const duracao = a.duracaoMinutosManual || servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
         return { inicioMin, fimMin: inicioMin + duracao, cliente: a.cliente, hora: a.hora, servico: a.servico };
       }),
     ...bloqueios
@@ -351,7 +351,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       .filter(a => a.id !== agendamentoEditando.id && a.profissionalId === agendamentoEditando.profissionalId && a.data === edicaoForm.data && a.status !== 'CANCELADO')
       .map(a => {
         const inicioMin = paraMinutos(a.hora);
-        const duracao = servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
+        const duracao = a.duracaoMinutosManual || servicosLista.find(s => s.nome === a.servico)?.duracaoMinutos || 60;
         return { inicioMin, fimMin: inicioMin + duracao, cliente: a.cliente, hora: a.hora, servico: a.servico };
       }),
     ...bloqueios

@@ -726,7 +726,7 @@ function ClientePublico() {
       // apareciam como ocupados aqui e causavam conflito com a agenda pública.
       const { data, error } = await supabase
         .from('agendamentos')
-        .select('profissional_id, data_hora, servico_id, status')
+        .select('profissional_id, data_hora, servico_id, status, duracao_minutos_manual')
         .gte('data_hora', `${dataInicio}T00:00:00`)
         .lte('data_hora', `${dataFim}T23:59:59`)
         .neq('status', 'CANCELADO');
@@ -739,8 +739,10 @@ function ClientePublico() {
         const [dataStr, horaCompleta] = agendamento.data_hora.split('T');
         const [hh, mm] = horaCompleta.split(':').map(Number);
         const inicioMin = hh * 60 + mm;
+        // Duração ajustada no Admin (ou travada ao mudar a duração do
+        // serviço) vale mais que a duração padrão do serviço.
         const servicoInfo = servicos.find(s => s.uuid === agendamento.servico_id);
-        const duracaoMin = servicoInfo ? servicoInfo.duracaoMinutos : 60;
+        const duracaoMin = agendamento.duracao_minutos_manual || (servicoInfo ? servicoInfo.duracaoMinutos : 60);
 
         if (!ocupados[profUUID]) {
           ocupados[profUUID] = [];
