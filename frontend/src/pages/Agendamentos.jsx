@@ -1228,7 +1228,8 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
     const agendadosDeste = agendamentosFiltrados.filter(a => {
       const dataAgendamento = new Date(a.data);
-      return dataAgendamento.getFullYear() === ano && dataAgendamento.getMonth() === mes;
+      return dataAgendamento.getFullYear() === ano && dataAgendamento.getMonth() === mes
+        && (filtroStatus !== 'todos' || a.status !== 'CANCELADO');
     });
 
     const bloqueadosDeste = bloqueiosFiltrados.filter(b => {
@@ -1286,7 +1287,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const dataDiaSelecionadoObj = new Date(`${diaSelecionado}T00:00:00`);
   const horarioDoDiaSelecionado = getHorarioDoDia(dataDiaSelecionadoObj, horarioEstendido);
   const agendamentosDoDiaSelecionado = agendamentosFiltrados
-    .filter(a => a.data === diaSelecionado)
+    .filter(a => a.data === diaSelecionado && (filtroStatus !== 'todos' || a.status !== 'CANCELADO'))
     .sort((a, b) => a.hora.localeCompare(b.hora));
   const bloqueiosDoDiaSelecionado = bloqueiosFiltrados
     .filter(b => b.data === diaSelecionado)
@@ -1400,7 +1401,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const colunasSemana = diasDaSemanaAtual.map((d, idx) => {
     const dataStr = formatarDataLocalISO(d);
     const horarioDoDia = horariosPorDiaSemana[idx];
-    const agendamentosNoDia = agendamentosFiltrados.filter(a => a.data === dataStr).sort((a, b) => a.hora.localeCompare(b.hora));
+    const agendamentosNoDia = agendamentosFiltrados.filter(a => a.data === dataStr && (filtroStatus !== 'todos' || a.status !== 'CANCELADO')).sort((a, b) => a.hora.localeCompare(b.hora));
     const bloqueiosNoDia = bloqueiosFiltrados.filter(b => b.data === dataStr).sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
 
     const itens = !horarioDoDia.aberto ? [] : atribuirColunasTimeline([
