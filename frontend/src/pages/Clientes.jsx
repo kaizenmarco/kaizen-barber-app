@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import { SERVICOS } from '../config/servicos';
-import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
+import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
+import { buscarHorariosAlmoco } from '../config/profissionais';
 
 // Importar clientes via CSV — parser simples (sem dependência externa) que
 // aceita aspas e vírgulas dentro de campos (padrão RFC4180 básico). O
@@ -134,6 +135,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
     { id: 3, uuid: 'ad232428-9872-46db-82b3-27819ab353ff', nome: 'Neia' },
   ];
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
+  const [horariosAlmoco, setHorariosAlmoco] = useState({});
   const [novoAgendamentoAberto, setNovoAgendamentoAberto] = useState(false);
   const [novoAgendamentoForm, setNovoAgendamentoForm] = useState({ data: '', horario: '', servico: '', profissional: '' });
   const [ocupadosNoDia, setOcupadosNoDia] = useState([]);
@@ -142,6 +144,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
 
   useEffect(() => {
     buscarHorarioEstendido().then(setHorarioEstendido);
+    buscarHorariosAlmoco().then(setHorariosAlmoco);
   }, []);
 
   // Busca os horários já ocupados do profissional escolhido, no dia
@@ -183,7 +186,8 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
         new Date(`${novoAgendamentoForm.data}T00:00:00`),
         servicoNovoAgendamentoObj.duracaoMinutos,
         ocupadosNoDia,
-        horarioEstendido
+        horarioEstendido,
+        horariosAlmoco[profissionaisLista.find(p => p.nome === novoAgendamentoForm.profissional)?.uuid] || HORARIO_ALMOCO
       );
 
   const abrirNovoAgendamento = () => {

@@ -11,6 +11,7 @@ import {
   getDiaSemana,
 } from '../config/horarios';
 import { SERVICOS, getNomeServico, buscarServicosCompletos, buscarPacotesAtivos } from '../config/servicos';
+import { buscarHorariosAlmoco } from '../config/profissionais';
 import { buscarPromocoesAtivas, encontrarPromocaoAplicavel, calcularPrecoComPromocao } from '../config/promocoes';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 import { PAISES_TELEFONE, PAIS_TELEFONE_PADRAO, montarTelefoneInternacional, telefoneInternacionalValido } from '../config/paisesTelefone';
@@ -235,6 +236,7 @@ function ClientePublico() {
   const [carregando, setCarregando] = useState(false);
   const [horariosOcupados, setHorariosOcupados] = useState({});
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
+  const [horariosAlmoco, setHorariosAlmoco] = useState({});
   const [pontosCliente, setPontosCliente] = useState(0);
   const [usarPontos, setUsarPontos] = useState(false);
   const [carregandoPontos, setCarregandoPontos] = useState(false);
@@ -425,6 +427,10 @@ function ClientePublico() {
 
   useEffect(() => {
     buscarHorarioEstendido().then(setHorarioEstendido);
+  }, []);
+
+  useEffect(() => {
+    buscarHorariosAlmoco().then(setHorariosAlmoco);
   }, []);
 
   useEffect(() => {
@@ -777,7 +783,8 @@ function ClientePublico() {
     const duracao = duracaoMinutos || 60;
     const dataStr = paraDataStr(data);
     const intervalosOcupados = (horariosOcupados[prof.uuid] || []).filter(o => o.data === dataStr);
-    const slots = getSlotsLivresNoDia(data, duracao, intervalosOcupados, horarioEstendido);
+    const horarioAlmocoProf = horariosAlmoco[prof.uuid] || HORARIO_ALMOCO;
+    const slots = getSlotsLivresNoDia(data, duracao, intervalosOcupados, horarioEstendido, horarioAlmocoProf);
 
     // Se o dia selecionado é "hoje" no horário do Japão, esconde os horários
     // que já passaram lá no salão (evita agendar às 9h sendo já 20h, por
@@ -1882,7 +1889,7 @@ function ClientePublico() {
                   {/* Grade de horários, dividida em Manhã / Tarde */}
                   {(() => {
                     const horarios = getHorariosProfissional(profissionalSelecionado, dataSelecionada, duracaoSelecionada);
-                    const limiteManha = paraMinutos(HORARIO_ALMOCO.inicio);
+                    const limiteManha = paraMinutos((horariosAlmoco[profissionalSelecionado?.uuid] || HORARIO_ALMOCO).inicio);
                     const manha = horarios.filter(h => paraMinutos(h) < limiteManha);
                     const tarde = horarios.filter(h => paraMinutos(h) >= limiteManha);
 
@@ -2116,7 +2123,17 @@ function ClientePublico() {
                   </tbody>
                 </table>
                 <p style={{ fontSize: '13px', color: '#999', marginTop: '14px', marginBottom: 0 }}>
-                  ☕ {t('endereco_almoco', { inicio: HORARIO_ALMOCO.inicio, fim: HORARIO_ALMOCO.fim })}
+                  ☕ {(() => {
+                    // Almoço é por profissional: se todos almoçam no mesmo
+                    // horário mostra um só; senão, lista cada um.
+                    const almocos = profissionais.map(p => ({ nome: p.nome.split(' ')[0], ...(horariosAlmoco[p.uuid] || HORARIO_ALMOCO) }));
+                    const unicos = new Set(almocos.map(a => `${a.inicio}-${a.fim}`));
+                    if (unicos.size <= 1) {
+                      const a = almocos[0] || HORARIO_ALMOCO;
+                      return t('endereco_almoco', { inicio: a.inicio, fim: a.fim });
+                    }
+                    return t('endereco_almoco_por_profissional', { lista: almocos.map(a => `${a.nome} ${a.inicio}-${a.fim}`).join(' · ') });
+                  })()}
                 </p>
               </div>
 

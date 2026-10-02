@@ -81,3 +81,29 @@ export const salvarComissao = async (uuid, percentual) => {
 
   if (error) throw error;
 };
+
+// ============================================================================
+// Horário de almoço individual por profissional (Marco 12:45-13:45, Gabriel e
+// Neia 12:00-13:00 por padrão). Lido pela função horarios_almoco_profissionais
+// do banco porque o site público não tem acesso à tabela profissionais.
+// ============================================================================
+
+// { [uuid]: { inicio: 'HH:MM', fim: 'HH:MM' } } — quem não vier do banco fica
+// sem entrada, e quem usa cai no HORARIO_ALMOCO padrão (config/horarios.js).
+export const buscarHorariosAlmoco = async () => {
+  const { data, error } = await supabase.rpc('horarios_almoco_profissionais');
+  if (error) {
+    console.error('Erro ao buscar horários de almoço:', error);
+    return {};
+  }
+  return Object.fromEntries((data || []).map(r => [r.id, { inicio: r.inicio, fim: r.fim }]));
+};
+
+export const salvarHorarioAlmoco = async (uuidProfissional, inicio, fim) => {
+  const { error } = await supabase
+    .from('profissionais')
+    .update({ horario_almoco_inicio: inicio, horario_almoco_fim: fim })
+    .eq('id', uuidProfissional);
+
+  if (error) throw error;
+};

@@ -18,7 +18,10 @@ export const HORARIO_SALAO = {
   sabado: { aberto: true, abertura: '08:00', fechamento: '20:30' },
 };
 
-// Intervalo de almoço, válido em todos os dias de funcionamento.
+// Intervalo de almoço padrão. Cada profissional pode ter o seu (colunas
+// horario_almoco_inicio/fim em profissionais, editável em Profissionais no
+// Admin) — este valor só é usado enquanto o horário individual não carrega
+// ou se ele não existir.
 export const HORARIO_ALMOCO = { inicio: '12:45', fim: '13:45' };
 
 // ----------------------------------------------------------------------------
@@ -130,14 +133,14 @@ export const getHorarioDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRA
 // Divide um dia nos blocos de trabalho (manhã e tarde, separados pelo
 // almoço), em minutos desde 00:00. Não considera agendamentos já feitos —
 // só a grade fixa de funcionamento do salão.
-const getBlocosDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRAO) => {
+const getBlocosDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRAO, horarioAlmoco = HORARIO_ALMOCO) => {
   const { aberto, abertura, fechamento } = getHorarioDoDia(data, horarioEstendido);
   if (!aberto) return [];
 
   const aberturaMin = paraMinutos(abertura);
   const fechamentoMin = paraMinutos(fechamento);
-  const almocoInicio = paraMinutos(HORARIO_ALMOCO.inicio);
-  const almocoFim = paraMinutos(HORARIO_ALMOCO.fim);
+  const almocoInicio = paraMinutos(horarioAlmoco.inicio);
+  const almocoFim = paraMinutos(horarioAlmoco.fim);
 
   return [
     [aberturaMin, Math.min(almocoInicio, fechamentoMin)],
@@ -164,8 +167,8 @@ export const getSlotsDisponiveisNoDia = (data, duracaoMinutos = 60, horarioEsten
 // de cada agendamento existente e continua a grade a partir dali. Assim
 // buracos "torcidos" (tipo 30min sobrando) aparecem como opção real de
 // horário, sem precisar do modo Encaixe.
-export const getSlotsLivresNoDia = (data, duracaoMinutos = 60, intervalosOcupados = [], horarioEstendido = HORARIO_ESTENDIDO_PADRAO) => {
-  const blocos = getBlocosDoDia(data, horarioEstendido);
+export const getSlotsLivresNoDia = (data, duracaoMinutos = 60, intervalosOcupados = [], horarioEstendido = HORARIO_ESTENDIDO_PADRAO, horarioAlmoco = HORARIO_ALMOCO) => {
+  const blocos = getBlocosDoDia(data, horarioEstendido, horarioAlmoco);
   if (blocos.length === 0) return [];
 
   const ocupadosOrdenados = [...intervalosOcupados].sort((a, b) => a.inicioMin - b.inicioMin);

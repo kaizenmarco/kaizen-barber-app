@@ -347,6 +347,10 @@ const TEXTOS = {
     'profissionais.digiteNumeroValido': 'Digite um número entre 0 e 100.',
     'profissionais.comissaoSalva': 'Salvo!',
     'profissionais.erroSalvarComissao': 'Não consegui salvar. Confira se a coluna comissao_percentual existe na tabela profissionais.',
+    'profissionais.salvarAlmoco': 'Salvar Almoço',
+    'profissionais.almocoInvalido': 'O fim do almoço precisa ser depois do início.',
+    'profissionais.erroSalvarAlmoco': 'Não consegui salvar o almoço. Tente de novo.',
+    'profissionais.almocoPorProfissional': 'cada profissional tem o seu — ajuste no cartão de cada um, abaixo.',
 
     // Caixa
     'caixa.titulo': 'Caixa - {dia}, {data}',
@@ -1071,6 +1075,10 @@ const TEXTOS = {
     'profissionais.digiteNumeroValido': 'Enter a number between 0 and 100.',
     'profissionais.comissaoSalva': 'Saved!',
     'profissionais.erroSalvarComissao': "Couldn't save. Check whether the comissao_percentual column exists in the profissionais table.",
+    'profissionais.salvarAlmoco': 'Save Lunch',
+    'profissionais.almocoInvalido': 'Lunch end must be after lunch start.',
+    'profissionais.erroSalvarAlmoco': "Couldn't save the lunch break. Please try again.",
+    'profissionais.almocoPorProfissional': 'each professional has their own — adjust it on each card below.',
 
     'caixa.titulo': 'Cash Register - {dia}, {data}',
     'caixa.carregando': '⏳ Loading cash register...',
@@ -1791,6 +1799,10 @@ const TEXTOS = {
     'profissionais.digiteNumeroValido': '0から100の間の数字を入力してください。',
     'profissionais.comissaoSalva': '保存しました！',
     'profissionais.erroSalvarComissao': '保存できませんでした。profissionaisテーブルにcomissao_percentual列が存在するか確認してください。',
+    'profissionais.salvarAlmoco': '昼休憩を保存',
+    'profissionais.almocoInvalido': '昼休憩の終了は開始より後にしてください。',
+    'profissionais.erroSalvarAlmoco': '昼休憩を保存できませんでした。もう一度お試しください。',
+    'profissionais.almocoPorProfissional': 'スタッフごとに設定できます（下の各カードで変更）。',
 
     'caixa.titulo': 'レジ - {dia}、{data}',
     'caixa.carregando': '⏳ レジを読み込み中...',

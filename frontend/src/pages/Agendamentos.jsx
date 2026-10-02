@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO } from '../config/horarios';
+import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
+import { buscarHorariosAlmoco } from '../config/profissionais';
 import { SERVICOS, buscarServicosCompletos } from '../config/servicos';
 import { LOCALE_POR_IDIOMA_ADMIN, DIAS_SEMANA_ABREV_ADMIN, DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import { contarCancelamentosUltimaHora, LIMITE_ULTIMA_HORA_MIN } from '../config/reincidencias';
@@ -18,6 +19,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [mesAtual, setMesAtual] = useState(new Date());
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
+  const [horariosAlmoco, setHorariosAlmoco] = useState({});
   const [diaModal, setDiaModal] = useState(null); // data (YYYY-MM-DD) do dia clicado no calendário, ou null se fechado
   const [bloqueios, setBloqueios] = useState([]);
   const [agendamentoEditando, setAgendamentoEditando] = useState(null); // agendamento sendo editado (data/hora), ou null se fechado
@@ -250,6 +252,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   useEffect(() => {
     buscarHorarioEstendido().then(setHorarioEstendido);
+    buscarHorariosAlmoco().then(setHorariosAlmoco);
   }, []);
 
   // Lista de clientes já cadastrados (nome/email/telefone/nascimento) — usada
@@ -326,7 +329,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const slotsDisponiveisNovoAgendamento = (!profissionalNovoObj || !servicoNovoObj || !novoAgendamento.data) ? [] : (() => {
     const dataObj = new Date(`${novoAgendamento.data}T00:00:00`);
-    return getSlotsLivresNoDia(dataObj, duracaoNovoAgendamento, intervalosOcupadosNoDia, horarioEstendido);
+    return getSlotsLivresNoDia(dataObj, duracaoNovoAgendamento, intervalosOcupadosNoDia, horarioEstendido, horariosAlmoco[profissionalNovoObj.uuid] || HORARIO_ALMOCO);
   })();
 
   const conflitosEncaixe = (!modoEncaixe || !novoAgendamento.horario) ? [] : (() => {
@@ -364,7 +367,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const slotsDisponiveisEdicao = (!agendamentoEditando || !edicaoForm.data) ? [] : (() => {
     const dataObj = new Date(`${edicaoForm.data}T00:00:00`);
-    return getSlotsLivresNoDia(dataObj, duracaoEdicao, intervalosOcupadosEdicao, horarioEstendido);
+    return getSlotsLivresNoDia(dataObj, duracaoEdicao, intervalosOcupadosEdicao, horarioEstendido, horariosAlmoco[agendamentoEditando.profissionalId] || HORARIO_ALMOCO);
   })();
 
   const conflitosEncaixeEdicao = (!edicaoForm.encaixe || !edicaoForm.horario) ? [] : (() => {

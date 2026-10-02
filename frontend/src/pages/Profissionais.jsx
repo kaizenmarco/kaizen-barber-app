@@ -6,7 +6,7 @@ import {
   buscarHorarioEstendido,
   salvarHorarioEstendido,
 } from '../config/horarios';
-import { PROFISSIONAIS, COMISSAO_PADRAO, buscarComissoes, salvarComissao } from '../config/profissionais';
+import { PROFISSIONAIS, COMISSAO_PADRAO, buscarComissoes, salvarComissao, buscarHorariosAlmoco, salvarHorarioAlmoco } from '../config/profissionais';
 import { DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 
 const INDICE_DIA = {
@@ -35,6 +35,8 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
 
   const [comissoes, setComissoes] = useState({});
   const [comissoesEditadas, setComissoesEditadas] = useState({});
+  const [horariosAlmoco, setHorariosAlmoco] = useState({});
+  const [horariosAlmocoEditados, setHorariosAlmocoEditados] = useState({});
   const [salvandoComissao, setSalvandoComissao] = useState(null);
   const [mensagemComissao, setMensagemComissao] = useState({});
 
@@ -48,6 +50,11 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
       const mapa = await buscarComissoes();
       setComissoes(mapa);
       setComissoesEditadas(mapa);
+    })();
+    (async () => {
+      const mapa = await buscarHorariosAlmoco();
+      setHorariosAlmoco(mapa);
+      setHorariosAlmocoEditados(mapa);
     })();
   }, []);
 
@@ -72,6 +79,40 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
       setMensagemComissao({ ...mensagemComissao, [uuid]: t('profissionais.erroSalvarComissao') });
     } finally {
       setSalvandoComissao(null);
+    }
+  };
+
+
+  const [salvandoAlmoco, setSalvandoAlmoco] = useState(null);
+  const [mensagemAlmoco, setMensagemAlmoco] = useState({});
+
+  const almocoDe = (uuid, mapa) => mapa[uuid] || HORARIO_ALMOCO;
+
+  const handleAlmocoInputChange = (uuid, campo, valor) => {
+    setMensagemAlmoco({ ...mensagemAlmoco, [uuid]: '' });
+    setHorariosAlmocoEditados({
+      ...horariosAlmocoEditados,
+      [uuid]: { ...almocoDe(uuid, horariosAlmocoEditados), [campo]: valor },
+    });
+  };
+
+  const handleSalvarAlmoco = async (uuid) => {
+    const { inicio, fim } = almocoDe(uuid, horariosAlmocoEditados);
+    if (!inicio || !fim || fim <= inicio) {
+      setMensagemAlmoco({ ...mensagemAlmoco, [uuid]: t('profissionais.almocoInvalido') });
+      return;
+    }
+
+    setSalvandoAlmoco(uuid);
+    try {
+      await salvarHorarioAlmoco(uuid, inicio, fim);
+      setHorariosAlmoco({ ...horariosAlmoco, [uuid]: { inicio, fim } });
+      setMensagemAlmoco({ ...mensagemAlmoco, [uuid]: t('profissionais.comissaoSalva') });
+    } catch (erro) {
+      console.error('Erro ao salvar horário de almoço:', erro);
+      setMensagemAlmoco({ ...mensagemAlmoco, [uuid]: t('profissionais.erroSalvarAlmoco') });
+    } finally {
+      setSalvandoAlmoco(null);
     }
   };
 
@@ -140,7 +181,7 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
           </tbody>
         </table>
         <p style={{ fontSize: '13px' }}>
-          <strong>{t('profissionais.almoco')}</strong> {HORARIO_ALMOCO.inicio} - {HORARIO_ALMOCO.fim} {t('profissionais.almocoTodosDias')}
+          <strong>{t('profissionais.almoco')}</strong> {t('profissionais.almocoPorProfissional')}
         </p>
       </section>
 
@@ -278,6 +319,34 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
                 {mensagemComissao[profissional.uuid] && (
                   <p style={{ fontSize: '12px', marginTop: '6px', color: mensagemComissao[profissional.uuid] === t('profissionais.comissaoSalva') ? '#4ade80' : '#f87171' }}>
                     {mensagemComissao[profissional.uuid]}
+                  </p>
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                  <strong>{t('profissionais.almoco')}</strong>
+                  <input
+                    type="time"
+                    value={almocoDe(profissional.uuid, horariosAlmocoEditados).inicio}
+                    onChange={(e) => handleAlmocoInputChange(profissional.uuid, 'inicio', e.target.value)}
+                  />
+                  <span>-</span>
+                  <input
+                    type="time"
+                    value={almocoDe(profissional.uuid, horariosAlmocoEditados).fim}
+                    onChange={(e) => handleAlmocoInputChange(profissional.uuid, 'fim', e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ marginTop: '8px' }}
+                  onClick={() => handleSalvarAlmoco(profissional.uuid)}
+                  disabled={salvandoAlmoco === profissional.uuid || JSON.stringify(almocoDe(profissional.uuid, horariosAlmocoEditados)) === JSON.stringify(almocoDe(profissional.uuid, horariosAlmoco))}
+                >
+                  {salvandoAlmoco === profissional.uuid ? t('comum.salvando') : t('profissionais.salvarAlmoco')}
+                </button>
+                {mensagemAlmoco[profissional.uuid] && (
+                  <p style={{ fontSize: '12px', marginTop: '6px', color: mensagemAlmoco[profissional.uuid] === t('profissionais.comissaoSalva') ? '#4ade80' : '#f87171' }}>
+                    {mensagemAlmoco[profissional.uuid]}
                   </p>
                 )}
               </div>
