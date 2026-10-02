@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import CampoTelefone from '../components/CampoTelefone';
 import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
 import { buscarHorariosAlmoco } from '../config/profissionais';
 import { SERVICOS, buscarServicosCompletos } from '../config/servicos';
@@ -663,6 +664,14 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           })
           .eq('id', clienteId)
           .or('email.is.null,data_nascimento.is.null');
+
+        // Cadastro antigo com telefone sem "+país": grava no formato
+        // internacional que veio do seletor (pro WhatsApp abrir no país certo).
+        await supabase
+          .from('clientes')
+          .update({ telefone: novoAgendamento.telefone })
+          .eq('id', clienteId)
+          .not('telefone', 'like', '+%');
       } else {
         const { data: novoCliente, error: erroCliente } = await supabase
           .from('clientes')
@@ -1758,12 +1767,10 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                 value={novoAgendamento.email}
                 onChange={handleInputChange}
               />
-              <input
-                type="tel"
-                name="telefone"
-                placeholder={t('agendamentos.telefoneOpcional')}
+              <CampoTelefone
                 value={novoAgendamento.telefone}
-                onChange={handleInputChange}
+                onChange={(telefone) => setNovoAgendamento(prev => ({ ...prev, telefone }))}
+                placeholder={t('agendamentos.telefoneOpcional')}
                 required
               />
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import CampoTelefone from '../components/CampoTelefone';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import { SERVICOS } from '../config/servicos';
 import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
@@ -650,12 +651,10 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
             onChange={handleInputChange}
             required
           />
-          <input
-            type="tel"
-            name="telefone"
-            placeholder={t('comum.telefone')}
+          <CampoTelefone
             value={novoCliente.telefone}
-            onChange={handleInputChange}
+            onChange={(telefone) => setNovoCliente(prev => ({ ...prev, telefone }))}
+            placeholder={t('comum.telefone')}
             required
           />
           <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
@@ -899,13 +898,12 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
                 {t('comum.telefone')}
-                <input
-                  type="tel"
-                  name="telefone"
+                <CampoTelefone
                   value={edicaoClienteForm.telefone}
-                  onChange={handleEdicaoClienteInputChange}
+                  onChange={(telefone) => setEdicaoClienteForm(prev => ({ ...prev, telefone }))}
                   required
-                  style={{ width: '100%', padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  estiloSelect={{ padding: '10px 6px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
+                  estiloInput={{ padding: '10px', background: '#1a1a1a', color: '#e8e8e8', border: '1px solid #404040', borderRadius: '4px', fontSize: '14px' }}
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#999' }}>
