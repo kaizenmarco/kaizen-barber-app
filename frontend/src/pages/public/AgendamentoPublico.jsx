@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { supabase } from '../../config/supabaseClientTenant';
+import { obterTokenRecaptcha } from '../../config/recaptcha';
 import {
   paraMinutos,
   paraHHMM,
@@ -1054,8 +1055,9 @@ function AgendamentoPublico() {
     setEnviandoCodigo(true);
     setErroCodigo('');
     try {
+      const captchaToken = await obterTokenRecaptcha('enviar_codigo_email');
       const { data, error } = await supabase.functions.invoke('enviar-codigo-confirmacao', {
-        body: { empresa_id: empresaId, email: dadosAgendamento.email },
+        body: { empresa_id: empresaId, email: dadosAgendamento.email, captcha_token: captchaToken },
       });
       if (error) throw error;
       if (data?.erro) throw new Error(data.erro);
@@ -1080,8 +1082,9 @@ function AgendamentoPublico() {
     setEnviandoCodigo(true);
     setErroCodigo('');
     try {
+      const captchaToken = await obterTokenRecaptcha('enviar_codigo_email');
       const { data, error } = await supabase.functions.invoke('enviar-codigo-confirmacao', {
-        body: { empresa_id: empresaId, email: dadosAgendamento.email },
+        body: { empresa_id: empresaId, email: dadosAgendamento.email, captcha_token: captchaToken },
       });
       if (error) throw error;
       if (data?.erro) throw new Error(data.erro);

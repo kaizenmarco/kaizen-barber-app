@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaWhatsapp, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { supabase } from '../supabaseClient';
+import { obterTokenRecaptcha } from '../config/recaptcha';
 import {
   getSlotsLivresNoDia,
   paraMinutos,
@@ -896,8 +897,9 @@ function ClientePublico() {
   };
 
   const enviarCodigoSms = async (telefone) => {
+    const captchaToken = await obterTokenRecaptcha('enviar_codigo_sms');
     const { data, error } = await supabase.functions.invoke('verificar-telefone', {
-      body: { acao: 'enviar', telefone, idioma },
+      body: { acao: 'enviar', telefone, idioma, captcha_token: captchaToken },
     });
     if (error || !data?.ok) {
       alert('⚠️ ' + mensagemErroSms(data?.erro));
