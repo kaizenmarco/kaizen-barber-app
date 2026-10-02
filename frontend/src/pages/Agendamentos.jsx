@@ -1339,6 +1339,20 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     && agoraMin <= fechamentoMinDia;
   const topLinhaAgora = ((agoraMin - aberturaMinDia) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
 
+  // Faixa de almoço do profissional selecionado (só visual, de fundo): não
+  // ocupa coluna nem impede encaixe/bloqueio — quem tira o almoço dos
+  // horários livres é getSlotsLivresNoDia.
+  const almocoProfSelecionado = horariosAlmoco[abaProfissional] || HORARIO_ALMOCO;
+  const faixaAlmoco = (abertura, fechamento, alturaSlotPx) => {
+    const inicio = Math.max(abertura, paraMinutos(almocoProfSelecionado.inicio));
+    const fim = Math.min(fechamento, paraMinutos(almocoProfSelecionado.fim));
+    if (fim <= inicio) return null;
+    return {
+      top: `${((inicio - abertura) / SLOT_MINUTOS) * alturaSlotPx}px`,
+      height: `${((fim - inicio) / SLOT_MINUTOS) * alturaSlotPx}px`,
+    };
+  };
+
   const diasDaSemanaAtual = obterDiasDaSemana(semanaAncora);
 
   // ---- Visão "Semana": mesma lógica da timeline do Dia, só que com uma
@@ -1485,6 +1499,11 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                     abrirBloqueioRapido(minutosClicados);
                   }}
                 >
+                  {horarioDoDiaSelecionado.aberto && faixaAlmoco(aberturaMinDia, fechamentoMinDia, SLOT_ALTURA_PX) && (
+                    <div className="agenda-timeline-almoco" style={faixaAlmoco(aberturaMinDia, fechamentoMinDia, SLOT_ALTURA_PX)}>
+                      🍽️ {t('agendamentos.almoco')} {almocoProfSelecionado.inicio}–{almocoProfSelecionado.fim}
+                    </div>
+                  )}
                   {itensTimeline.map(item => {
                     const top = ((item.inicioMin - aberturaMinDia) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
                     const altura = ((item.fimMin - item.inicioMin) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
@@ -1598,6 +1617,15 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                       }}
                     >
                       {!col.horarioDoDia.aberto && <span className="agenda-semana-fechado-label">{t('agendamentos.fechado')}</span>}
+                      {col.horarioDoDia.aberto && faixaAlmoco(aberturaMinSemana, fechamentoMinSemana, SLOT_ALTURA_PX_SEMANA) && (
+                        <div
+                          className="agenda-timeline-almoco agenda-semana-almoco"
+                          style={faixaAlmoco(aberturaMinSemana, fechamentoMinSemana, SLOT_ALTURA_PX_SEMANA)}
+                          title={`${t('agendamentos.almoco')} ${almocoProfSelecionado.inicio}–${almocoProfSelecionado.fim}`}
+                        >
+                          🍽️
+                        </div>
+                      )}
 
                       {col.itens.map(item => {
                         const top = ((item.inicioMin - aberturaMinSemana) / SLOT_MINUTOS) * SLOT_ALTURA_PX_SEMANA;
