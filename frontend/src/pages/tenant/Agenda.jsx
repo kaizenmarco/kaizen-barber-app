@@ -1392,6 +1392,29 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
     && agoraMin <= fechamentoMinDia;
   const topLinhaAgora = ((agoraMin - aberturaMinDia) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
 
+  // Faixas de intervalo (vazios ENTRE os blocos de trabalho do dia) — nascem
+  // direto dos blocos configurados (ex.: 09:00-12:00 e 13:00-19:00 → um
+  // intervalo 12:00-13:00, tipicamente o almoço). Só visual, de fundo: não
+  // ocupam coluna nem impedem encaixe/bloqueio. Pode haver zero, um ou
+  // vários intervalos por dia, dependendo de quantos blocos o profissional
+  // tiver configurado (aba "Horário de Trabalho").
+  const faixasIntervalo = (blocos, abertura, fechamento, alturaSlotPx) => {
+    const faixas = [];
+    for (let i = 0; i < blocos.length - 1; i++) {
+      const inicio = Math.max(abertura, blocos[i].fimMin);
+      const fim = Math.min(fechamento, blocos[i + 1].inicioMin);
+      if (fim > inicio) {
+        faixas.push({
+          inicioMin: inicio,
+          fimMin: fim,
+          top: `${((inicio - abertura) / SLOT_MINUTOS) * alturaSlotPx}px`,
+          height: `${((fim - inicio) / SLOT_MINUTOS) * alturaSlotPx}px`,
+        });
+      }
+    }
+    return faixas;
+  };
+
   const diasDaSemanaAtual = obterDiasDaSemana(semanaAncora);
 
   // ---- Visão "Semana": mesma lógica da timeline do Dia, só que com uma
@@ -1546,6 +1569,11 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
                     abrirBloqueioRapido(minutosClicados);
                   }}
                 >
+                  {horarioDoDiaSelecionado.aberto && faixasIntervalo(horarioDoDiaSelecionado.blocos, aberturaMinDia, fechamentoMinDia, SLOT_ALTURA_PX).map(faixa => (
+                    <div key={`almoco-${faixa.inicioMin}`} className="agenda-timeline-almoco" style={{ top: faixa.top, height: faixa.height }}>
+                      🍽️ {t('agendamentos.almoco')} {paraHHMM(faixa.inicioMin)}–{paraHHMM(faixa.fimMin)}
+                    </div>
+                  ))}
                   {itensTimeline.map(item => {
                     const top = ((item.inicioMin - aberturaMinDia) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
                     const altura = ((item.fimMin - item.inicioMin) / SLOT_MINUTOS) * SLOT_ALTURA_PX;
@@ -1659,6 +1687,17 @@ function Agenda({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
                       }}
                     >
                       {!col.horarioDoDia.aberto && <span className="agenda-semana-fechado-label">{t('agendamentos.fechado')}</span>}
+
+                      {col.horarioDoDia.aberto && faixasIntervalo(col.horarioDoDia.blocos, aberturaMinSemana, fechamentoMinSemana, SLOT_ALTURA_PX_SEMANA).map(faixa => (
+                        <div
+                          key={`sm-almoco-${col.dataStr}-${faixa.inicioMin}`}
+                          className="agenda-timeline-almoco agenda-semana-almoco"
+                          style={{ top: faixa.top, height: faixa.height }}
+                          title={`${t('agendamentos.almoco')} ${paraHHMM(faixa.inicioMin)}–${paraHHMM(faixa.fimMin)}`}
+                        >
+                          🍽️
+                        </div>
+                      ))}
 
                       {col.itens.map(item => {
                         const top = ((item.inicioMin - aberturaMinSemana) / SLOT_MINUTOS) * SLOT_ALTURA_PX_SEMANA;
