@@ -701,6 +701,9 @@ function ClientePublico() {
       // tela virou um relatório completo — só perde a opção de cancelar.
       setAgendamentosDoCliente(prev => prev.map(a => (a.id === agendamento.id ? { ...a, status: 'CANCELADO', podeCancelar: false } : a)));
       setAgendamentosLocalDispositivo(prev => prev.map(a => (a.id === agendamento.id ? { ...a, status: 'CANCELADO', podeCancelar: false } : a)));
+      // Libera o horário na hora: sem isso, quem cancela e volta pra aba
+      // Agendar continua vendo o horário como ocupado até recarregar a página.
+      buscarHorariosOcupados();
       return true;
     } catch (error) {
       alert(t('meusAgendamentos_erro_cancelar') + error.message);
