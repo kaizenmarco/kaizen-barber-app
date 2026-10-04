@@ -18,7 +18,7 @@
 // Ou seja: só preencher aqui não é suficiente nem necessário sozinho — os
 // dois lados (site key aqui + secret key no Supabase) precisam estar
 // configurados juntos pra proteção entrar em vigor.
-export const RECAPTCHA_SITE_KEY = '';
+export const RECAPTCHA_SITE_KEY = '6Lfb390tAAAAAJ-2JiCYwTJlDLNCe1WIKM-8YgJv';
 
 let promessaScript = null;
 
