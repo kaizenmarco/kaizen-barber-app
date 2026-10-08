@@ -1152,6 +1152,20 @@ function AgendamentoPublico() {
       lembreteMinutos,
     });
     baixarArquivoICS(conteudo, `agendamento-${agendamentoConfirmado.dataStr}.ics`);
+
+    // O lembrete do calendário do celular só funciona se a pessoa realmente
+    // abrir o arquivo baixado — muito navegador de Android só salva sem abrir
+    // nada. Por isso, além do .ics, guarda a escolha no agendamento pra
+    // também mandar um e-mail de lembrete confiável, direto do servidor.
+    if (agendamentoConfirmado?.id) {
+      supabase
+        .from('agendamentos')
+        .update({ lembrete_minutos_antes: lembreteMinutos })
+        .eq('id', agendamentoConfirmado.id)
+        .then(({ error }) => {
+          if (error) console.error('Erro ao salvar preferência de lembrete:', error);
+        });
+    }
   };
 
   const handleEnviarListaEspera = async (e) => {

@@ -12,6 +12,13 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
   const hoje = new Date();
   const hojeStr = hoje.toISOString().split('T')[0];
 
+  // Antes a tela só mostrava o dia de hoje, então agendamentos de dias
+  // anteriores que não foram "dados baixa" ficavam inacessíveis pra sempre.
+  // Agora dá pra escolher qualquer data pra ver/fechar o que ficou pendente.
+  const [dataSelecionada, setDataSelecionada] = useState(hojeStr);
+  const ehHoje = dataSelecionada === hojeStr;
+  const dataSelecionadaObj = new Date(`${dataSelecionada}T00:00:00`);
+
   const [caixaHoje, setCaixaHoje] = useState(null);
   const [comandasAbertas, setComandasAbertas] = useState([]);
   const [realizadosHoje, setRealizadosHoje] = useState([]);
@@ -37,7 +44,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
     setCarregando(true);
     try {
       const [caixaResp, abertasResp, realizadasResp] = await Promise.all([
-        supabase.from('caixa_dias').select('*').eq('data', hojeStr).maybeSingle(),
+        supabase.from('caixa_dias').select('*').eq('data', dataSelecionada).maybeSingle(),
         supabase
           .from('agendamentos')
           .select(`
@@ -46,8 +53,8 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
           `)
-          .gte('data_hora', `${hojeStr}T00:00:00`)
-          .lte('data_hora', `${hojeStr}T23:59:59`)
+          .gte('data_hora', `${dataSelecionada}T00:00:00`)
+          .lte('data_hora', `${dataSelecionada}T23:59:59`)
           .in('status', ['AGENDADO', 'CONFIRMADO'])
           .order('data_hora', { ascending: true }),
         supabase
@@ -58,8 +65,8 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
           `)
-          .gte('data_hora', `${hojeStr}T00:00:00`)
-          .lte('data_hora', `${hojeStr}T23:59:59`)
+          .gte('data_hora', `${dataSelecionada}T00:00:00`)
+          .lte('data_hora', `${dataSelecionada}T23:59:59`)
           .eq('status', 'REALIZADO')
           .order('data_hora', { ascending: false }),
       ]);
@@ -89,7 +96,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
       setCarregando(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hojeStr]);
+  }, [dataSelecionada]);
 
   useEffect(() => {
     buscarTudo();
@@ -109,7 +116,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
   const registrarNoCaixa = async ({ descricao, valor, profissionalId, agendamentoId }) => {
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
     const { error } = await supabase.from('caixa_movimentacoes').insert([{
-      data: hojeStr,
+      data: dataSelecionada,
       hora,
       tipo: 'entrada',
       descricao,
@@ -121,7 +128,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
   };
 
   const handleFecharComanda = async (item) => {
-    if (!caixaAberto) {
+    if (ehHoje && !caixaAberto) {
       alert(t('comandas.caixaNaoAberto'));
       return;
     }
@@ -163,6 +170,10 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
   const handleAdicionarItem = async (e) => {
     e.preventDefault();
 
+    if (!ehHoje) {
+      alert(t('comandas.avulsoSoHoje'));
+      return;
+    }
     if (!caixaAberto) {
       alert(t('comandas.caixaNaoAbertoAvulso'));
       return;
@@ -229,14 +240,37 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
 
   const totalRealizadoHoje = realizadosHoje.reduce((sum, item) => sum + item.valor, 0);
 
-  const nomeDia = diasNomes[hoje.getDay()];
-  const dia = String(hoje.getDate()).padStart(2, '0');
-  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-  const ano = hoje.getFullYear();
+  const nomeDia = diasNomes[dataSelecionadaObj.getDay()];
+  const dia = String(dataSelecionadaObj.getDate()).padStart(2, '0');
+  const mes = String(dataSelecionadaObj.getMonth() + 1).padStart(2, '0');
+  const ano = dataSelecionadaObj.getFullYear();
+  const rotuloDia = ehHoje ? t('comandas.hoje') : `${dia}/${mes}/${ano}`;
 
   return (
     <div className="page-container">
       <h2>{t('comandas.titulo', { dia: nomeDia, data: `${dia}/${mes}/${ano}` })}</h2>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', margin: '-6px 0 18px' }}>
+        <label style={{ fontSize: '13px', color: '#999' }}>
+          {t('comandas.selecionarData')}{' '}
+          <input
+            type="date"
+            value={dataSelecionada}
+            max={hojeStr}
+            onChange={(e) => setDataSelecionada(e.target.value || hojeStr)}
+            style={{ marginLeft: '6px' }}
+          />
+        </label>
+        {!ehHoje && (
+          <button
+            type="button"
+            onClick={() => setDataSelecionada(hojeStr)}
+            style={{ padding: '6px 14px', background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}
+          >
+            {t('comandas.voltarHoje')}
+          </button>
+        )}
+      </div>
 
       <section className="caixa-status">
         <div className="status-card">
@@ -244,7 +278,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
           <p className={`status ${caixaAberto ? 'aberto' : 'fechado'}`}>
             {caixaAberto ? t('caixa.aberto') : t('caixa.fechado')}
           </p>
-          {!caixaAberto && (
+          {ehHoje && !caixaAberto && (
             <p style={{ fontSize: '13px', color: '#f87171' }}>
               {t('comandas.abraCaixaAviso')}
             </p>
@@ -252,18 +286,18 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         </div>
 
         <div className="status-card">
-          <h3>{t('comandas.totalRealizadoHoje')}</h3>
+          <h3>{t('comandas.totalRealizadoRotulo', { rotulo: rotuloDia })}</h3>
           <p>{t('comandas.atendimentos')} <strong>{realizadosHoje.length}</strong></p>
           <p className="saldo-final">{t('comum.total')}: <strong>¥{totalRealizadoHoje.toLocaleString('ja-JP')}</strong></p>
         </div>
       </section>
 
       <section className="list-section">
-        <h3>{t('comandas.comandasAbertas')}</h3>
+        <h3>{t('comandas.comandasAbertasRotulo', { rotulo: rotuloDia })}</h3>
         {carregando ? (
           <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : comandasAbertas.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>{t('comandas.nenhumaComandaAberta')}</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('comandas.nenhumaComandaAbertaData', { rotulo: rotuloDia })}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
@@ -296,7 +330,13 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         )}
       </section>
 
-      {caixaAberto && (
+      {!ehHoje && (
+        <section className="form-section">
+          <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>{t('comandas.avulsoSoHoje')}</p>
+        </section>
+      )}
+
+      {ehHoje && caixaAberto && (
         <section className="form-section">
           <h3>{t('comandas.lancarAvulso')}</h3>
           <form onSubmit={handleAdicionarItem}>
@@ -344,12 +384,12 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
       )}
 
       <section className="list-section">
-        <h3>{t('comandas.servicosRealizadosHoje')}</h3>
+        <h3>{t('comandas.servicosRealizadosRotulo', { rotulo: rotuloDia })}</h3>
 
         {carregando ? (
           <p style={{ textAlign: 'center', color: '#d4af37' }}>{t('comum.carregando')}</p>
         ) : realizadosHoje.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999' }}>{t('comandas.nenhumRealizadoAinda')}</p>
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('comandas.nenhumRealizadoAindaData', { rotulo: rotuloDia })}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
