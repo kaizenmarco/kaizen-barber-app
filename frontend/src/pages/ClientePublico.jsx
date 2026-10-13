@@ -1593,6 +1593,45 @@ function ClientePublico() {
         </div>
       </header>
 
+      {/* Mostra o último agendamento feito neste aparelho em qualquer aba,
+          assim que o app abre — sem precisar entrar em "Meus Agendamentos"
+          nem digitar e-mail/telefone (Marco: clientes achavam complicado
+          descobrir rápido o dia/hora que tinham marcado). */}
+      {agendamentosLocalDispositivo.length > 0 && (() => {
+        const ultimo = agendamentosLocalDispositivo[0];
+        return (
+          <div
+            onClick={() => setAbaAtiva('meusAgendamentos')}
+            role="button"
+            tabIndex={0}
+            style={{
+              background: '#2d2d2d',
+              borderBottom: '1px solid #d4af37',
+              padding: '10px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              flexWrap: 'wrap',
+              cursor: 'pointer',
+              fontSize: '13px',
+              textAlign: 'center',
+            }}
+          >
+            <span>
+              📅 {t('bannerUltimoAgendamento_texto', {
+                data: new Date(`${ultimo.data}T00:00:00`).toLocaleDateString(localeAtual),
+                hora: ultimo.hora,
+              })}
+            </span>
+            <span style={{ color: corStatusAgendamento(ultimo.status), fontWeight: 'bold', border: `1px solid ${corStatusAgendamento(ultimo.status)}`, borderRadius: '4px', padding: '1px 8px', fontSize: '11px' }}>
+              {rotuloStatusAgendamento(ultimo.status)}
+            </span>
+            <span style={{ color: '#d4af37', textDecoration: 'underline' }}>{t('bannerUltimoAgendamento_verDetalhes')}</span>
+          </div>
+        );
+      })()}
+
       <nav style={{ display: 'flex', gap: '10px', padding: '20px', borderBottom: '1px solid #404040', overflowX: 'auto' }}>
         {[
           { id: 'servicos', label: `💈 ${t('nav_servicos')}` },

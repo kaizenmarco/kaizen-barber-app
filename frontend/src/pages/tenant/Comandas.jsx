@@ -31,6 +31,15 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
   const [realizadosHoje, setRealizadosHoje] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
+  // Toast de sucesso ao dar baixa — substitui o alert() que exigia um
+  // terceiro clique (Marco: "tenho que clicar 3 vezes"). Some sozinho.
+  const [mensagemSucesso, setMensagemSucesso] = useState('');
+  useEffect(() => {
+    if (!mensagemSucesso) return;
+    const timer = setTimeout(() => setMensagemSucesso(''), 2500);
+    return () => clearTimeout(timer);
+  }, [mensagemSucesso]);
+
   // Profissionais e serviços MULTI-TENANT: vêm das tabelas cadastradas nas
   // abas Profissionais/Serviços do painel, como em tenant/Agenda.jsx — sem
   // catálogo fixo e sem restrição de "qual profissional faz qual serviço"
@@ -187,7 +196,7 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
         agendamentoId: item.id,
       });
 
-      alert(t('comandas.fechadaComSucesso'));
+      setMensagemSucesso(t('comandas.fechadaComSucesso'));
       buscarTudo();
     } catch (error) {
       alert(t('comandas.erroFechar', { msg: error.message }));
@@ -277,6 +286,12 @@ function Comandas({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
   return (
     <div className="page-container">
       <h2>{t('comandas.titulo', { dia: nomeDia, data: `${dia}/${mes}/${ano}` })}</h2>
+
+      {mensagemSucesso && (
+        <div style={{ background: '#166534', color: '#fff', padding: '10px 16px', borderRadius: '6px', marginBottom: '14px', fontWeight: 'bold', fontSize: '14px' }}>
+          ✅ {mensagemSucesso}
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', margin: '-6px 0 18px' }}>
         <label style={{ fontSize: '13px', color: '#999' }}>
