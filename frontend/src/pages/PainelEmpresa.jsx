@@ -13,6 +13,7 @@ import HorariosProfissionais from './tenant/HorariosProfissionais';
 import Agenda from './tenant/Agenda';
 import Comandas from './tenant/Comandas';
 import Caixa from './tenant/Caixa';
+import MinhaComissao from './tenant/MinhaComissao';
 
 // Painel administrativo MULTI-TENANT do Kaizen Flow App — Dashboard,
 // Clientes, Fidelidade, Aniversariantes, Profissionais, Serviços, Identidade
@@ -24,18 +25,22 @@ import Caixa from './tenant/Caixa';
 // são sempre do projeto kaizen-saas, isolados por empresa via RLS.
 
 const CHAVES_ABAS = [
-  { key: 'dashboard', labelChave: 'nav.dashboard' },
-  { key: 'clientes', labelChave: 'nav.clientes' },
-  { key: 'fidelidade', labelChave: 'nav.fidelidade' },
-  { key: 'aniversariantes', labelChave: 'nav.aniversariantes' },
-  { key: 'profissionais', labelChave: 'nav.profissionais' },
-  { key: 'servicos', labelChave: 'nav.servicos' },
-  { key: 'visual', labelChave: 'nav.visual' },
-  { key: 'horarios', labelChave: 'nav.horarios' },
-  { key: 'agenda', labelChave: 'nav.agenda' },
-  { key: 'comandas', labelChave: 'nav.comandas' },
-  { key: 'caixa', labelChave: 'nav.caixa' },
+  { key: 'dashboard', labelChave: 'nav.dashboard', admin: true, restrito: false },
+  { key: 'clientes', labelChave: 'nav.clientes', admin: true, restrito: false },
+  { key: 'fidelidade', labelChave: 'nav.fidelidade', admin: true, restrito: false },
+  { key: 'aniversariantes', labelChave: 'nav.aniversariantes', admin: true, restrito: false },
+  { key: 'profissionais', labelChave: 'nav.profissionais', admin: true, restrito: false },
+  { key: 'servicos', labelChave: 'nav.servicos', admin: true, restrito: false },
+  { key: 'visual', labelChave: 'nav.visual', admin: true, restrito: false },
+  { key: 'horarios', labelChave: 'nav.horarios', admin: true, restrito: false },
+  { key: 'agenda', labelChave: 'nav.agenda', admin: true, restrito: true },
+  { key: 'comandas', labelChave: 'nav.comandas', admin: true, restrito: true },
+  { key: 'caixa', labelChave: 'nav.caixa', admin: true, restrito: false },
+  { key: 'minhaComissao', labelChave: 'nav.minhaComissao', admin: false, restrito: true },
 ];
+// Visão do Profissional (2026-10-14): login com role='profissional' só vê
+// Agenda, Comandas e Minha Comissão — igual ao profissional_restrito que já
+// existe no Kaizen Barber Shop (AdminLogin.jsx), replicado aqui pro SaaS.
 
 const estilos = {
   pagina: { minHeight: '100vh', background: '#1a1a1a', color: '#e8e8e8', fontFamily: 'system-ui, sans-serif' },
@@ -172,9 +177,21 @@ function TelaLogin({ idioma, mudarIdioma, t }) {
   );
 }
 
-function PainelPrincipal({ perfil, empresa, aoSair, idioma, mudarIdioma, t }) {
-  const [abaSelecionada, setAbaSelecionada] = useState('dashboard');
+function PainelPrincipal({ perfil, empresa, profissionalId, aoSair, idioma, mudarIdioma, t }) {
   const ABAS = CHAVES_ABAS.map((a) => ({ ...a, label: t(a.labelChave) }));
+  const abasVisiveis = ABAS.filter((a) => (perfil?.role === 'admin' ? a.admin : a.restrito));
+
+  const [abaSelecionada, setAbaSelecionada] = useState(() => abasVisiveis[0]?.key || 'dashboard');
+
+  // Se o papel mudar (ou a aba atual sumir da lista visível), volta pra
+  // primeira disponível — mesma proteção que o AdminLogin.jsx (single-tenant)
+  // já usa pro profissional restrito.
+  useEffect(() => {
+    if (abasVisiveis.length > 0 && !abasVisiveis.some((a) => a.key === abaSelecionada)) {
+      setAbaSelecionada(abasVisiveis[0].key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfil?.role]);
 
   return (
     <div style={estilos.pagina}>
@@ -207,10 +224,11 @@ function PainelPrincipal({ perfil, empresa, aoSair, idioma, mudarIdioma, t }) {
         {abaSelecionada === 'agenda' && <Agenda empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
         {abaSelecionada === 'comandas' && <Comandas empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
         {abaSelecionada === 'caixa' && <Caixa empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
+        {abaSelecionada === 'minhaComissao' && <MinhaComissao empresa={empresa} empresaId={perfil.empresa_id} profissionalId={profissionalId} idioma={idioma} t={t} />}
       </main>
 
       <nav style={estilos.nav}>
-        {ABAS.map((aba) => (
+        {abasVisiveis.map((aba) => (
           <button
             key={aba.key}
             type="button"
@@ -233,6 +251,7 @@ export default function PainelEmpresa() {
   const [session, setSession] = useState(null);
   const [perfil, setPerfil] = useState(null);
   const [empresa, setEmpresa] = useState(null);
+  const [profissionalId, setProfissionalId] = useState(null);
 
   // Idioma: detecta automaticamente pt-BR / en / ja pelo idioma do
   // navegador na primeira visita; depois disso, a escolha manual (seletor
@@ -269,7 +288,7 @@ export default function PainelEmpresa() {
   }, []);
 
   useEffect(() => {
-    if (!session?.user) { setPerfil(null); setEmpresa(null); return; }
+    if (!session?.user) { setPerfil(null); setEmpresa(null); setProfissionalId(null); return; }
 
     let cancelado = false;
     (async () => {
@@ -289,6 +308,20 @@ export default function PainelEmpresa() {
           .maybeSingle();
         if (!cancelado) setEmpresa(empresaData);
       }
+
+      // Visão do Profissional: descobre qual linha de profissionais está
+      // ligada a este login, pra filtrar a própria comissão (Minha
+      // Comissão) sem depender do que o front manda.
+      if (perfilData?.role === 'profissional') {
+        const { data: profissionalData } = await supabaseSaaS
+          .from('profissionais')
+          .select('id')
+          .eq('usuario_id', session.user.id)
+          .maybeSingle();
+        if (!cancelado) setProfissionalId(profissionalData?.id || null);
+      } else if (!cancelado) {
+        setProfissionalId(null);
+      }
     })();
 
     return () => { cancelado = true; };
@@ -304,5 +337,5 @@ export default function PainelEmpresa() {
   if (!perfil.empresa_id) return <TelaAguardandoVinculo email={perfil.email} aoSair={handleSair} t={t} />;
   if (empresa?.status === 'cancelado') return <TelaAssinaturaCancelada empresa={empresa} aoSair={handleSair} t={t} />;
 
-  return <PainelPrincipal perfil={perfil} empresa={empresa} aoSair={handleSair} idioma={idioma} mudarIdioma={mudarIdioma} t={t} />;
+  return <PainelPrincipal perfil={perfil} empresa={empresa} profissionalId={profissionalId} aoSair={handleSair} idioma={idioma} mudarIdioma={mudarIdioma} t={t} />;
 }

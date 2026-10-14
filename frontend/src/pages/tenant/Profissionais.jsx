@@ -43,6 +43,12 @@ function Profissionais({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
   const [arquivoImagem, setArquivoImagem] = useState(null);
   const [trocandoFotoId, setTrocandoFotoId] = useState(null);
 
+  // Visão do Profissional (2026-10-14): convite de login por e-mail —
+  // cria o acesso que o profissional usa pra ver a própria agenda,
+  // comandas e comissão, sem ver o resto do painel.
+  const [emailConvite, setEmailConvite] = useState({});
+  const [convidandoId, setConvidandoId] = useState(null);
+
   const limite = calcularLimite(empresa);
   const limiteAtingido = Number.isFinite(limite) && profissionais.length >= limite;
 
@@ -51,13 +57,38 @@ function Profissionais({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleConvidarLogin = async (profissional) => {
+    const email = (emailConvite[profissional.id] || '').trim();
+    if (!email || !email.includes('@')) {
+      alert(t('profissionaisEmpresa.emailInvalido'));
+      return;
+    }
+    if (!window.confirm(t('profissionaisEmpresa.confirmarConvite', { nome: profissional.nome, email }))) return;
+
+    setConvidandoId(profissional.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('convidar-profissional-login', {
+        body: { profissional_id: profissional.id, email },
+      });
+      if (error) throw error;
+      if (data?.erro) throw new Error(data.erro);
+
+      alert(t('profissionaisEmpresa.conviteEnviado', { email }));
+      buscarProfissionais();
+    } catch (e) {
+      alert(`${t('profissionaisEmpresa.erroConvite')}${e.message}`);
+    } finally {
+      setConvidandoId(null);
+    }
+  };
+
   const buscarProfissionais = async () => {
     setCarregando(true);
     setErro('');
     try {
       const { data, error } = await supabase
         .from('profissionais')
-        .select('id, nome, telefone, comissao_percentual, imagem_url, criado_em')
+        .select('id, nome, telefone, comissao_percentual, imagem_url, criado_em, usuario_id, email')
         .eq('empresa_id', empresaId)
         .order('criado_em', { ascending: false });
       if (error) throw error;
@@ -221,6 +252,7 @@ function Profissionais({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
                   <th>{t('comum.nome')}</th>
                   <th>{t('comum.telefone')}</th>
                   <th>{t('profissionaisEmpresa.colComissao')}</th>
+                  <th>{t('profissionaisEmpresa.colLogin')}</th>
                   <th>{t('comum.acao')}</th>
                 </tr>
               </thead>
@@ -252,6 +284,30 @@ function Profissionais({ t: tProp, idioma: idiomaProp, empresa, empresaId }) {
                     <td style={{ fontWeight: 'bold' }}>{p.nome}</td>
                     <td>{p.telefone || '-'}</td>
                     <td>{p.comissao_percentual != null ? `${p.comissao_percentual}%` : '-'}</td>
+                    <td>
+                      {p.usuario_id ? (
+                        <span style={{ color: '#4ade80', fontSize: '12px' }}>✅ {p.email || t('profissionaisEmpresa.loginAtivo')}</span>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', minWidth: '180px' }}>
+                          <input
+                            type="email"
+                            placeholder={t('profissionaisEmpresa.emailPlaceholder')}
+                            value={emailConvite[p.id] || ''}
+                            onChange={(e) => setEmailConvite(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            style={{ padding: '6px', fontSize: '12px', flex: 1, minWidth: '140px' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            disabled={convidandoId === p.id}
+                            onClick={() => handleConvidarLogin(p)}
+                            style={{ fontSize: '12px', padding: '6px 10px' }}
+                          >
+                            {convidandoId === p.id ? t('comum.enviando') : t('profissionaisEmpresa.convidarBtn')}
+                          </button>
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <button className="btn-delete" onClick={() => handleDeletar(p.id)}>
                         🗑️ {t('comum.remover')}
