@@ -14,6 +14,7 @@ import Agenda from './tenant/Agenda';
 import Comandas from './tenant/Comandas';
 import Caixa from './tenant/Caixa';
 import MinhaComissao from './tenant/MinhaComissao';
+import ClientesAusentes from './tenant/ClientesAusentes';
 
 // Painel administrativo MULTI-TENANT do Kaizen Flow App — Dashboard,
 // Clientes, Fidelidade, Aniversariantes, Profissionais, Serviços, Identidade
@@ -37,6 +38,7 @@ const CHAVES_ABAS = [
   { key: 'comandas', labelChave: 'nav.comandas', admin: true, restrito: true },
   { key: 'caixa', labelChave: 'nav.caixa', admin: true, restrito: false },
   { key: 'minhaComissao', labelChave: 'nav.minhaComissao', admin: false, restrito: true },
+  { key: 'clientesAusentes', labelChave: 'nav.clientesAusentes', admin: true, restrito: false },
 ];
 // Visão do Profissional (2026-10-14): login com role='profissional' só vê
 // Agenda, Comandas e Minha Comissão — igual ao profissional_restrito que já
@@ -225,6 +227,7 @@ function PainelPrincipal({ perfil, empresa, profissionalId, aoSair, idioma, muda
         {abaSelecionada === 'comandas' && <Comandas empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
         {abaSelecionada === 'caixa' && <Caixa empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
         {abaSelecionada === 'minhaComissao' && <MinhaComissao empresa={empresa} empresaId={perfil.empresa_id} profissionalId={profissionalId} idioma={idioma} t={t} />}
+        {abaSelecionada === 'clientesAusentes' && <ClientesAusentes empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
       </main>
 
       <nav style={estilos.nav}>
