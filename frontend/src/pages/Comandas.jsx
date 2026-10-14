@@ -57,7 +57,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         supabase
           .from('agendamentos')
           .select(`
-            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final,
+            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final, elegivel_desconto_recorrencia,
             clientes(id, nome),
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
@@ -69,7 +69,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         supabase
           .from('agendamentos')
           .select(`
-            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final,
+            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final, elegivel_desconto_recorrencia,
             clientes(id, nome),
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
@@ -94,6 +94,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         profissional: a.profissionais?.nome || 'N/A',
         valor: a.preco_final || 0,
         hora: a.data_hora?.split('T')[1]?.substring(0, 5) || '',
+        elegivelDescontoRecorrencia: !!a.elegivel_desconto_recorrencia,
       });
 
       setCaixaHoje(caixaResp.data);
@@ -143,9 +144,12 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
     }
 
     const servicoInfo = SERVICOS.find(s => s.uuid === item.servicoId);
-    const sugestao = item.valor > 0 ? item.valor : (servicoInfo?.preco ?? 0);
+    const sugestaoCheia = item.valor > 0 ? item.valor : (servicoInfo?.preco ?? 0);
+    const sugestao = item.elegivelDescontoRecorrencia
+      ? Math.round(sugestaoCheia * 0.85 * 100) / 100
+      : sugestaoCheia;
     const valorStr = window.prompt(
-      t('comandas.fecharPrompt', { servico: item.servico, cliente: item.cliente, profissional: item.profissional }),
+      t(item.elegivelDescontoRecorrencia ? 'comandas.fecharPromptComDesconto' : 'comandas.fecharPrompt', { servico: item.servico, cliente: item.cliente, profissional: item.profissional }),
       String(sugestao)
     );
     if (valorStr === null) return;
@@ -158,7 +162,11 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
     try {
       const { error: erroUpdate } = await supabase
         .from('agendamentos')
-        .update({ status: 'REALIZADO', preco_final: valor })
+        .update({
+          status: 'REALIZADO',
+          preco_final: valor,
+          ...(item.elegivelDescontoRecorrencia ? { observacoes: '[DESCONTO RECORRÊNCIA 15%]' } : {}),
+        })
         .eq('id', item.id);
       if (erroUpdate) throw erroUpdate;
 
@@ -329,7 +337,14 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
                 {comandasAbertas.map((item) => (
                   <tr key={item.id}>
                     <td>{item.hora}</td>
-                    <td>{item.cliente}</td>
+                    <td>
+                      {item.cliente}
+                      {item.elegivelDescontoRecorrencia && (
+                        <span title={t('comandas.descontoRecorrenciaBadge')} style={{ marginLeft: '6px', color: '#4ade80', fontSize: '11px', fontWeight: 'bold' }}>
+                          💰 -15%
+                        </span>
+                      )}
+                    </td>
                     <td>{item.servico}</td>
                     <td>{item.profissional}</td>
                     <td>
@@ -421,7 +436,14 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
                 {realizadosHoje.map((item) => (
                   <tr key={item.id}>
                     <td>{item.hora}</td>
-                    <td>{item.cliente}</td>
+                    <td>
+                      {item.cliente}
+                      {item.elegivelDescontoRecorrencia && (
+                        <span title={t('comandas.descontoRecorrenciaBadge')} style={{ marginLeft: '6px', color: '#4ade80', fontSize: '11px', fontWeight: 'bold' }}>
+                          💰 -15%
+                        </span>
+                      )}
+                    </td>
                     <td>{item.servico}</td>
                     <td>{item.profissional}</td>
                     <td style={{ fontWeight: 'bold', color: '#d4af37' }}>¥{item.valor.toLocaleString('ja-JP')}</td>
