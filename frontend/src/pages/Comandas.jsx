@@ -57,7 +57,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         supabase
           .from('agendamentos')
           .select(`
-            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final, elegivel_desconto_recorrencia,
+            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final, elegivel_desconto_recorrencia, origem_pagamento,
             clientes(id, nome),
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
@@ -69,7 +69,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         supabase
           .from('agendamentos')
           .select(`
-            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final, elegivel_desconto_recorrencia,
+            id, cliente_id, profissional_id, servico_id, data_hora, status, preco_final, elegivel_desconto_recorrencia, origem_pagamento,
             clientes(id, nome),
             profissionais:profissional_id(id, nome),
             servicos:servico_id(id, nome)
@@ -95,6 +95,7 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         valor: a.preco_final || 0,
         hora: a.data_hora?.split('T')[1]?.substring(0, 5) || '',
         elegivelDescontoRecorrencia: !!a.elegivel_desconto_recorrencia,
+        origemPagamento: a.origem_pagamento || 'avulso',
       });
 
       setCaixaHoje(caixaResp.data);
@@ -145,11 +146,19 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
 
     const servicoInfo = SERVICOS.find(s => s.uuid === item.servicoId);
     const sugestaoCheia = item.valor > 0 ? item.valor : (servicoInfo?.preco ?? 0);
-    const sugestao = item.elegivelDescontoRecorrencia
-      ? Math.round(sugestaoCheia * 0.85 * 100) / 100
-      : sugestaoCheia;
+    const coberturaAssinatura = item.origemPagamento === 'assinatura';
+    const sugestao = coberturaAssinatura
+      ? 0
+      : item.elegivelDescontoRecorrencia
+        ? Math.round(sugestaoCheia * 0.85 * 100) / 100
+        : sugestaoCheia;
+    const chavePrompt = coberturaAssinatura
+      ? 'comandas.fecharPromptAssinatura'
+      : item.elegivelDescontoRecorrencia
+        ? 'comandas.fecharPromptComDesconto'
+        : 'comandas.fecharPrompt';
     const valorStr = window.prompt(
-      t(item.elegivelDescontoRecorrencia ? 'comandas.fecharPromptComDesconto' : 'comandas.fecharPrompt', { servico: item.servico, cliente: item.cliente, profissional: item.profissional }),
+      t(chavePrompt, { servico: item.servico, cliente: item.cliente, profissional: item.profissional }),
       String(sugestao)
     );
     if (valorStr === null) return;
@@ -165,7 +174,11 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
         .update({
           status: 'REALIZADO',
           preco_final: valor,
-          ...(item.elegivelDescontoRecorrencia ? { observacoes: '[DESCONTO RECORRÊNCIA 15%]' } : {}),
+          ...(coberturaAssinatura
+            ? { observacoes: '[COBERTO POR ASSINATURA]' }
+            : item.elegivelDescontoRecorrencia
+              ? { observacoes: '[DESCONTO RECORRÊNCIA 15%]' }
+              : {}),
         })
         .eq('id', item.id);
       if (erroUpdate) throw erroUpdate;
@@ -339,7 +352,11 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
                     <td>{item.hora}</td>
                     <td>
                       {item.cliente}
-                      {item.elegivelDescontoRecorrencia && (
+                      {item.origemPagamento === 'assinatura' ? (
+                        <span title={t('comandas.coberturaAssinaturaBadge')} style={{ marginLeft: '6px', color: '#60a5fa', fontSize: '11px', fontWeight: 'bold' }}>
+                          💳 {t('comandas.assinaturaBadgeTexto')}
+                        </span>
+                      ) : item.elegivelDescontoRecorrencia && (
                         <span title={t('comandas.descontoRecorrenciaBadge')} style={{ marginLeft: '6px', color: '#4ade80', fontSize: '11px', fontWeight: 'bold' }}>
                           💰 -15%
                         </span>
@@ -438,7 +455,11 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
                     <td>{item.hora}</td>
                     <td>
                       {item.cliente}
-                      {item.elegivelDescontoRecorrencia && (
+                      {item.origemPagamento === 'assinatura' ? (
+                        <span title={t('comandas.coberturaAssinaturaBadge')} style={{ marginLeft: '6px', color: '#60a5fa', fontSize: '11px', fontWeight: 'bold' }}>
+                          💳 {t('comandas.assinaturaBadgeTexto')}
+                        </span>
+                      ) : item.elegivelDescontoRecorrencia && (
                         <span title={t('comandas.descontoRecorrenciaBadge')} style={{ marginLeft: '6px', color: '#4ade80', fontSize: '11px', fontWeight: 'bold' }}>
                           💰 -15%
                         </span>

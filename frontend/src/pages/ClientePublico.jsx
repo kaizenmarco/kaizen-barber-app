@@ -227,7 +227,7 @@ function ClientePublico() {
   // Permite abrir o site direto numa aba específica via link/QR code, ex:
   // app.kaizenbarbershop.com/?aba=agendar — usado no QR code impresso na
   // barbearia, pra cair direto na tela de agendar em vez da de serviços.
-  const ABAS_VALIDAS = ['servicos', 'agendar', 'meusAgendamentos', 'endereco', 'profissionais', 'fidelidade', 'avaliacoes'];
+  const ABAS_VALIDAS = ['servicos', 'agendar', 'meusAgendamentos', 'endereco', 'profissionais', 'fidelidade', 'assinatura', 'avaliacoes'];
   const [abaAtiva, setAbaAtiva] = useState(() => {
     if (typeof window === 'undefined') return 'servicos';
     const abaUrl = new URLSearchParams(window.location.search).get('aba');
@@ -273,6 +273,15 @@ function ClientePublico() {
   const [consultandoAgendamentos, setConsultandoAgendamentos] = useState(false);
   const [consultaAgendamentosFeita, setConsultaAgendamentosFeita] = useState(false);
   const [cancelandoId, setCancelandoId] = useState(null);
+
+  const [emailConsultaAssinatura, setEmailConsultaAssinatura] = useState('');
+  const [telefoneConsultaAssinatura, setTelefoneConsultaAssinatura] = useState('');
+  const [clienteAssinaturaId, setClienteAssinaturaId] = useState(null);
+  const [assinaturaAtual, setAssinaturaAtual] = useState(null);
+  const [consultandoAssinatura, setConsultandoAssinatura] = useState(false);
+  const [consultaAssinaturaFeita, setConsultaAssinaturaFeita] = useState(false);
+  const [assinandoPlanoId, setAssinandoPlanoId] = useState(null);
+  const [cancelandoAssinatura, setCancelandoAssinatura] = useState(false);
 
   // Agendamentos feitos NESTE aparelho/navegador (guardados só o id, no
   // localStorage) — permite achar e cancelar sem precisar digitar e-mail e
@@ -326,6 +335,25 @@ function ClientePublico() {
   const [pacotes, setPacotes] = useState([]);
   useEffect(() => {
     buscarPacotesAtivos().then(setPacotes);
+  }, []);
+
+  // Planos de assinatura recorrente cadastrados pelo Admin em "Planos".
+  // Só os ativos (ver policy publico_le_planos) aparecem aqui.
+  const [planosAssinatura, setPlanosAssinatura] = useState([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('planos_assinatura')
+        .select('id, nome, descricao, preco, planos_assinatura_servicos(servico_id)')
+        .order('preco');
+      setPlanosAssinatura((data || []).map(p => ({
+        id: p.id,
+        nome: p.nome,
+        descricao: p.descricao || '',
+        preco: Number(p.preco),
+        servicoIds: (p.planos_assinatura_servicos || []).map(s => s.servico_id),
+      })));
+    })();
   }, []);
 
   // Promoções cadastradas pelo Admin em Cadastros > Promoções (pausável a
@@ -625,6 +653,103 @@ function ClientePublico() {
       setAgendamentosDoCliente([]);
     } finally {
       setConsultandoAgendamentos(false);
+    }
+  };
+
+  // Mesma lógica de identificação (e-mail + telefone) usada em "Meus
+  // Agendamentos", só que pra consultar/gerenciar a assinatura recorrente
+  // do cliente, sem precisar de login.
+  const buscarAssinaturaCliente = async (emailParam, telefoneParam) => {
+    const email = (emailParam || emailConsultaAssinatura || '').trim();
+    const telefoneAlvo = normalizarTelefoneParaComparar(telefoneParam || telefoneConsultaAssinatura);
+    if (!email || !telefoneAlvo) return;
+    setConsultandoAssinatura(true);
+    try {
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('id, telefone')
+        .ilike('email', email);
+
+      const encontrado = (clientes || []).find(c => normalizarTelefoneParaComparar(c.telefone) === telefoneAlvo);
+
+      if (!encontrado) {
+        setClienteAssinaturaId(null);
+        setAssinaturaAtual(null);
+        return;
+      }
+
+      setClienteAssinaturaId(encontrado.id);
+
+      const { data: assinaturas, error } = await supabase
+        .from('assinaturas_clientes')
+        .select('id, plano_id, status, metodo_pagamento, proxima_cobranca, cancelada_em, planos_assinatura(nome, preco)')
+        .eq('cliente_id', encontrado.id)
+        .order('criado_em', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      setAssinaturaAtual((assinaturas && assinaturas[0]) || null);
+    } catch (error) {
+      console.error('Erro ao buscar assinatura do cliente:', error);
+      setAssinaturaAtual(null);
+    } finally {
+      setConsultandoAssinatura(false);
+    }
+  };
+
+  // Extrai a mensagem de erro específica que a edge function devolveu no
+  // corpo da resposta (quando o status não é 2xx, o supabase-js só expõe
+  // uma mensagem genérica em error.message — o corpo real fica em
+  // error.context, que é o Response original).
+  const mensagemErroFuncao = async (error, fallback) => {
+    try {
+      const corpo = await error?.context?.json();
+      return corpo?.erro || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const handleAssinarPlano = async (planoId) => {
+    if (!clienteAssinaturaId) {
+      alert('⚠️ ' + t('assinatura_identifiqueSePrimeiro'));
+      return;
+    }
+    setAssinandoPlanoId(planoId);
+    try {
+      const { data, error } = await supabase.functions.invoke('criar-checkout-assinatura', {
+        body: { cliente_id: clienteAssinaturaId, email: emailConsultaAssinatura.trim(), plano_id: planoId },
+      });
+      if (error || !data?.checkout_url) {
+        alert('⚠️ ' + (await mensagemErroFuncao(error, t('assinatura_erroCheckout'))));
+        return;
+      }
+      window.location.href = data.checkout_url;
+    } catch (error) {
+      alert('⚠️ ' + t('assinatura_erroCheckout'));
+    } finally {
+      setAssinandoPlanoId(null);
+    }
+  };
+
+  const handleCancelarAssinatura = async () => {
+    if (!assinaturaAtual || !clienteAssinaturaId) return;
+    if (!window.confirm(t('assinatura_confirmarCancelamento'))) return;
+    setCancelandoAssinatura(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('cancelar-assinatura', {
+        body: { assinatura_id: assinaturaAtual.id, cliente_id: clienteAssinaturaId, email: emailConsultaAssinatura.trim() },
+      });
+      if (error || !data?.ok) {
+        alert('⚠️ ' + (await mensagemErroFuncao(error, t('assinatura_erroCancelar'))));
+        return;
+      }
+      alert(t('assinatura_canceladaSucesso'));
+      await buscarAssinaturaCliente(emailConsultaAssinatura, telefoneConsultaAssinatura);
+    } catch (error) {
+      alert('⚠️ ' + t('assinatura_erroCancelar'));
+    } finally {
+      setCancelandoAssinatura(false);
     }
   };
 
@@ -1641,6 +1766,7 @@ function ClientePublico() {
           { id: 'endereco', label: `📍 ${t('nav_endereco')}` },
           { id: 'profissionais', label: `👥 ${t('nav_profissionais')}` },
           { id: 'fidelidade', label: `🎁 ${t('nav_fidelidade')}` },
+          { id: 'assinatura', label: `💳 ${t('nav_assinatura')}` },
           { id: 'avaliacoes', label: `★ ${t('nav_avaliacoes')}` },
         ].map((aba) => (
           <button
@@ -2269,6 +2395,103 @@ function ClientePublico() {
                   ) : (
                     <p style={{ color: '#999' }}>{t('fidelidade_faltam', { n: 10 - pontosCliente })}</p>
                   )}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {abaAtiva === 'assinatura' && (
+          <section>
+            <h2 style={{ color: '#d4af37' }}>💳 {t('assinatura_titulo')}</h2>
+
+            <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '20px' }}>
+              <p style={{ color: '#999', fontSize: '12px', margin: '0 0 10px' }}>{t('assinatura_identificacaoAviso')}</p>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <input
+                  type="email"
+                  placeholder={t('fidelidade_email_placeholder')}
+                  value={emailConsultaAssinatura}
+                  onChange={(e) => setEmailConsultaAssinatura(e.target.value)}
+                  style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
+                />
+                <input
+                  type="tel"
+                  placeholder={t('fidelidade_telefone_placeholder')}
+                  value={telefoneConsultaAssinatura}
+                  onChange={(e) => setTelefoneConsultaAssinatura(e.target.value)}
+                  style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
+                />
+                <button
+                  onClick={async () => { await buscarAssinaturaCliente(emailConsultaAssinatura, telefoneConsultaAssinatura); setConsultaAssinaturaFeita(true); }}
+                  disabled={!emailConsultaAssinatura.includes('@') || telefoneConsultaAssinatura.replace(/\D/g, '').length < 8 || consultandoAssinatura}
+                  style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: consultandoAssinatura ? 'wait' : 'pointer' }}
+                >
+                  {consultandoAssinatura ? '⏳' : t('fidelidade_consultar_botao')}
+                </button>
+              </div>
+            </div>
+
+            {consultaAssinaturaFeita && !consultandoAssinatura && !clienteAssinaturaId && (
+              <p style={{ color: '#f87171', maxWidth: '600px' }}>{t('assinatura_clienteNaoEncontrado')}</p>
+            )}
+
+            {clienteAssinaturaId && assinaturaAtual && assinaturaAtual.status !== 'cancelada' && (
+              <div style={{ background: '#2d2d2d', border: '1px solid #4ade80', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '26px' }}>
+                <h3 style={{ color: '#4ade80', marginTop: 0 }}>{t('assinatura_suaAssinatura')}</h3>
+                <p>{t('assinatura_planoAtual')} <strong style={{ color: '#d4af37' }}>{assinaturaAtual.planos_assinatura?.nome}</strong></p>
+                <p>{t('assinatura_statusLabel')} <strong>{t(`assinatura_status_${assinaturaAtual.status}`)}</strong></p>
+                {assinaturaAtual.proxima_cobranca && (
+                  <p>{t('assinatura_proximaCobranca')} {new Date(`${assinaturaAtual.proxima_cobranca}T00:00:00`).toLocaleDateString(localeAtual)}</p>
+                )}
+                <button
+                  onClick={handleCancelarAssinatura}
+                  disabled={cancelandoAssinatura}
+                  style={{ background: 'transparent', border: '1px solid #f87171', color: '#f87171', padding: '10px 18px', borderRadius: '4px', fontWeight: 'bold', cursor: cancelandoAssinatura ? 'wait' : 'pointer', marginTop: '10px' }}
+                >
+                  {cancelandoAssinatura ? '⏳' : t('assinatura_cancelarBotao')}
+                </button>
+              </div>
+            )}
+
+            <div style={{ maxWidth: '600px' }}>
+              <h3 style={{ color: '#d4af37', fontSize: '15px', marginBottom: '4px' }}>{t('assinatura_planosDisponiveis')}</h3>
+              {!clienteAssinaturaId && (
+                <p style={{ color: '#999', fontSize: '12px', margin: '0 0 12px' }}>{t('assinatura_identifiqueSePrimeiro')}</p>
+              )}
+              {planosAssinatura.length === 0 ? (
+                <p style={{ color: '#999' }}>{t('assinatura_semPlanos')}</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {planosAssinatura.map(plano => {
+                    const nomesServicos = plano.servicoIds.map(id => servicos.find(s => s.id === id)?.nome).filter(Boolean).join(', ');
+                    const podeAssinar = !!clienteAssinaturaId && (!assinaturaAtual || assinaturaAtual.status === 'cancelada');
+                    return (
+                      <div key={plano.id} style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '18px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
+                          <div>
+                            <strong style={{ color: '#e8e8e8', fontSize: '16px' }}>{plano.nome}</strong>
+                            {plano.descricao && <p style={{ color: '#999', fontSize: '13px', margin: '6px 0 0' }}>{plano.descricao}</p>}
+                            <p style={{ color: '#999', fontSize: '12px', margin: '6px 0 0' }}>{t('assinatura_servicosInclusos')}: {nomesServicos || '-'}</p>
+                          </div>
+                          <strong style={{ color: '#d4af37', fontSize: '18px', whiteSpace: 'nowrap' }}>¥{plano.preco.toLocaleString('ja-JP')}{t('assinatura_porMes')}</strong>
+                        </div>
+                        <button
+                          onClick={() => handleAssinarPlano(plano.id)}
+                          disabled={!podeAssinar || assinandoPlanoId === plano.id}
+                          style={{
+                            marginTop: '14px', width: '100%', padding: '12px',
+                            background: podeAssinar ? '#d4af37' : '#404040',
+                            color: podeAssinar ? '#1a1a1a' : '#777',
+                            border: 'none', borderRadius: '6px', fontWeight: 'bold',
+                            cursor: !podeAssinar ? 'not-allowed' : (assinandoPlanoId === plano.id ? 'wait' : 'pointer')
+                          }}
+                        >
+                          {assinandoPlanoId === plano.id ? '⏳' : t('assinatura_assinarBotao')}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
