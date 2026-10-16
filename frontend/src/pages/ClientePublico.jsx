@@ -246,6 +246,9 @@ function ClientePublico() {
   const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [observacoesCliente, setObservacoesCliente] = useState('');
+  // Nome de quem vai ser atendido, quando não é a própria pessoa do cadastro
+  // (mãe marcando pro filho, tio pro sobrinho...). Vai nas observações.
+  const [nomeAtendido, setNomeAtendido] = useState('');
 
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
   const [mesCalendario, setMesCalendario] = useState(() => {
@@ -1167,18 +1170,17 @@ function ClientePublico() {
         }
       }
 
-      // Trava de segurança: a checagem de horário livre (getHorariosProfissional)
-      // só olha se AQUELE profissional está livre — nada impedia o mesmo
-      // cliente de ficar marcado duas vezes ao mesmo tempo com profissionais
-      // diferentes (foi o que aconteceu e gerou um agendamento duplicado).
-      // Aqui verificamos se esse cliente já tem algum outro compromisso não
-      // cancelado que colida com o horário novo, em qualquer profissional.
+      // O mesmo cadastro pode ter horários ao mesmo tempo com profissionais
+      // diferentes (família: mãe com a Neia, filho com o Marco). Mas como já
+      // houve duplicado por engano, quando colide com um horário que essa
+      // pessoa já tem, exige o nome de quem vai ser atendido. O limite de
+      // horários por cadastro fica no banco (exigir_telefone_verificado).
       const inicioNovoMin = paraMinutos(dadosAgendamento.hora);
       const fimNovoMin = inicioNovoMin + duracaoSelecionada;
 
       const { data: agendamentosDoDiaCliente, error: erroConflito } = await supabase
         .from('agendamentos')
-        .select('data_hora, servico_id')
+        .select('data_hora, servico_id, duracao_minutos_manual')
         .eq('cliente_id', clienteId)
         .neq('status', 'CANCELADO')
         .gte('data_hora', `${dadosAgendamento.data}T00:00:00`)
@@ -1190,13 +1192,13 @@ function ClientePublico() {
         const horaExistente = a.data_hora.split('T')[1]?.substring(0, 5);
         const inicioExistenteMin = paraMinutos(horaExistente);
         const servicoExistente = servicos.find(s => s.uuid === a.servico_id);
-        const duracaoExistente = servicoExistente ? servicoExistente.duracaoMinutos : 60;
+        const duracaoExistente = a.duracao_minutos_manual || (servicoExistente ? servicoExistente.duracaoMinutos : 60);
         const fimExistenteMin = inicioExistenteMin + duracaoExistente;
         return inicioNovoMin < fimExistenteMin && fimNovoMin > inicioExistenteMin;
       });
 
-      if (temConflito) {
-        alert('⚠️ ' + t('alerta_cliente_ja_tem_horario'));
+      if (temConflito && !nomeAtendido.trim()) {
+        alert('⚠️ ' + t('alerta_mesmo_horario_outra_pessoa'));
         setCarregando(false);
         return;
       }
@@ -1208,6 +1210,7 @@ function ClientePublico() {
       const promoAplicada = promocaoDoAgendamentoAtual();
 
       const notas = [
+        nomeAtendido.trim() ? `Atendimento para: ${nomeAtendido.trim()}` : null,
         promoAplicada ? `Promoção aplicada: ${promoAplicada.nome}` : null,
         (!promoAplicada && usarPontos) ? 'Desconto de pontos de fidelidade aplicado (-¥500)' : null,
         observacoesCliente ? `Observação do cliente: ${observacoesCliente}` : null,
@@ -1240,6 +1243,16 @@ function ClientePublico() {
       }
       if (error?.message?.includes('CLIENTE_BLOQUEADO')) {
         alert('⚠️ ' + t('alerta_cliente_bloqueado'));
+        return;
+      }
+      // Limites por cadastro (contra robô/brincadeira) — ver migração
+      // limite_agendamentos_publicos e limitar_agendamentos_sequenciais_anonimo.
+      if (error?.message?.includes('LIMITE_AGENDAMENTOS_FUTUROS')) {
+        alert('⚠️ ' + t('alerta_limite_agendamentos_futuros'));
+        return;
+      }
+      if (error?.message?.includes('LIMITE_AGENDAMENTOS_DIA') || error?.message?.includes('MUITOS_AGENDAMENTOS_SEGUIDOS')) {
+        alert('⚠️ ' + t('alerta_limite_agendamentos_dia'));
         return;
       }
       if (error) throw error;
@@ -1276,6 +1289,7 @@ function ClientePublico() {
       setDadosAgendamento({ nome: '', email: '', telefone: '', dataNascimento: '', profissional: '', hora: '', servico: '', data: '' });
       setUsarPontos(false);
       setObservacoesCliente('');
+      setNomeAtendido('');
       setPontosCliente(0);
       setDiaHorarioSelecionado(null);
 
@@ -2627,6 +2641,14 @@ function ClientePublico() {
               {t('modal_data_nascimento_placeholder')}
             </label>
             <input type="date" value={dadosAgendamento.dataNascimento} onChange={(e) => setDadosAgendamento({...dadosAgendamento, dataNascimento: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
+            <input
+              type="text"
+              placeholder={t('modal_nome_atendido_placeholder')}
+              value={nomeAtendido}
+              onChange={(e) => setNomeAtendido(e.target.value)}
+              maxLength={60}
+              style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
+            />
             <textarea
               placeholder={t('modal_obs_placeholder')}
               value={observacoesCliente}
