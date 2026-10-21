@@ -7,6 +7,8 @@ import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, buscarHorario
 // aceita aspas e vírgulas dentro de campos (padrão RFC4180 básico). O
 // cabeçalho é comparado de forma tolerante (sem acento, minúsculo, espaços
 // viram "_"), então "Telefone", "telefone" ou "Celular" são todos aceitos.
+// Aceita também o CSV do Excel em português (separado por ";", datas
+// dd/mm/aaaa e codificação Windows-1252).
 const ALIASES_COLUNA_IMPORTACAO = {
   nome: ['nome', 'name', 'cliente'],
   telefone: ['telefone', 'telephone', 'phone', 'celular', 'whatsapp', 'fone'],
@@ -25,7 +27,40 @@ function normalizarTelefoneImportacao(valor) {
   return (valor || '').replace(/\D/g, '');
 }
 
+// Datas no CSV podem vir como AAAA-MM-DD (modelo) ou dd/mm/aaaa (Excel e
+// Google Planilhas em português). Devolve AAAA-MM-DD, '' se vazio e null se
+// não der pra entender (aí o cliente entra sem essa data).
+function normalizarDataImportacao(valor) {
+  const texto = (valor || '').trim();
+  if (!texto) return '';
+  let ano;
+  let mes;
+  let dia;
+  let partes = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (partes) {
+    [, ano, mes, dia] = partes;
+  } else {
+    partes = texto.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+    if (!partes) return null;
+    [, dia, mes, ano] = partes;
+  }
+  const data = new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+  if (data.getUTCFullYear() !== Number(ano) || data.getUTCMonth() !== Number(mes) - 1 || data.getUTCDate() !== Number(dia)) {
+    return null;
+  }
+  return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
+// O Excel em português salva o CSV com ";" no lugar de "," — o separador é
+// escolhido pelo que aparece mais na linha de cabeçalho.
+function detectarSeparadorCsv(texto) {
+  const cabecalho = String(texto || '').split(/\r\n|\n|\r/)[0];
+  const contar = (separador) => cabecalho.split(separador).length - 1;
+  return contar(';') > contar(',') ? ';' : ',';
+}
+
 function analisarCsvImportacao(texto) {
+  const separador = detectarSeparadorCsv(texto);
   const linhas = [];
   let linhaAtual = [];
   let campoAtual = '';
@@ -42,7 +77,7 @@ function analisarCsvImportacao(texto) {
       }
     } else if (c === '"') {
       dentroAspas = true;
-    } else if (c === ',') {
+    } else if (c === separador) {
       linhaAtual.push(campoAtual);
       campoAtual = '';
     } else if (c === '\n') {
@@ -372,7 +407,15 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
     setPreviewImportacao(null);
 
     const leitor = new FileReader();
+    let releuWindows1252 = false;
     leitor.onload = (evento) => {
+      // "CSV (separado por ;)" do Excel vem em Windows-1252, não UTF-8: se a
+      // leitura trouxer caracteres inválidos, relê o arquivo nessa codificação.
+      if (!releuWindows1252 && evento.target.result.includes('\uFFFD')) {
+        releuWindows1252 = true;
+        leitor.readAsText(arquivo, 'windows-1252');
+        return;
+      }
       try {
         const linhas = analisarCsvImportacao(evento.target.result);
         if (linhas.length < 2) {
@@ -401,6 +444,8 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
         const validos = [];
         let duplicados = 0;
         let semNomeOuTelefone = 0;
+        let datasNaoReconhecidas = 0;
+        const hoje = new Date().toISOString().split('T')[0];
 
         linhas.slice(1).forEach((linha) => {
           const nome = (linha[indices.nome] || '').trim();
@@ -421,18 +466,19 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
           }
           telefonesNoArquivo.add(telefone);
           if (emailNormalizado) emailsNoArquivo.add(emailNormalizado);
+          const dataNascimento = indices.data_nascimento !== undefined ? normalizarDataImportacao(linha[indices.data_nascimento]) : '';
+          const dataPrimeiraVisita = indices.data_primeira_visita !== undefined ? normalizarDataImportacao(linha[indices.data_primeira_visita]) : '';
+          if (dataNascimento === null || dataPrimeiraVisita === null) datasNaoReconhecidas += 1;
           validos.push({
             nome,
             telefone,
             email: email || null,
-            data_nascimento: indices.data_nascimento !== undefined ? ((linha[indices.data_nascimento] || '').trim() || null) : null,
-            data_primeiro_atendimento: indices.data_primeira_visita !== undefined
-              ? ((linha[indices.data_primeira_visita] || '').trim() || new Date().toISOString().split('T')[0])
-              : new Date().toISOString().split('T')[0],
+            data_nascimento: dataNascimento || null,
+            data_primeiro_atendimento: dataPrimeiraVisita || hoje,
           });
         });
 
-        setPreviewImportacao({ validos, duplicados, semNomeOuTelefone, totalLinhas: linhas.length - 1 });
+        setPreviewImportacao({ validos, duplicados, semNomeOuTelefone, datasNaoReconhecidas, totalLinhas: linhas.length - 1 });
       } catch (err) {
         setErroImportacao(`Não consegui ler o arquivo: ${err.message}`);
       }
@@ -741,6 +787,7 @@ function Clientes({ t: tProp, idioma: idiomaProp, empresaId }) {
               {previewImportacao.totalLinhas} linha(s) no arquivo — <strong style={{ color: '#4ade80' }}>{previewImportacao.validos.length} pronto(s) para importar</strong>
               {previewImportacao.duplicados > 0 && `, ${previewImportacao.duplicados} já existente(s) (ignorado(s))`}
               {previewImportacao.semNomeOuTelefone > 0 && `, ${previewImportacao.semNomeOuTelefone} sem nome ou telefone (ignorado(s))`}.
+              {previewImportacao.datasNaoReconhecidas > 0 && ` ${previewImportacao.datasNaoReconhecidas} cliente(s) com data em formato não reconhecido — entram sem essa data (use dd/mm/aaaa ou AAAA-MM-DD).`}
             </p>
             {previewImportacao.validos.length > 0 && (
               <div style={{ overflowX: 'auto', marginBottom: '10px' }}>
