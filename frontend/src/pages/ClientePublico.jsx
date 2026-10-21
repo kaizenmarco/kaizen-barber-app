@@ -275,6 +275,7 @@ function ClientePublico() {
   const [agendamentosDoCliente, setAgendamentosDoCliente] = useState([]);
   const [consultandoAgendamentos, setConsultandoAgendamentos] = useState(false);
   const [consultaAgendamentosFeita, setConsultaAgendamentosFeita] = useState(false);
+  const [identificacaoAgendamentosVerificada, setIdentificacaoAgendamentosVerificada] = useState(false);
   const [cancelandoId, setCancelandoId] = useState(null);
 
   const [emailConsultaAssinatura, setEmailConsultaAssinatura] = useState('');
@@ -594,30 +595,36 @@ function ClientePublico() {
     }
   };
 
-  // Busca os agendamentos futuros (ainda não cancelados) do cliente pelo
-  // e-mail + telefone (os dois precisam bater com o mesmo cadastro), pra ele
-  // poder cancelar sozinho sem precisar de login. Exigir os dois evita puxar
-  // (e deixar cancelar) o agendamento de outra pessoa por engano — e-mail
-  // sozinho não é garantia suficiente de identidade.
+  // Busca o histórico de agendamentos do cliente pelo TELEFONE (sozinho já
+  // basta pra ver — clientes importados do sistema antigo às vezes têm um
+  // e-mail desatualizado no cadastro, e decorar o telefone é bem mais fácil;
+  // mesmo critério já usado na aba Fidelidade). O e-mail, quando também
+  // informado e batendo com o cadastro, é que libera o botão de cancelar —
+  // cancelar é uma ação sensível (mexe no horário de outra pessoa), então
+  // continua exigindo os dois, só a visualização que ficou mais simples.
   const buscarAgendamentosCliente = async (emailParam, telefoneParam) => {
     const email = (emailParam || emailConsultaAgendamentos || '').trim();
     const telefoneAlvo = normalizarTelefoneParaComparar(telefoneParam || telefoneConsultaAgendamentos);
-    if (!email || !telefoneAlvo) return;
+    if (!telefoneAlvo) return;
     setConsultandoAgendamentos(true);
     try {
-      // ilike em vez de eq: e-mail não deve ser sensível a maiúsculas/
-      // minúsculas — ver mesma observação em buscarPontosCliente.
       const { data: clientes } = await supabase
         .from('clientes')
-        .select('id, telefone')
-        .ilike('email', email);
+        .select('id, telefone, email')
+        .not('telefone', 'is', null);
 
       const clienteEncontrado = (clientes || []).find(c => normalizarTelefoneParaComparar(c.telefone) === telefoneAlvo);
 
       if (!clienteEncontrado) {
         setAgendamentosDoCliente([]);
+        setIdentificacaoAgendamentosVerificada(false);
         return;
       }
+
+      // E-mail bate (comparação sem diferenciar maiúsculas/minúsculas) só se
+      // a pessoa informou um e-mail E ele é igual ao do cadastro.
+      const emailBate = !!email && !!clienteEncontrado.email && clienteEncontrado.email.trim().toLowerCase() === email.toLowerCase();
+      setIdentificacaoAgendamentosVerificada(emailBate);
 
       const clienteId = clienteEncontrado.id;
       const agoraMs = Date.now();
@@ -646,7 +653,7 @@ function ClientePublico() {
           servico: a.servicos?.nome || '-',
           profissional: a.profissionais?.nome || '-',
           futuro,
-          podeCancelar: futuro && a.status !== 'CANCELADO' && minutosRestantes >= LIMITE_CANCELAMENTO_MINUTOS,
+          podeCancelar: emailBate && futuro && a.status !== 'CANCELADO' && minutosRestantes >= LIMITE_CANCELAMENTO_MINUTOS,
         };
       });
 
@@ -2202,7 +2209,7 @@ function ClientePublico() {
                 />
                 <button
                   onClick={async () => { await buscarAgendamentosCliente(emailConsultaAgendamentos, telefoneConsultaAgendamentos); setConsultaAgendamentosFeita(true); }}
-                  disabled={!emailConsultaAgendamentos.includes('@') || telefoneConsultaAgendamentos.replace(/\D/g, '').length < 8 || consultandoAgendamentos}
+                  disabled={telefoneConsultaAgendamentos.replace(/\D/g, '').length < 8 || consultandoAgendamentos}
                   style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: consultandoAgendamentos ? 'wait' : 'pointer' }}
                 >
                   {consultandoAgendamentos ? '⏳' : t('fidelidade_consultar_botao')}
@@ -2214,11 +2221,17 @@ function ClientePublico() {
               agendamentosDoCliente.length === 0 ? (
                 <p style={{ color: '#999', maxWidth: '600px' }}>{t('meusAgendamentos_nenhum')}</p>
               ) : (() => {
+                const avisoSomenteLeitura = !identificacaoAgendamentosVerificada ? (
+                  <p style={{ color: '#d4af37', fontSize: '12px', maxWidth: '600px', marginBottom: '14px' }}>
+                    ℹ️ {t('meusAgendamentos_somenteLeituraAviso')}
+                  </p>
+                ) : null;
                 const proximos = agendamentosDoCliente.filter(ativoAgendamento).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`));
                 const historico = agendamentosDoCliente.filter(a => !ativoAgendamento(a));
 
                 return (
                   <div style={{ maxWidth: '600px' }}>
+                    {avisoSomenteLeitura}
                     {proximos.length > 0 && (
                       <div style={{ marginBottom: '26px' }}>
                         <h3 style={{ color: '#d4af37', fontSize: '15px', marginBottom: '10px' }}>{t('meusAgendamentos_proximos')}</h3>
