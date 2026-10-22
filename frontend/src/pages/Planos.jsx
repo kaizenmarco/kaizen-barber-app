@@ -68,6 +68,7 @@ function Planos({ t: tProp, idioma: idiomaProp }) {
   useEffect(() => {
     buscarServicos();
     buscarPlanos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const abrirNovo = () => {
