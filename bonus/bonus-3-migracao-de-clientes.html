@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Bônus 3 — Migração Sem Perder Histórico</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<section class="capa">
+  <div class="capa-topo"><div class="marca">KAIZEN FLOW</div><div class="selo">BÔNUS EXCLUSIVO</div></div>
+  <div class="capa-numero"><div class="n">03</div><div class="rotulo">SUA BASE DE CLIENTES</div></div>
+  <h1 style="font-size: 58pt">Migração Sem<br>Perder Histórico</h1>
+  <p class="sub">Clientes do WhatsApp, do caderno ou da planilha dentro do sistema de uma vez — sem cadastrar um por um.</p>
+  <div class="print"><img src="img/05-clientes-importar-csv.jpg" alt="" style="object-position: left bottom"></div>
+  <div class="capa-rodape"><span>Modelo pronto · Excel ou Google · Prévia · Sem duplicados</span><b>Kaizen Flow</b></div>
+</section>
+
+<main>
+<p class="lead">Sua base de clientes — do WhatsApp, do caderno ou de uma planilha — entra no Kaizen Flow de uma vez só, por um arquivo CSV, sem cadastrar cliente por cliente. Nenhum cliente duplicado entra: o sistema confere pelo telefone e pelo e-mail.</p>
+
+<h2>Passo 1 — Baixe o modelo</h2>
+<p>Na aba <strong>Clientes</strong>, logo abaixo do formulário "Novo Cliente", fica o bloco <strong>Importar clientes (CSV)</strong>. Clique em <strong>Baixar modelo CSV</strong>: vem o arquivo <code>modelo-importar-clientes.csv</code>, com as colunas certas e uma linha de exemplo.</p>
+<figure><img src="img/05-clientes-importar-csv.jpg" alt=""><figcaption>Aba Clientes: formulário Novo Cliente e o bloco Importar clientes (CSV) com o botão Baixar modelo CSV.</figcaption></figure>
+
+<h2>Passo 2 — Preencha a planilha</h2>
+<p>Use o <strong>Google Planilhas</strong> (grátis, no celular ou no computador): abra o modelo, preencha uma linha por cliente e baixe em <strong>Arquivo → Fazer download → Valores separados por vírgula (.csv)</strong>.</p>
+<p>Prefere o Excel? Também funciona: salve como <strong>CSV</strong> — com vírgula ou ponto e vírgula, o sistema reconhece os dois.</p>
+<table>
+  <tr><th>Coluna</th><th>Obrigatória?</th><th>Como preencher</th></tr>
+  <tr><td>Nome</td><td>Sim</td><td>Nome como você chama o cliente</td></tr>
+  <tr><td>Telefone</td><td>Sim</td><td>Com código do país e DDD: 5511999999999. Espaços, parênteses e traços são removidos sozinhos</td></tr>
+  <tr><td>Email</td><td>Não</td><td>Necessário para o cliente receber os e-mails automáticos, como o de parabéns no aniversário</td></tr>
+  <tr><td>Data de Nascimento</td><td>Não</td><td>dd/mm/aaaa (ex.: 12/05/1990) ou AAAA-MM-DD</td></tr>
+  <tr><td>Data da Primeira Visita</td><td>Não</td><td>dd/mm/aaaa ou AAAA-MM-DD. Em branco, vira a data de hoje</td></tr>
+</table>
+<p>O nome das colunas aceita variações: "Celular", "WhatsApp" ou "Fone" funcionam no lugar de "Telefone"; "Cliente" no lugar de "Nome"; "Aniversário" no lugar de "Data de Nascimento".</p>
+<p>O arquivo pronto fica assim:</p>
+<pre>Nome,Telefone,Email,Data de Nascimento,Data da Primeira Visita
+Ana Silva,5511999999999,ana@email.com,12/05/1990,10/01/2024
+Carlos Souza,5511988887777,,30/11/1985,
+João Lima,5511977776666,joao@email.com,,02/08/2023</pre>
+
+<h2>Passo 3 — Envie e confira a prévia</h2>
+<p>No bloco Importar clientes, clique em <strong>Escolher arquivo</strong> e selecione o CSV. Nada é importado ainda: o sistema primeiro mostra uma prévia.</p>
+<table>
+  <tr><th>A prévia mostra</th><th>O que significa</th></tr>
+  <tr><td>X pronto(s) para importar</td><td>Clientes novos, que vão entrar</td></tr>
+  <tr><td>X já existente(s) (ignorado(s))</td><td>Mesmo telefone ou mesmo e-mail de um cliente que já está no sistema, ou repetido no próprio arquivo</td></tr>
+  <tr><td>X sem nome ou telefone (ignorado(s))</td><td>Linhas incompletas; corrija na planilha e envie de novo, se quiser</td></tr>
+</table>
+<p>Abaixo aparecem os primeiros 8 clientes (nome, telefone e e-mail) para você conferir se as colunas foram lidas certo.</p>
+
+<h2>Passo 4 — Confirme a importação</h2>
+<p>Com a prévia certa, clique em <strong>Confirmar importação (X)</strong>. Se algo estiver estranho, clique em <strong>Cancelar</strong>, corrija a planilha e envie de novo.</p>
+<p>No fim aparece "X cliente(s) importado(s) com sucesso" e a lista de clientes já se atualiza. Se algum cliente der conflito, só ele fica de fora — o resto entra normalmente, e a mensagem diz quantos não puderam ser importados.</p>
+<div class="nota">Pode importar quantas vezes quiser: quem já foi importado é ignorado na próxima vez, então dá para mandar a base em partes.</div>
+
+<h2>Sua lista está no WhatsApp, no caderno ou em PDF</h2>
+<p>O sistema só lê CSV, porque cada caderno ou PDF tem um formato diferente. O caminho é passar nome e telefone para a planilha-modelo e seguir os Passos 3 e 4 — a parte repetitiva, cadastrar um por um no sistema, continua eliminada.</p>
+<table>
+  <tr><th>Onde está hoje</th><th>Como levar para a planilha</th></tr>
+  <tr><td>Contatos do WhatsApp</td><td>Copie nome e número de cada conversa de cliente; comece pelos que vieram nos últimos meses</td></tr>
+  <tr><td>Caderno ou agenda de papel</td><td>Digite direto no Google Planilhas pelo celular, uma linha por cliente</td></tr>
+  <tr><td>Planilha antiga (Excel, Google)</td><td>Copie as colunas de nome e telefone e cole nas colunas certas do modelo</td></tr>
+  <tr><td>PDF de outro sistema</td><td>Copie e cole as colunas do PDF na planilha e confira se nome e telefone ficaram em colunas separadas</td></tr>
+</table>
+<p>Não precisa esperar a base inteira: importe o que já tem e mande o resto depois, sem risco de duplicar.</p>
+
+<h2>O que já funciona depois de importar</h2>
+<p>Cada cliente importado vale o mesmo que um cadastrado à mão, a partir do primeiro dia:</p>
+<table>
+  <tr><th>Recurso</th><th>O que acontece com o cliente importado</th></tr>
+  <tr><td>Agenda e página pública</td><td>Já pode ser agendado pelo nome</td></tr>
+  <tr><td>Aniversariantes</td><td>Quem tem data de nascimento aparece na lista do mês e, com e-mail, recebe os parabéns automáticos com o desconto de aniversário</td></tr>
+  <tr><td>Fidelidade</td><td>Começa a somar pontos a cada atendimento realizado no sistema</td></tr>
+  <tr><td>Clientes Ausentes</td><td>Entra no acompanhamento a partir do primeiro atendimento concluído no sistema</td></tr>
+</table>
+<figure><img src="img/07-aniversariantes.jpg" alt=""><figcaption>Tela Aniversariantes: clientes do mês com a data e o contato de cada um.</figcaption></figure>
+<p>O que vem da base antiga é o cadastro: nome, telefone, e-mail, aniversário e data da primeira visita. Atendimentos e pontos anteriores à importação não são trazidos — a contagem de fidelidade começa do zero no Kaizen Flow.</p>
+
+<h2>Deu problema?</h2>
+<table>
+  <tr><th>Mensagem ou sintoma</th><th>Causa provável</th><th>Solução</th></tr>
+  <tr><td>"Não encontrei as colunas Nome e Telefone no arquivo"</td><td>Cabeçalho apagado ou com outro nome</td><td>Mantenha a primeira linha do modelo</td></tr>
+  <tr><td>"O arquivo precisa ter uma linha de cabeçalho e pelo menos um cliente"</td><td>Planilha vazia ou só com o cabeçalho</td><td>Preencha pelo menos uma linha abaixo do cabeçalho</td></tr>
+  <tr><td>Muitos "já existente(s)"</td><td>Esses clientes já estão cadastrados, ou o mesmo telefone aparece duas vezes no arquivo</td><td>Nada a fazer: ninguém é duplicado</td></tr>
+  <tr><td>"Cliente(s) com data em formato não reconhecido"</td><td>Data escrita de outro jeito (ex.: 12/05/90 ou "maio de 1990")</td><td>O cliente entra sem essa data; corrija para dd/mm/aaaa e edite o cadastro dele depois</td></tr>
+  <tr><td>"X não puderam ser importados"</td><td>Conflito de e-mail ou telefone com outro cliente</td><td>Confira esses clientes na lista e cadastre à mão, se precisar</td></tr>
+</table>
+<p class="fim">Kaizen Flow · Bônus 3 — Migração Sem Perder Histórico · Material exclusivo para assinantes.</p>
+</main>
+</body>
+</html>

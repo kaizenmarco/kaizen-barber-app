@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Bônus 1 — Implantação Kaizen</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<section class="capa">
+  <div class="capa-topo"><div class="marca">KAIZEN FLOW</div><div class="selo">BÔNUS EXCLUSIVO</div></div>
+  <div class="capa-numero"><div class="n">01</div><div class="rotulo">GUIA DE IMPLANTAÇÃO</div></div>
+  <h1>Implantação<br>Kaizen</h1>
+  <p class="sub">Sua barbearia pronta para receber agendamentos em 5 passos — sem travar em nenhuma etapa.</p>
+  <div class="print"><img src="img/08-profissionais.jpg" alt=""></div>
+  <div class="capa-rodape"><span>Profissionais · Horários · Serviços · Identidade visual · Teste final</span><b>Kaizen Flow</b></div>
+</section>
+
+<main>
+<p class="lead">Seguindo 5 passos nesta ordem, sua barbearia sai do zero e fica pronta para receber agendamentos pelo Kaizen Flow — sem travar em nenhuma etapa.</p>
+
+<h2>A ordem importa</h2>
+<p>Cada passo usa o que foi cadastrado no anterior. Pular um deles é o motivo mais comum de "o sistema não mostra horário nenhum".</p>
+<ol>
+  <li><strong>Profissionais</strong> — quem atende.</li>
+  <li><strong>Horário de Trabalho</strong> — quando cada um atende.</li>
+  <li><strong>Serviços</strong> — o que o cliente pode escolher.</li>
+  <li><strong>Identidade Visual</strong> — como sua página pública aparece.</li>
+  <li><strong>Teste como cliente</strong> — conferir tudo antes de divulgar o link.</li>
+</ol>
+<p>Todas as abas ficam na barra inferior do painel: Profissionais, Serviços, Identidade Visual e Horário de Trabalho.</p>
+
+<h2>Passo 1 — Cadastre seus profissionais</h2>
+<p>Vá em <strong>Profissionais</strong> e cadastre cada pessoa que atende na barbearia — inclusive você, se também corta cabelo.</p>
+<figure><img src="img/08-profissionais.jpg" alt=""><figcaption>Tela Profissionais: formulário "Adicionar profissional" e a lista "Seus profissionais".</figcaption></figure>
+<table>
+  <tr><th>Campo</th><th>Obrigatório?</th><th>Para que serve</th></tr>
+  <tr><td>Nome</td><td>Sim</td><td>Aparece na Agenda, nas Comandas e na página pública</td></tr>
+  <tr><td>Telefone</td><td>Não</td><td>Contato interno</td></tr>
+  <tr><td>Comissão %</td><td>Não</td><td>Usada no cálculo de comissão do Caixa</td></tr>
+  <tr><td>Foto</td><td>Não</td><td>Aparece na aba Profissionais da página pública</td></tr>
+</table>
+<div class="nota"><strong>Vagas do plano:</strong> o limite de profissionais já inclui você, se você também atende — o dono não ganha uma vaga extra. Básico e Intermediário têm 1 vaga incluída (mais as vagas extras compradas); o Completo não tem limite. O topo do formulário mostra quantas vagas você já usou.</div>
+<p><strong>Login do profissional (opcional):</strong> na lista "Seus profissionais", digite o e-mail dele e clique em <strong>Convidar</strong>. Ele recebe um e-mail para criar a própria senha. Com esse login, o profissional vê só <strong>Agenda</strong>, <strong>Comandas</strong> e <strong>Minha Comissão</strong> — nada de Caixa, configurações ou dados de outros profissionais. O passo a passo do dia a dia dele está no Bônus 2 (Manual de Bolso da Equipe).</p>
+
+<h2>Passo 2 — Configure o horário de cada profissional</h2>
+<div class="nota">Sem este passo, o profissional não tem nenhum horário livre — nem na Agenda interna, nem na página pública. Não é opcional.</div>
+<p>Vá em <strong>Horário de Trabalho</strong>, escolha o profissional no seletor do topo e use <strong>Adicionar bloco de horário</strong>: dia da semana + hora de início + hora de fim. Depois clique em <strong>Adicionar bloco</strong>.</p>
+<ul>
+  <li><strong>Folga:</strong> um dia sem nenhum bloco já é folga. Não precisa marcar nada.</li>
+  <li><strong>Almoço:</strong> cadastre dois blocos no mesmo dia. O espaço entre eles some dos horários oferecidos e aparece como "Almoço" na Agenda.</li>
+  <li><strong>Um por um:</strong> o horário é individual. Repita o cadastro para cada profissional.</li>
+  <li>A seção <strong>Semana atual</strong> mostra como ficou a semana de quem está selecionado.</li>
+</ul>
+<p>Exemplo de uma semana com almoço e folga no domingo e na segunda:</p>
+<table>
+  <tr><th>Dia</th><th>Bloco 1</th><th>Bloco 2</th></tr>
+  <tr><td>Ter a Sex</td><td>09:00–12:00</td><td>13:00–19:00</td></tr>
+  <tr><td>Sábado</td><td>08:00–12:00</td><td>13:00–17:00</td></tr>
+  <tr><td>Domingo e Segunda</td><td>— (folga)</td><td>—</td></tr>
+</table>
+<p>Se aparecer "Esse horário se sobrepõe a um bloco já cadastrado nesse dia", remova o bloco antigo antes de cadastrar o novo.</p>
+
+<h2>Passo 3 — Cadastre seus serviços e pacotes</h2>
+<p>O catálogo cadastrado aqui é o que aparece na Agenda e na página pública. Serviço que não está aqui, o cliente não consegue escolher.</p>
+<p>Vá em <strong>Serviços</strong> e preencha:</p>
+<table>
+  <tr><th>Campo</th><th>Obrigatório?</th><th>Dica</th></tr>
+  <tr><td>Nome</td><td>Sim</td><td>Como o cliente reconhece: "Corte Clássico", "Corte + Barba"</td></tr>
+  <tr><td>Descrição</td><td>Não</td><td>Uma linha sobre o que inclui</td></tr>
+  <tr><td>Preço</td><td>Sim</td><td>Na moeda do seu plano</td></tr>
+  <tr><td>Preço máximo</td><td>Não</td><td>Para serviço com valor variável — aparece como faixa (ex.: R$60,00 – R$120,00)</td></tr>
+  <tr><td>Duração em minutos</td><td>Não</td><td>Define quanto tempo o horário ocupa na agenda</td></tr>
+  <tr><td>Foto</td><td>Não</td><td>Deixa o catálogo público mais atrativo</td></tr>
+</table>
+<p><strong>Pacotes:</strong> marque <strong>É um pacote?</strong> e os campos mudam para <strong>Quantidade de sessões</strong> (vazio = ilimitado) e <strong>Validade em dias</strong>. Exemplo: "Pacote 5 Cortes", R$200,00, 5 sessões, 90 dias.</p>
+<figure><img src="img/09-servicos-e-pacotes.jpg" alt=""><figcaption>Tela Serviços: listas "Seus serviços" e "Seus pacotes" já preenchidas.</figcaption></figure>
+
+<h2>Passo 4 — Capriche na Identidade Visual</h2>
+<p>Este passo não trava o sistema, mas é o que faz sua página pública parecer profissional. Faça antes de divulgar o link.</p>
+<p>Vá em <strong>Identidade Visual</strong>:</p>
+<table>
+  <tr><th>Item</th><th>Onde aparece</th><th>Dica de foto</th></tr>
+  <tr><td>Foto de capa</td><td>Topo da página pública</td><td>Celular deitado, bem larga (ideal 1600×700px)</td></tr>
+  <tr><td>Logo</td><td>Selo pequeno no canto da capa</td><td>Imagem quadrada</td></tr>
+  <tr><td>Fotos Ambiente e Fachada</td><td>Aba Endereço/Sobre</td><td>Quantas quiser</td></tr>
+  <tr><td>Imagem de fundo da aba Agendar</td><td>Atrás do formulário de agendamento</td><td>Celular deitado (ideal 1600×900px)</td></tr>
+  <tr><td>Endereço, WhatsApp, Instagram, TikTok</td><td>Aba Endereço/Sobre e rodapé</td><td>WhatsApp só com números e código do país (ex.: 5511999999999); Instagram e TikTok sem @</td></tr>
+</table>
+<p>Foto tirada com o celular em pé aparece bem cortada na capa e no fundo. Depois de preencher endereço e contato, clique em <strong>Salvar</strong>.</p>
+<figure><img src="img/10-identidade-visual-contato.jpg" alt=""><figcaption>Tela Identidade Visual: imagem de fundo da aba Agendar e o bloco Endereço e contato.</figcaption></figure>
+<p>Assim o cliente vê o seu catálogo na página pública, com as abas Serviços, Pacotes, Agendar, Endereço, Profissionais e mais:</p>
+<figure><img src="img/11-publico-servicos.jpg" alt=""><figcaption>Página pública da barbearia, aba Serviços.</figcaption></figure>
+
+<h2>Passo 5 — Teste como se fosse cliente</h2>
+<p>Antes de mandar o link para os clientes, abra a sua página pública no celular e faça um agendamento de teste:</p>
+<ol>
+  <li>Na aba <strong>Agendar</strong>, escolha um serviço.</li>
+  <li>Escolha o profissional e uma data em que ele trabalha.</li>
+  <li>Confira se os horários oferecidos batem com o Passo 2 — sem horário no almoço nem em dia de folga.</li>
+  <li>Conclua o agendamento e veja se ele aparece na <strong>Agenda</strong> do painel.</li>
+  <li>Cancele o agendamento de teste na Agenda (o horário volta a ficar livre na hora).</li>
+</ol>
+<figure><img src="img/14-publico-agendar.jpg" alt=""><figcaption>Aba Agendar da página pública: o cliente escolhe o serviço para ver os horários.</figcaption></figure>
+<p>Se não aparecer nenhum horário, volte ao Passo 2: quase sempre falta bloco de horário para aquele profissional naquele dia.</p>
+
+<h2>Checklist final</h2>
+<ul class="check">
+  <li>Todos os profissionais cadastrados (você incluído, se atende)</li>
+  <li>Convite de login enviado para quem vai usar o painel (opcional)</li>
+  <li>Horário de trabalho configurado para <strong>cada</strong> profissional, com almoço e folgas</li>
+  <li>Serviços (e pacotes, se usar) com preço e duração certos</li>
+  <li>Capa, logo, fotos, endereço e WhatsApp preenchidos</li>
+  <li>Agendamento de teste feito na página pública e cancelado</li>
+</ul>
+<p>Tudo marcado? Sua barbearia está pronta. O próximo passo é ensinar a equipe a operar o dia a dia — isso está no Bônus 2, Manual de Bolso da Equipe.</p>
+<p class="fim">Kaizen Flow · Bônus 1 — Implantação Kaizen · Material exclusivo para assinantes.</p>
+</main>
+</body>
+</html>
