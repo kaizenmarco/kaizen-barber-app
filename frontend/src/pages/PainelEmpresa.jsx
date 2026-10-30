@@ -183,7 +183,12 @@ function TelaLogin({ idioma, mudarIdioma, t }) {
 
 function PainelPrincipal({ perfil, empresa, profissionalId, aoSair, idioma, mudarIdioma, t }) {
   const ABAS = CHAVES_ABAS.map((a) => ({ ...a, label: t(a.labelChave) }));
-  const abasVisiveis = ABAS.filter((a) => (perfil?.role === 'admin' ? a.admin : a.restrito));
+  // super_admin (Marco testando como se fosse o dono da empresa) deve
+  // ver pelo menos tudo que um admin ve - antes caia na regra de baixo
+  // (so restrito: true) e sumia com quase todas as abas, incluindo
+  // Horario de Trabalho.
+  const ehAdminOuSuperAdmin = perfil?.role === 'admin' || perfil?.role === 'super_admin';
+  const abasVisiveis = ABAS.filter((a) => (ehAdminOuSuperAdmin ? a.admin : a.restrito));
 
   const [abaSelecionada, setAbaSelecionada] = useState(() => abasVisiveis[0]?.key || 'dashboard');
 
