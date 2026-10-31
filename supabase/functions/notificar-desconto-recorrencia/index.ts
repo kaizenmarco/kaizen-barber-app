@@ -13,13 +13,17 @@ const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
 // enquanto isso, a função só registra no log e não quebra nada.
 const TWILIO_WHATSAPP_FROM = Deno.env.get("TWILIO_WHATSAPP_FROM");
 
-function montarMensagem(nomeCliente: string): string {
-  const primeiroNome = (nomeCliente || "").trim().split(" ")[0] || "";
-  return (
-    `Oi${primeiroNome ? ", " + primeiroNome : ""}! Valeu pela visita hoje na Kaizen Barber Shop 💈 ` +
-    `Se você marcar o próximo atendimento ainda hoje, garante 15% de desconto. ` +
-    `Agende por aqui: https://app.kaizenbarbershop.com`
-  );
+// SID do template de WhatsApp ("desconto_recorrencia_15") aprovado pela Meta.
+// Não é um segredo — é só o identificador do modelo de mensagem — por isso
+// fica fixo aqui em vez de precisar configurar como secret no Supabase.
+// Mensagens de WhatsApp iniciadas pela empresa (fora de uma janela de 24h em
+// que o cliente mandou mensagem primeiro) só podem ser enviadas usando um
+// template pré-aprovado — texto livre (Body) é recusado pela WhatsApp API
+// nesse caso, por isso usamos ContentSid/ContentVariables em vez de Body.
+const TWILIO_CONTENT_SID = "HX68b2ae2a60c8fe9d0bb59e3feb50e2e4";
+
+function primeiroNomeDe(nomeCliente: string): string {
+  return (nomeCliente || "").trim().split(" ")[0] || "";
 }
 
 Deno.serve(async (req: Request) => {
@@ -65,12 +69,11 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: false, motivo: "whatsapp_nao_configurado" }), { status: 200 });
     }
 
-    const mensagem = montarMensagem(cliente?.nome ?? "");
-
     const corpo = new URLSearchParams({
       From: `whatsapp:${TWILIO_WHATSAPP_FROM}`,
       To: `whatsapp:${telefone}`,
-      Body: mensagem,
+      ContentSid: TWILIO_CONTENT_SID,
+      ContentVariables: JSON.stringify({ "1": primeiroNomeDe(cliente?.nome ?? "") || "cliente" }),
     });
 
     const twilioResp = await fetch(
