@@ -1137,16 +1137,34 @@ function ClientePublico() {
         clienteId = verificacao.cliente_id;
         tokenVerificacao = verificacao.token;
       } else {
-        // ilike em vez de eq: mesmo cuidado de maiúsculas/minúsculas — sem
-        // isso, a mesma pessoa digitando o e-mail com capitalização diferente
-        // de uma vez pra outra virava um cadastro de cliente duplicado.
-        const { data: clientesExistentes } = await supabase
+        // Acha o cliente primeiro pelo e-mail (ilike pra tolerar
+        // maiúsculas/minúsculas diferentes) e, se não achar, tenta pelo
+        // telefone — mesma lógica usada no Admin. Sem o fallback por telefone,
+        // a mesma pessoa digitando um e-mail diferente do que usou da última
+        // vez (ou com um typo) virava um cadastro de cliente duplicado, com o
+        // histórico e os pontos de fidelidade divididos entre dois cadastros.
+        const { data: clientesPorEmail } = await supabase
           .from('clientes')
           .select('id')
           .ilike('email', dadosAgendamento.email.trim());
 
-        if (clientesExistentes && clientesExistentes.length > 0) {
-          clienteId = clientesExistentes[0].id;
+        let clienteExistente = clientesPorEmail?.[0] || null;
+
+        if (!clienteExistente) {
+          const alvoTelefone = normalizarTelefoneParaComparar(telefoneCompleto);
+          if (alvoTelefone) {
+            const { data: clientesComTelefone } = await supabase
+              .from('clientes')
+              .select('id, telefone')
+              .not('telefone', 'is', null);
+            clienteExistente = (clientesComTelefone || []).find(
+              c => normalizarTelefoneParaComparar(c.telefone) === alvoTelefone
+            ) || null;
+          }
+        }
+
+        if (clienteExistente) {
+          clienteId = clienteExistente.id;
           // Cliente já cadastrado — se faltava telefone ou data de nascimento,
           // aproveita o que a pessoa preencheu agora pra completar o cadastro
           // (sem sobrescrever o que já existia).
