@@ -15,6 +15,7 @@ const BONUS = [
 ];
 
 const LINK_VALIDO_SEGUNDOS = 300;
+const WHATSAPP_SUPORTE = '818097242512';
 
 const estilos = {
   grade: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' },
@@ -80,6 +81,13 @@ function MeusBonus({ t: tProp, idioma: idiomaProp, empresa }) {
           );
         })}
       </div>
+
+      <p style={{ color: '#999', fontSize: '13px', marginTop: '20px' }}>
+        {t('meusBonus.ajuda')}{' '}
+        <a href={`https://wa.me/${WHATSAPP_SUPORTE}`} target="_blank" rel="noopener noreferrer" style={{ color: '#d4af37' }}>
+          WhatsApp
+        </a>
+      </p>
     </div>
   );
 }

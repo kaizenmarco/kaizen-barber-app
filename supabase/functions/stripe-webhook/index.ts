@@ -21,6 +21,7 @@
 //   STRIPE_PRICE_COMPLETO_JPY / STRIPE_PRICE_COMPLETO_BRL
 //   STRIPE_PRICE_ADICIONAL_JPY / STRIPE_PRICE_ADICIONAL_BRL
 //   WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID
+//   RESEND_API_KEY (já configurada neste projeto) / EMAIL_REMETENTE (opcional)
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (injetadas automaticamente)
 //
 // Sobre inadimplência: quando uma cobrança falha, marcamos a empresa como
@@ -30,6 +31,32 @@
 // quem ficar inadimplente por mais de 35 dias. Na primeira falha, também
 // disparamos um aviso pelo WhatsApp (modelo "aviso_pagamento_pendente",
 // categoria Utilidade) pro telefone cadastrado da empresa.
+//
+// Sobre o login do dono (2026-09): até aqui, pagar criava a empresa mas
+// NINGUÉM criava/vinculava automaticamente o login da pessoa que pagou —
+// ela ficava travada numa tela de "conta não vinculada" até alguém rodar um
+// UPDATE manual no banco. Agora, assim que o primeiro pagamento é
+// confirmado (checkout.session.completed), a função:
+//   1. Se já existe uma linha em usuarios com o e-mail de contato da
+//      empresa (a pessoa já tinha criado login antes de pagar, pelo botão
+//      "Ainda não tenho conta" do /painel), só vincula essa conta à
+//      empresa (caso ainda não estivesse vinculada).
+//   2. Senão, cria a conta automaticamente com supabase.auth.admin.
+//      inviteUserByEmail — isso já dispara um e-mail de convite pro dono
+//      definir a senha e acessar o /painel direto, sem precisar se
+//      cadastrar de novo.
+// Isso depende do envio de e-mail estar configurado no projeto (Supabase
+// Auth → Emails). O serviço de e-mail padrão do Supabase tem um limite bem
+// baixo de envios por hora, adequado só pra teste — antes de depender disso
+// pra clientes de verdade, configurar um SMTP próprio em Project Settings →
+// Auth → SMTP Settings. Se o e-mail não chegar, dá pra vincular manualmente
+// pela tela de Super Admin (usa a função vincular-usuario-empresa).
+//
+// Sobre o e-mail de boas-vindas (2026-11): depois do login, manda pelo
+// Resend um e-mail com o endereço do painel, os bônus liberados pelo plano
+// (aba "Meus Bônus") e o WhatsApp do suporte. A trava é a coluna
+// empresas.email_boas_vindas_enviado_em (supabase_email_boas_vindas.sql):
+// só envia quem consegue preenchê-la, então evento repetido não duplica.
 // ============================================================================
 
 import Stripe from "npm:stripe@17";
@@ -48,6 +75,25 @@ const supabaseAdmin = createClient(
 
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN");
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const EMAIL_REMETENTE = Deno.env.get("EMAIL_REMETENTE") ?? "Kaizen Flow <onboarding@resend.dev>";
+const URL_PAINEL = "https://painel.kaizenflowaplicativo.com";
+const WHATSAPP_SUPORTE = "818097242512";
+
+// Mesma regra da aba "Meus Bônus" (tenant/MeusBonus.jsx) e da política
+// bonus_leitura_por_plano no Storage.
+const BONUS_POR_PLANO: Record<string, string[]> = {
+  basico: ["Implantação Kaizen"],
+  intermediario: ["Implantação Kaizen", "Manual de Bolso da Equipe"],
+  completo: ["Implantação Kaizen", "Manual de Bolso da Equipe", "Migração Sem Perder Histórico"],
+};
+
+const NOME_PLANO: Record<string, string> = {
+  basico: "Básico",
+  intermediario: "Intermediário",
+  completo: "Completo",
+};
 
 // Mapeia cada price id de PLANO (Básico/Intermediário/Completo, nas duas
 // moedas) pro nome do plano. O price id do "profissional adicional" fica de
@@ -88,6 +134,141 @@ async function empresaIdPelaSubscription(subscriptionId: string): Promise<string
     .eq("stripe_subscription_id", subscriptionId)
     .maybeSingle();
   return data?.id ?? null;
+}
+
+// Cria (se ainda não existir) o login do dono da empresa e garante que ele
+// fica vinculado (usuarios.empresa_id) assim que o primeiro pagamento é
+// confirmado. Nunca lança erro pra fora — se e-mail/convite falhar, isso
+// não pode derrubar o processamento do webhook do Stripe (a empresa já foi
+// marcada como ativa de qualquer forma; o vínculo pode ser feito depois,
+// manualmente, pela tela de Super Admin).
+async function garantirLoginDoDono(empresaId: string) {
+  try {
+    const { data: empresa } = await supabaseAdmin
+      .from("empresas")
+      .select("nome, email_contato")
+      .eq("id", empresaId)
+      .maybeSingle();
+
+    const email = empresa?.email_contato;
+    if (!email) {
+      console.warn(`Empresa ${empresaId} sem email_contato — não dá pra criar/vincular login.`);
+      return;
+    }
+
+    // Já existe uma conta com esse e-mail? (a pessoa pode ter se cadastrado
+    // pelo /painel antes de pagar, ou isso pode ser um pagamento repetido).
+    const { data: usuarioExistente } = await supabaseAdmin
+      .from("usuarios")
+      .select("id, empresa_id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (usuarioExistente) {
+      if (!usuarioExistente.empresa_id) {
+        await supabaseAdmin.from("usuarios").update({ empresa_id: empresaId }).eq("id", usuarioExistente.id);
+        console.log(`Login existente (${email}) vinculado à empresa ${empresaId}.`);
+      }
+      return;
+    }
+
+    // Não existe login ainda — cria a conta e dispara o e-mail de convite
+    // (a pessoa define a senha dela e já cai vinculada à empresa).
+    const { data: convite, error: erroConvite } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { nome: empresa?.nome || undefined },
+    });
+
+    if (erroConvite) {
+      console.error(`Falha ao convidar ${email} pra empresa ${empresaId}:`, erroConvite.message);
+      return;
+    }
+
+    const novoUsuarioId = convite?.user?.id;
+    if (novoUsuarioId) {
+      await supabaseAdmin.from("usuarios").update({ empresa_id: empresaId }).eq("id", novoUsuarioId);
+      console.log(`Login criado e vinculado pra ${email} -> empresa ${empresaId}.`);
+    }
+  } catch (erro) {
+    console.error(`Erro inesperado garantindo login do dono da empresa ${empresaId}:`, erro);
+  }
+}
+
+function escaparHtml(texto: string) {
+  return texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+// E-mail de boas-vindas (Resend): endereço do painel, bônus liberados pelo
+// plano e suporte. Nunca lança erro pra fora, pelo mesmo motivo do
+// garantirLoginDoDono. Se o envio falhar, solta a trava pra um evento
+// repetido da Stripe poder tentar de novo.
+async function enviarEmailBoasVindas(empresaId: string) {
+  if (!RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY não configurada — e-mail de boas-vindas não enviado.");
+    return;
+  }
+
+  try {
+    const { data: empresa } = await supabaseAdmin
+      .from("empresas")
+      .update({ email_boas_vindas_enviado_em: new Date().toISOString() })
+      .eq("id", empresaId)
+      .is("email_boas_vindas_enviado_em", null)
+      .select("nome, email_contato, plano")
+      .maybeSingle();
+
+    if (!empresa) return; // já enviado antes (ou empresa não existe)
+
+    if (!empresa.email_contato) {
+      console.warn(`Empresa ${empresaId} sem email_contato — e-mail de boas-vindas não enviado.`);
+      return;
+    }
+
+    const nome = escaparHtml(empresa.nome || "sua barbearia");
+    const plano = NOME_PLANO[empresa.plano] ?? empresa.plano;
+    const bonus = BONUS_POR_PLANO[empresa.plano] ?? BONUS_POR_PLANO.basico;
+    const listaBonus = bonus.map((b) => `<li style="margin-bottom:6px;">${b}</li>`).join("");
+
+    const resposta = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: EMAIL_REMETENTE,
+        to: empresa.email_contato,
+        subject: "Bem-vindo ao Kaizen Flow — seu acesso e seus bônus",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; color: #1a1a1a;">
+            <div style="background:#121212; padding:24px; border-radius:10px 10px 0 0;">
+              <div style="color:#d4af37; font-size:20px; font-weight:bold; letter-spacing:3px;">KAIZEN FLOW</div>
+            </div>
+            <div style="border:1px solid #e3ddcc; border-top:none; padding:24px; border-radius:0 0 10px 10px;">
+              <h2 style="margin:0 0 12px;">Bem-vindo, ${nome}!</h2>
+              <p>Sua assinatura do plano <strong>${plano}</strong> está ativa. Seu painel fica em:</p>
+              <p style="text-align:center; margin:22px 0;">
+                <a href="${URL_PAINEL}" style="background:#d4af37; color:#121212; font-weight:bold; padding:12px 24px; border-radius:6px; text-decoration:none;">Acessar meu painel</a>
+              </p>
+              <p style="font-size:13px; color:#555;">Entre com este e-mail. Se ainda não tem senha, procure o e-mail de convite que enviamos junto com este e use o link para criar a sua.</p>
+              <h3 style="margin:24px 0 8px;">🎁 Seus bônus</h3>
+              <ul style="padding-left:20px; margin:0 0 8px;">${listaBonus}</ul>
+              <p style="font-size:13px; color:#555;">Estão em PDF no painel, na aba <strong>Meus Bônus</strong>. Comece pela Implantação Kaizen: em 5 passos sua barbearia fica pronta para receber agendamentos.</p>
+              <p style="font-size:13px; color:#555; margin-top:24px;">Precisa de ajuda? Fale com o suporte pelo <a href="https://wa.me/${WHATSAPP_SUPORTE}" style="color:#9a7b1c;">WhatsApp</a>.</p>
+            </div>
+          </div>
+        `,
+      }),
+    });
+
+    if (!resposta.ok) {
+      console.error(`Falha ao enviar e-mail de boas-vindas pra empresa ${empresaId}:`, resposta.status, await resposta.text());
+      await supabaseAdmin.from("empresas").update({ email_boas_vindas_enviado_em: null }).eq("id", empresaId);
+      return;
+    }
+    console.log(`E-mail de boas-vindas enviado pra empresa ${empresaId}.`);
+  } catch (erro) {
+    console.error(`Erro inesperado enviando boas-vindas da empresa ${empresaId}:`, erro);
+  }
 }
 
 // Envia o aviso de pagamento pendente pelo WhatsApp (modelo aprovado
@@ -206,6 +387,8 @@ Deno.serve(async (req) => {
             extra.profissionais_extras = Number.parseInt(session.metadata.profissionais_adicionais, 10) || 0;
           }
           await marcarStatus(empresaId, "ativo", extra);
+          await garantirLoginDoDono(empresaId);
+          await enviarEmailBoasVindas(empresaId);
         }
         break;
       }
