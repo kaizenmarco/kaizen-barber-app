@@ -13,18 +13,15 @@ const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
 // enquanto isso, a função só registra no log e não quebra nada.
 const TWILIO_WHATSAPP_FROM = Deno.env.get("TWILIO_WHATSAPP_FROM");
 
-// SID do template de WhatsApp ("desconto_recorrencia_15") aprovado pela Meta.
-// Não é um segredo — é só o identificador do modelo de mensagem — por isso
-// fica fixo aqui em vez de precisar configurar como secret no Supabase.
+// SID do template de WhatsApp ("desconto_recorrencia_15_v2") aprovado pela
+// Meta. Não é um segredo — é só o identificador do modelo de mensagem — por
+// isso fica fixo aqui em vez de precisar configurar como secret no Supabase.
 // Mensagens de WhatsApp iniciadas pela empresa (fora de uma janela de 24h em
 // que o cliente mandou mensagem primeiro) só podem ser enviadas usando um
 // template pré-aprovado — texto livre (Body) é recusado pela WhatsApp API
-// nesse caso, por isso usamos ContentSid/ContentVariables em vez de Body.
-const TWILIO_CONTENT_SID = "HX68b2ae2a60c8fe9d0bb59e3feb50e2e4";
-
-function primeiroNomeDe(nomeCliente: string): string {
-  return (nomeCliente || "").trim().split(" ")[0] || "";
-}
+// nesse caso, por isso usamos ContentSid em vez de Body. Esse template (v2)
+// tem o texto fixo pedido pelo Marco, sem variavel de nome do cliente.
+const TWILIO_CONTENT_SID = "HXde94c28d3fd7f06f892a815dd73c05dc";
 
 Deno.serve(async (req: Request) => {
   try {
@@ -73,7 +70,6 @@ Deno.serve(async (req: Request) => {
       From: `whatsapp:${TWILIO_WHATSAPP_FROM}`,
       To: `whatsapp:${telefone}`,
       ContentSid: TWILIO_CONTENT_SID,
-      ContentVariables: JSON.stringify({ "1": primeiroNomeDe(cliente?.nome ?? "") || "cliente" }),
     });
 
     const twilioResp = await fetch(
