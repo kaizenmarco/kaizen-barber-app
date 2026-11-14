@@ -23,6 +23,41 @@ const TWILIO_WHATSAPP_FROM = Deno.env.get("TWILIO_WHATSAPP_FROM");
 // tem o texto fixo pedido pelo Marco, sem variavel de nome do cliente.
 const TWILIO_CONTENT_SID = "HXde94c28d3fd7f06f892a815dd73c05dc";
 
+// Credenciais da conta oficial "Kaizen Barber ShopJP" no LINE. Diferente do
+// WhatsApp, o LINE não exige template pré-aprovado pela Meta — a empresa pode
+// mandar texto livre pra qualquer pessoa que já adicionou a conta como amiga.
+const LINE_CHANNEL_ACCESS_TOKEN = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN");
+
+const MENSAGEM_DESCONTO_LINE =
+  "Obrigado pela visita hoje na Kaizen Barber Shop! Garanta 15% de desconto no próximo corte se agendar ainda hoje: https://app.kaizenbarbershop.com";
+
+async function enviarPorLine(lineUserId: string): Promise<boolean> {
+  if (!LINE_CHANNEL_ACCESS_TOKEN) {
+    console.warn("LINE_CHANNEL_ACCESS_TOKEN não configurado — não dá pra mandar pelo LINE.");
+    return false;
+  }
+
+  const resp = await fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+    },
+    body: JSON.stringify({
+      to: lineUserId,
+      messages: [{ type: "text", text: MENSAGEM_DESCONTO_LINE }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    console.error("Erro ao enviar mensagem de desconto via LINE:", errText);
+    return false;
+  }
+
+  return true;
+}
+
 Deno.serve(async (req: Request) => {
   try {
     if (req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
@@ -41,7 +76,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: agendamento, error } = await supabase
       .from("agendamentos")
-      .select(`id, clientes ( nome, telefone )`)
+      .select(`id, clientes ( nome, telefone, line_user_id )`)
       .eq("id", agendamento_id)
       .single();
 
@@ -51,6 +86,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const cliente = (agendamento as any).clientes;
+    const lineUserId: string | undefined = cliente?.line_user_id;
+
+    // Prioridade: se o cliente já se vinculou ao LINE, manda por lá — é o
+    // canal que ele escolheu e não tem o problema do número americano do
+    // WhatsApp. Só cai pro WhatsApp se não tiver vínculo com o LINE.
+    if (lineUserId) {
+      const enviouPorLine = await enviarPorLine(lineUserId);
+      if (enviouPorLine) {
+        return new Response(JSON.stringify({ ok: true, canal: "line" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      console.warn("Falha ao enviar pelo LINE, tentando WhatsApp como alternativa:", agendamento_id);
+    }
+
     const telefone: string | undefined = cliente?.telefone;
 
     if (!telefone || !telefone.startsWith("+")) {
@@ -90,7 +140,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "falha ao enviar whatsapp", detalhe: errText }), { status: 502 });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, canal: "whatsapp" }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
