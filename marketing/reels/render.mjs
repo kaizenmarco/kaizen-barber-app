@@ -16,6 +16,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { gerarTrilha, salvarWav } from './engine/trilha-epica.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -73,7 +74,22 @@ console.log(`\r  frames ${total}/${total} ✓`);
 await navegador.close(); servidor.close();
 
 // ---------- áudio: batida + whoosh nos cortes + impactos ----------
-if (!SEM_AUDIO) {
+if (!SEM_AUDIO && info.audio) {
+  // Roteiro com voz própria + trilha épica: a música "abaixa" sozinha quando a voz fala (sidechain)
+  const trilha = gerarTrilha({ duracao: info.duracao, ...info.audio.trilha });
+  const trilhaPath = path.join(SAIDA, `${info.nome}-trilha.wav`);
+  salvarWav(trilhaPath, trilha, fs);
+  const voz = path.join(AQUI, info.audio.voz);
+  const final = path.join(SAIDA, `${info.nome}.mp4`);
+  await rodar('ffmpeg', ['-y', '-loglevel', 'error', '-i', mudo, '-i', voz, '-i', trilhaPath, '-filter_complex',
+    '[1:a]aformat=channel_layouts=stereo,asplit=2[v1][vsc];' +
+    `[2:a]volume=${info.audio.volumeTrilha ?? 0.55}[m];` +
+    '[m][vsc]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=350[mduck];' +
+    '[v1][mduck]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]',
+    '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', final]);
+  fs.renameSync(trilhaPath, path.join(SAIDA, `${info.nome}-so-musica.wav`));
+  console.log('Pronto:', path.relative(RAIZ, final));
+} else if (!SEM_AUDIO) {
   const SR = 44100, N = Math.ceil((info.duracao + 0.3) * SR);
   const L = new Float32Array(N), R = new Float32Array(N);
   let seed = 1; const ruido = () => { seed = (seed * 16807) % 2147483647; return seed / 1073741823.5 - 1; };
