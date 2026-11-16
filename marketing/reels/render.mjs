@@ -56,6 +56,16 @@ const pagina = await navegador.newPage({ viewport: { width: 1080, height: 1920 }
 pagina.on('pageerror', e => console.error('Erro na página:', e.message));
 await pagina.goto(`http://127.0.0.1:${porta}/marketing/reels/engine/stage.html?roteiro=../${roteiro}`);
 const info = await pagina.evaluate(() => window.pronto);
+const iCapa = args.indexOf('--capa');
+if (iCapa >= 0) {
+  // capa: um único quadro em PNG, no instante pedido (padrão 2 s, com tudo já na tela)
+  const T = Number(args[iCapa + 1]) || 2;
+  await pagina.evaluate(T => window.desenhar(T), T);
+  const png = path.join(SAIDA, `${info.nome}.png`);
+  await pagina.locator('#c').screenshot({ path: png });
+  console.log('Capa:', path.relative(RAIZ, png));
+  await navegador.close(); servidor.close(); process.exit(0);
+}
 const total = Math.round(info.duracao * FPS);
 console.log(`Roteiro "${info.nome}": ${info.duracao.toFixed(2)}s, ${info.cenas.length} cenas, ${total} frames`);
 
