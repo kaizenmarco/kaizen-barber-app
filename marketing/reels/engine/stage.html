@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Kaizen Reels</title>
+<style>
+  @font-face { font-family: 'Anton'; src: url('../fonts/anton.woff2') format('woff2'); }
+  @font-face { font-family: 'Inter'; font-weight: 400; src: url('../fonts/inter-400.woff2') format('woff2'); }
+  @font-face { font-family: 'Inter'; font-weight: 800; src: url('../fonts/inter-800.woff2') format('woff2'); }
+  html, body { margin: 0; background: #111; }
+  canvas { display: block; width: 1080px; height: 1920px; }
+  /* modo prévia: cabe na tela */
+  body.previa { display: grid; place-items: center; min-height: 100vh; }
+  body.previa canvas { width: auto; height: 92vh; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="engine.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const roteiro = params.get('roteiro') || '../roteiros/01-agenda-online.js';
+  const IMAGENS = {
+    tesoura: '../assets/tesoura.png', maquina: '../assets/maquina.png', poste: '../assets/poste.png',
+    relogio: '../assets/relogio.png', navalha: '../assets/navalha.png',
+    logo: '/frontend/public/images/logo.png', marco: '/frontend/public/images/marco.jpg',
+    gabriel: '/frontend/public/images/gabriel.jpg', neia: '/frontend/public/images/neia.jpg',
+    interior: '/frontend/public/images/interior.jpg',
+  };
+  window.pronto = (async () => {
+    await new Promise((ok, erro) => { const s = document.createElement('script'); s.src = roteiro; s.onload = ok; s.onerror = () => erro(new Error('Roteiro não encontrado: ' + roteiro)); document.head.appendChild(s); });
+    await Promise.all(['Anton', '400 10px Inter', '800 10px Inter'].map(f => document.fonts.load(f.includes('px') ? f : `10px ${f}`)));
+    await KaizenReels.carregarImagens(IMAGENS);
+    const info = KaizenReels.prepararRoteiro(window.ROTEIRO);
+    const ctx = document.getElementById('c').getContext('2d');
+    window.desenhar = (T, qualidade = 0.92) => { KaizenReels.renderFrame(ctx, T); return document.getElementById('c').toDataURL('image/jpeg', qualidade); };
+    if (params.has('previa')) {
+      document.body.classList.add('previa');
+      const t0 = performance.now();
+      const loop = () => { KaizenReels.renderFrame(ctx, ((performance.now() - t0) / 1000) % info.duracao); requestAnimationFrame(loop); };
+      loop();
+    }
+    return { ...info, nome: window.ROTEIRO.nome };
+  })();
+</script>
+</body>
+</html>
