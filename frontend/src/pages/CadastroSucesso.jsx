@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { iniciarMetaPixel, rastrear, lerEApagarDadosCompra } from '../config/metaPixel';
 
 // Endereço do painel do Kaizen Flow (subdomínio da página de vendas) e
 // WhatsApp do suporte — os mesmos do e-mail de boas-vindas que o
@@ -21,6 +22,17 @@ const estilos = {
 };
 
 export default function CadastroSucesso() {
+  useEffect(() => {
+    iniciarMetaPixel();
+    // Só dispara uma vez por cadastro (os dados são apagados depois de lidos),
+    // então recarregar a página não conta um cadastro duplicado.
+    const dados = lerEApagarDadosCompra();
+    if (dados) {
+      rastrear('CompleteRegistration', dados);
+      rastrear('StartTrial', { ...dados, predicted_ltv: dados.value });
+    }
+  }, []);
+
   return (
     <div style={estilos.pagina}>
       <div style={estilos.cartao}>
