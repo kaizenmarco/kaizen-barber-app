@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabaseSaaS } from '../config/supabaseClientSaaS';
+import { iniciarMetaPixel, rastrear, guardarDadosCompra } from '../config/metaPixel';
 import { IDIOMAS_ADMIN, IDIOMA_ADMIN_PADRAO, idiomaAdminPorNavegador, traduzirAdmin } from '../config/traducoesAdmin';
 
 // Página pública de cadastro self-service: a barbearia escolhe o país (que
@@ -118,6 +119,8 @@ export default function Cadastro() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
+  useEffect(() => { iniciarMetaPixel(); }, []);
+
   const planoSelecionado = PLANOS.find((p) => p.id === plano);
   const permiteAdicional = planoSelecionado?.permiteAdicional ?? false;
   const precoBase = planoSelecionado ? planoSelecionado.preco[moeda] : 0;
@@ -171,6 +174,9 @@ export default function Cadastro() {
       return;
     }
     if (data?.checkout_url) {
+      const dadosCompra = { currency: moeda.toUpperCase(), value: precoTotal, content_name: plano };
+      guardarDadosCompra(dadosCompra);
+      rastrear('InitiateCheckout', dadosCompra);
       window.location.href = data.checkout_url;
     } else {
       setErro(t('cadastroSaas.erroRespostaInesperada'));
