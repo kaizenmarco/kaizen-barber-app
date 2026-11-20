@@ -10,11 +10,16 @@ import PaginaCartao from '../../components/fidelidade/PaginaCartao';
 function CartaoFidelidadeTenant() {
   const { slug } = useParams();
   const [nomeLoja, setNomeLoja] = useState('');
+  const [logo, setLogo] = useState('');
 
   useEffect(() => {
     let ativo = true;
-    supabase.from('empresas').select('nome').eq('slug', slug).maybeSingle()
-      .then(({ data }) => { if (ativo) setNomeLoja(data?.nome || ''); });
+    supabase.from('empresas').select('nome, logo_url, logo_pequeno_url').eq('slug', slug).maybeSingle()
+      .then(({ data }) => {
+        if (!ativo) return;
+        setNomeLoja(data?.nome || '');
+        setLogo(data?.logo_pequeno_url || data?.logo_url || '');
+      });
     return () => { ativo = false; };
   }, [slug]);
 
@@ -48,6 +53,7 @@ function CartaoFidelidadeTenant() {
       linkAgendar={`/b/${slug}`}
       caminhoBase={`/b/${slug}/cartao`}
       chaveStorage={`kaizen_cartao_token_${slug}`}
+      logoSelo={logo || undefined}
     />
   );
 }

@@ -24,7 +24,7 @@ const gravarStorage = (chave, valor) => { try { localStorage.setItem(chave, valo
 const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent || '');
 const estaInstalado = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
 
-function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage }) {
+function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, logoSelo }) {
   const { token } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -145,7 +145,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage })
       ) : token ? (
         cartao ? (
           <Cartao cartao={cartao} config={config} t={t} idioma={idioma} nomeLoja={nomeLoja}
-            premio={premio} brinde={brinde} linkAgendar={linkAgendar}
+            premio={premio} brinde={brinde} linkAgendar={linkAgendar} logoSelo={logoSelo}
             indicar={indicar} copiado={copiado} />
         ) : (
           <p style={estilos.erro}>{erro}</p>
@@ -186,7 +186,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage })
   );
 }
 
-function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgendar, indicar, copiado }) {
+function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgendar, indicar, copiado, logoSelo }) {
   const meta = config?.meta_selos || 10;
   const seloBrinde = config?.selo_brinde && config.selo_brinde < meta ? config.selo_brinde : null;
   const noCiclo = cartao.selos_no_ciclo || 0;
@@ -254,9 +254,14 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
               <div key={n} style={{
                 ...estilos.selo,
                 ...(cheio ? estilos.seloCheio : {}),
+                ...(cheio && logoSelo ? { background: '#111', overflow: 'hidden' } : {}),
                 ...((ehBrinde || ehPremio) && !cheio ? { borderStyle: 'dashed', borderColor: OURO } : {}),
               }}>
-                {cheio ? '✂' : ehPremio ? '👑' : ehBrinde ? '🎁' : n}
+                {cheio
+                  ? (logoSelo
+                    ? <img src={logoSelo} alt="" style={{ ...estilos.carimbo, transform: `rotate(${((n * 37) % 25) - 12}deg)` }} />
+                    : '✂')
+                  : ehPremio ? '👑' : ehBrinde ? '🎁' : n}
               </div>
             );
           })}
@@ -310,9 +315,11 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
         <div style={{ ...estilos.bloco, marginTop: 16, position: 'relative' }}>
           <button onClick={() => setMostrarSalvar(false)} aria-label="×" style={estilos.fechar}>×</button>
           <h3 style={{ color: OURO, margin: '0 0 6px' }}>📲 {t('salvar_titulo')}</h3>
-          <p style={{ color: '#ccc', margin: 0, fontSize: 14, lineHeight: 1.5 }}>
-            {ehIOS() ? t('salvar_ios') : t('salvar_android')}
-          </p>
+          {(ehIOS() ? ['salvar_ios', 'salvar_android'] : ['salvar_android', 'salvar_ios']).map((k, i) => (
+            <p key={k} style={{ color: i === 0 ? '#e8e8e8' : '#999', margin: i === 0 ? 0 : '8px 0 0', fontSize: 14, lineHeight: 1.5 }}>
+              {t(k)}
+            </p>
+          ))}
         </div>
       )}
     </div>
@@ -343,6 +350,7 @@ const estilos = {
   gradeSelos: { display: 'grid', gap: 10, marginTop: 18 },
   selo: { aspectRatio: '1 / 1', borderRadius: '50%', border: '1.5px solid #444', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: 16, fontWeight: 'bold' },
   seloCheio: { background: OURO, borderColor: OURO, color: '#1a1a1a', fontSize: 20 },
+  carimbo: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' },
   recompensa: { background: '#14532d', border: '1px solid #4ade80', color: '#dcfce7', borderRadius: 16, padding: 16, margin: '16px 0', textAlign: 'center' },
   fechar: { position: 'absolute', top: 8, right: 12, background: 'none', border: 'none', color: '#888', fontSize: 22, cursor: 'pointer' },
 };

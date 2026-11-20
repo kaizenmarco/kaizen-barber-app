@@ -47,6 +47,7 @@ function CartaoFidelidade() {
       linkAgendar="/?aba=agendar"
       caminhoBase="/cartao"
       chaveStorage="kaizen_cartao_token"
+      logoSelo="/images/logo.jpg"
     />
   );
 }
