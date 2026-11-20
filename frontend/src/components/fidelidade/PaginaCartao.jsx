@@ -107,13 +107,17 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, l
     }
   };
 
+  const pctAmigo = Number(config?.desconto_pct) || 0;
+  const pctIndicacao = Number(config?.indicacao_pct ?? config?.desconto_pct) || 0;
+  const carimbo = logoSelo || config?.selo_url || null;
+
   const linkIndicacao = useMemo(() => {
     if (!cartao?.codigo_indicacao) return '';
     return `${window.location.origin}${caminhoBase}?ref=${cartao.codigo_indicacao}`;
   }, [cartao, caminhoBase]);
 
   const indicar = async () => {
-    const texto = t('indicar_mensagem', { pct: config?.desconto_pct, loja: nomeLoja, link: linkIndicacao });
+    const texto = t(pctAmigo > 0 ? 'indicar_mensagem' : 'indicar_mensagem_sem_desconto', { pct: pctAmigo, loja: nomeLoja, link: linkIndicacao });
     if (navigator.share) {
       try { await navigator.share({ text: texto }); return; } catch { /* cancelou — cai no copiar */ }
     }
@@ -145,7 +149,8 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, l
       ) : token ? (
         cartao ? (
           <Cartao cartao={cartao} config={config} t={t} idioma={idioma} nomeLoja={nomeLoja}
-            premio={premio} brinde={brinde} linkAgendar={linkAgendar} logoSelo={logoSelo}
+            premio={premio} brinde={brinde} linkAgendar={linkAgendar} logoSelo={carimbo}
+            pctAmigo={pctAmigo} pctIndicacao={pctIndicacao}
             indicar={indicar} copiado={copiado} />
         ) : (
           <p style={estilos.erro}>{erro}</p>
@@ -156,7 +161,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, l
         <form onSubmit={entrar} style={estilos.bloco}>
           {ref && <p style={{ color: '#4ade80', fontWeight: 'bold', margin: '0 0 8px' }}>{t('indicado_por_amigo')}</p>}
           <h2 style={{ color: OURO, margin: '0 0 8px', fontSize: 26 }}>
-            {t('entrar_titulo', { pct: config?.desconto_pct ?? 40 })}
+            {pctAmigo > 0 ? t('entrar_titulo', { pct: pctAmigo }) : t('entrar_titulo_sem_desconto')}
           </h2>
           <p style={{ color: '#ccc', margin: '0 0 16px', lineHeight: 1.5 }}>{t('entrar_sub')}</p>
 
@@ -186,7 +191,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, l
   );
 }
 
-function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgendar, indicar, copiado, logoSelo }) {
+function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgendar, indicar, copiado, logoSelo, pctAmigo, pctIndicacao }) {
   const meta = config?.meta_selos || 10;
   const seloBrinde = config?.selo_brinde && config.selo_brinde < meta ? config.selo_brinde : null;
   const noCiclo = cartao.selos_no_ciclo || 0;
@@ -297,11 +302,13 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
         </a>
       )}
 
-      {/* Indicação */}
+      {/* Indicação (some se a barbearia não dá nada nem ao amigo nem a quem indica) */}
+      {(pctAmigo > 0 || pctIndicacao > 0) && (
       <div style={{ ...estilos.bloco, marginTop: 16 }}>
         <h3 style={{ color: OURO, margin: '0 0 6px' }}>🤝 {t('indicar_titulo')}</h3>
         <p style={{ color: '#ccc', margin: '0 0 12px', fontSize: 14, lineHeight: 1.5 }}>
-          {t('indicar_texto', { pct: config?.desconto_pct, pctInd: config?.indicacao_pct ?? config?.desconto_pct })}
+          {t(pctAmigo > 0 && pctIndicacao > 0 ? 'indicar_texto' : pctAmigo > 0 ? 'indicar_texto_so_amigo' : 'indicar_texto_so_voce',
+            { pct: pctAmigo, pctInd: pctIndicacao })}
         </p>
         <button onClick={indicar} style={estilos.botaoSecundario}>
           {copiado ? t('indicar_copiado') : t('indicar_botao')}
@@ -310,6 +317,7 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
           <p style={{ color: '#4ade80', fontSize: 13, margin: '10px 0 0' }}>{t('indicacoes', { n: cartao.indicacoes_creditadas })}</p>
         )}
       </div>
+      )}
 
       {mostrarSalvar && (
         <div style={{ ...estilos.bloco, marginTop: 16, position: 'relative' }}>

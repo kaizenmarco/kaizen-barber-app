@@ -5,6 +5,10 @@ const TEXTOS = {
   'pt-BR': {
     titulo: 'Cartão Fidelidade',
     entrar_titulo: 'Ganhe {pct}% OFF na sua 1ª visita',
+    entrar_titulo_sem_desconto: 'Seu cartão fidelidade',
+    indicar_texto_so_amigo: 'Seu amigo ganha {pct}% OFF na 1ª visita.',
+    indicar_texto_so_voce: 'Quando seu amigo vier, você ganha até {pctInd}% OFF.',
+    indicar_mensagem_sem_desconto: 'Pegue seu cartão fidelidade da {loja}: {link}',
     entrar_sub: 'Salve seu cartão fidelidade no celular. A cada visita você ganha um selo.',
     entrar_regra_selos: 'A cada {meta} selos: {premio}',
     entrar_regra_brinde: 'No {n}º selo: {brinde}',
@@ -49,6 +53,10 @@ const TEXTOS = {
   en: {
     titulo: 'Loyalty Card',
     entrar_titulo: 'Get {pct}% OFF your first visit',
+    entrar_titulo_sem_desconto: 'Your loyalty card',
+    indicar_texto_so_amigo: 'Your friend gets {pct}% OFF their first visit.',
+    indicar_texto_so_voce: 'When your friend comes, you get up to {pctInd}% OFF.',
+    indicar_mensagem_sem_desconto: 'Get your {loja} loyalty card: {link}',
     entrar_sub: 'Save your loyalty card on your phone. Earn a stamp every visit.',
     entrar_regra_selos: 'Every {meta} stamps: {premio}',
     entrar_regra_brinde: 'Stamp #{n}: {brinde}',
@@ -93,6 +101,10 @@ const TEXTOS = {
   ja: {
     titulo: 'ポイントカード',
     entrar_titulo: '初回 {pct}% OFF',
+    entrar_titulo_sem_desconto: 'ポイントカード',
+    indicar_texto_so_amigo: 'お友達は初回{pct}% OFF。',
+    indicar_texto_so_voce: 'お友達がご来店すると、お客様に最大{pctInd}% OFFクーポン。',
+    indicar_mensagem_sem_desconto: '{loja}のポイントカード：{link}',
     entrar_sub: 'スマホにポイントカードを保存。来店ごとにスタンプ1個。',
     entrar_regra_selos: 'スタンプ{meta}個で：{premio}',
     entrar_regra_brinde: '{n}個目：{brinde}',
@@ -137,6 +149,10 @@ const TEXTOS = {
   es: {
     titulo: 'Tarjeta de Fidelidad',
     entrar_titulo: '{pct}% OFF en tu primera visita',
+    entrar_titulo_sem_desconto: 'Tu tarjeta de fidelidad',
+    indicar_texto_so_amigo: 'Tu amigo gana {pct}% OFF en su primera visita.',
+    indicar_texto_so_voce: 'Cuando tu amigo venga, ganas hasta {pctInd}% OFF.',
+    indicar_mensagem_sem_desconto: 'Consigue tu tarjeta de fidelidad de {loja}: {link}',
     entrar_sub: 'Guarda tu tarjeta de fidelidad en el celular. Ganas un sello en cada visita.',
     entrar_regra_selos: 'Cada {meta} sellos: {premio}',
     entrar_regra_brinde: 'Sello n.º {n}: {brinde}',

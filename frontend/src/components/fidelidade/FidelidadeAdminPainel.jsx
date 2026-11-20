@@ -42,6 +42,12 @@ const TEXTOS = {
     tipo1a: '1ª visita', tipoInd: 'Indicação', trouxe: 'trouxe {n}',
     stDisponivel: 'Disponível', stAgendado: 'Agendado {d}', stUsado: 'Usado {d}',
     nenhumDesconto: 'Nenhum desconto aqui.',
+    exemplo: 'ex.: {v}', regrasVazias: 'Defina as regras do seu programa e marque "Programa ativo" para começar.',
+    faltaRegras: 'Para ativar o programa, preencha: {campos}.',
+    carimbo: 'Carimbo do cartão', carimboTesoura: '✂️ Tesoura', carimboLogo: 'Logo da barbearia', carimboImagem: 'Imagem própria',
+    semLogo: 'Cadastre a logo na aba Visual para usar esta opção.', enviarImagem: 'Enviar imagem', enviando: 'Enviando...',
+    carimboDica: 'Imagem quadrada; ela aparece recortada em círculo.',
+    qrCartazSemDesconto: 'Cartão Fidelidade',
     passo5: '5. Quando aparecer uma recompensa aqui, entregue e clique em "Entregar" para dar baixa.',
     qrCartaz: '{pct}% OFF', qrCartazSub: 'na sua 1ª visita', qrCartazRodape: 'Aponte a câmera e salve seu cartão fidelidade',
   },
@@ -73,6 +79,12 @@ const TEXTOS = {
     tipo1a: 'First visit', tipoInd: 'Referral', trouxe: 'brought {n}',
     stDisponivel: 'Available', stAgendado: 'Booked {d}', stUsado: 'Used {d}',
     nenhumDesconto: 'No discounts here.',
+    exemplo: 'e.g. {v}', regrasVazias: 'Set your program rules and tick "Program active" to start.',
+    faltaRegras: 'To activate the program, fill in: {campos}.',
+    carimbo: 'Card stamp', carimboTesoura: '✂️ Scissors', carimboLogo: 'Shop logo', carimboImagem: 'Custom image',
+    semLogo: 'Upload your logo in the Visual tab to use this option.', enviarImagem: 'Upload image', enviando: 'Uploading...',
+    carimboDica: 'Square image; it is shown cropped into a circle.',
+    qrCartazSemDesconto: 'Loyalty Card',
     passo5: '5. When a reward shows up here, hand it out and click "Hand out" to record it.',
     qrCartaz: '{pct}% OFF', qrCartazSub: 'your first visit', qrCartazRodape: 'Scan to save your loyalty card',
   },
@@ -104,6 +116,12 @@ const TEXTOS = {
     tipo1a: '初回', tipoInd: '紹介', trouxe: '{n}様をご紹介',
     stDisponivel: '利用可能', stAgendado: '予約済み {d}', stUsado: '使用済み {d}',
     nenhumDesconto: '割引はありません。',
+    exemplo: '例：{v}', regrasVazias: 'ルールを設定し「プログラム有効」にチェックすると開始できます。',
+    faltaRegras: 'プログラムを有効にするには次を入力してください：{campos}。',
+    carimbo: 'スタンプのデザイン', carimboTesoura: '✂️ ハサミ', carimboLogo: '店舗ロゴ', carimboImagem: 'オリジナル画像',
+    semLogo: 'この設定を使うには「ビジュアル」タブでロゴを登録してください。', enviarImagem: '画像をアップロード', enviando: 'アップロード中...',
+    carimboDica: '正方形の画像がおすすめです（円形に切り抜かれます）。',
+    qrCartazSemDesconto: 'ポイントカード',
     passo5: '5. 特典が表示されたらお渡しし、「渡す」をクリックして記録してください。',
     qrCartaz: '初回 {pct}% OFF', qrCartazSub: '', qrCartazRodape: 'カメラで読み取ってポイントカードを保存',
   },
@@ -116,7 +134,11 @@ const CAMPOS_CONFIG = ['ativo', 'desconto_primeira_visita_pct', 'validade_cupom_
   'selos_boas_vindas', 'indicacao_pct_inicial', 'indicacao_reducao_pct', 'indicacao_minimo_pct',
   'brinde_pt', 'brinde_en', 'brinde_ja', 'premio_pt', 'premio_en', 'premio_ja'];
 
-function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, linkCartao }) {
+const CAMPOS_NUMERICOS = ['desconto_primeira_visita_pct', 'validade_cupom_dias', 'meta_selos', 'selo_brinde', 'selos_boas_vindas',
+  'indicacao_pct_inicial', 'indicacao_reducao_pct', 'indicacao_minimo_pct'];
+
+// opcoesSelo (só no Kaizen Flow): { logoUrl, enviarImagem(arquivo) → url } — habilita a escolha do carimbo.
+function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, linkCartao, opcoesSelo }) {
   const T = TEXTOS[idioma] || TEXTOS['pt-BR'];
   const t = useCallback((k, v) => fmt(T[k] ?? TEXTOS['pt-BR'][k] ?? k, v), [T]);
   const locale = idioma === 'ja' ? 'ja-JP' : idioma === 'en' ? 'en-US' : 'pt-BR';
@@ -132,6 +154,8 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
   const [salvo, setSalvo] = useState(false);
   const [copiado, setCopiado] = useState('');
   const qrRef = useRef(null);
+  const [enviandoSelo, setEnviandoSelo] = useState(false);
+  const camposConfig = useMemo(() => (opcoesSelo ? [...CAMPOS_CONFIG, 'selo_estilo', 'selo_imagem_url'] : CAMPOS_CONFIG), [opcoesSelo]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -140,13 +164,13 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
       setLinhas(r || []);
       setDescontos(d || []);
       setConfig(c);
-      setForm(c ? Object.fromEntries(CAMPOS_CONFIG.map((k) => [k, c[k] ?? ''])) : null);
+      setForm(c ? Object.fromEntries(camposConfig.map((k) => [k, c[k] ?? ''])) : null);
     } catch (e) {
       alert(t('erro', { m: e.message }));
     } finally {
       setCarregando(false);
     }
-  }, [api, t]);
+  }, [api, t, camposConfig]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -154,9 +178,21 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
     e.preventDefault();
     try {
       const campos = { ...form };
-      ['desconto_primeira_visita_pct', 'validade_cupom_dias', 'meta_selos', 'selos_boas_vindas',
-        'indicacao_pct_inicial', 'indicacao_reducao_pct', 'indicacao_minimo_pct'].forEach((k) => { campos[k] = Number(campos[k]); });
-      campos.selo_brinde = Number(campos.selo_brinde) > 0 ? Number(campos.selo_brinde) : null;
+      CAMPOS_NUMERICOS.forEach((k) => { campos[k] = campos[k] === '' || campos[k] == null ? null : Number(campos[k]); });
+      campos.selos_boas_vindas = campos.selos_boas_vindas ?? 0;
+      campos.selo_brinde = campos.selo_brinde > 0 ? campos.selo_brinde : null;
+      Object.keys(campos).filter((k) => /^(brinde|premio)_/.test(k) || k === 'selo_imagem_url')
+        .forEach((k) => { campos[k] = String(campos[k] ?? '').trim() || null; });
+      if (campos.ativo) {
+        const faltando = [
+          campos.desconto_primeira_visita_pct == null && t('pct'),
+          campos.validade_cupom_dias == null && t('validade'),
+          campos.meta_selos == null && t('meta'),
+          !campos.premio_pt && `${t('premio')} (PT)`,
+          campos.selo_brinde && !campos.brinde_pt && `${t('brinde')} (PT)`,
+        ].filter(Boolean);
+        if (faltando.length) { alert(t('faltaRegras', { campos: faltando.join(', ') })); return; }
+      }
       await api.salvarConfig(campos);
       setSalvo(true);
       setTimeout(() => setSalvo(false), 2500);
@@ -206,8 +242,8 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
       .loja{letter-spacing:4px;font-weight:800;font-size:22px}.pct{font-size:64px;font-weight:900;margin:16px 0 0}
       .sub{font-size:24px;margin:0 0 24px}svg{width:300px;height:300px}.rodape{font-size:18px;margin-top:20px}</style></head>
       <body><div class="loja">${nomeLoja.toUpperCase()}</div>
-      <div class="pct">${t('qrCartaz', { pct: config?.desconto_primeira_visita_pct ?? 40 })}</div>
-      <div class="sub">${t('qrCartazSub')}</div>${svg}<div class="rodape">${t('qrCartazRodape')}</div>
+      <div class="pct">${config?.desconto_primeira_visita_pct > 0 ? t('qrCartaz', { pct: config.desconto_primeira_visita_pct }) : t('qrCartazSemDesconto')}</div>
+      <div class="sub">${config?.desconto_primeira_visita_pct > 0 ? t('qrCartazSub') : ''}</div>${svg}<div class="rodape">${t('qrCartazRodape')}</div>
       <script>window.onload=function(){window.print()}</script></body></html>`);
     w.document.close();
   };
@@ -278,19 +314,23 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
         {form && (
           <form onSubmit={salvarConfig} style={{ ...estilos.caixa, flex: '2 1 420px' }}>
             <h3 style={{ color: OURO, marginTop: 0 }}>{t('config')}</h3>
+            {opcoesSelo && !config?.ativo && (
+              <p style={{ background: '#3b2f0b', color: '#fde68a', padding: '8px 12px', borderRadius: 8, fontSize: 13 }}>{t('regrasVazias')}</p>
+            )}
             <label style={{ ...estilos.label, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" checked={!!form.ativo} onChange={(e) => setForm({ ...form, ativo: e.target.checked })} />
               {t('ativo')}
             </label>
             <div style={estilos.grade}>
-              {[['desconto_primeira_visita_pct', 'pct', 0, 100], ['validade_cupom_dias', 'validade', 1, 365],
-                ['meta_selos', 'meta', 3, 30], ['selo_brinde', 'seloBrinde', 0, 29], ['selos_boas_vindas', 'boasVindas', 0, 5],
-                ['indicacao_pct_inicial', 'indInicial', 0, 100], ['indicacao_reducao_pct', 'indReducao', 0, 100],
-                ['indicacao_minimo_pct', 'indMinimo', 0, 100]]
-                .map(([campo, rotulo, min, max]) => (
+              {[['desconto_primeira_visita_pct', 'pct', 0, 100, 30], ['validade_cupom_dias', 'validade', 1, 365, 30],
+                ['meta_selos', 'meta', 3, 30, 8], ['selo_brinde', 'seloBrinde', 0, 29, 4], ['selos_boas_vindas', 'boasVindas', 0, 5, 0],
+                ['indicacao_pct_inicial', 'indInicial', 0, 100, 20], ['indicacao_reducao_pct', 'indReducao', 0, 100, 5],
+                ['indicacao_minimo_pct', 'indMinimo', 0, 100, 5]]
+                .map(([campo, rotulo, min, max, ex]) => (
                   <label key={campo} style={estilos.label}>
                     {t(rotulo)}
                     <input type="number" min={min} max={max} value={form[campo] ?? ''} style={estilos.input}
+                      placeholder={t('exemplo', { v: ex })}
                       onChange={(e) => setForm({ ...form, [campo]: e.target.value })} />
                   </label>
                 ))}
@@ -301,12 +341,73 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
                   <label key={lang} style={estilos.label}>
                     {t(tipo)} ({lang.toUpperCase()})
                     <input value={form[`${tipo}_${lang}`] ?? ''} style={estilos.input} maxLength={60}
+                      placeholder={lang === 'pt' ? t('exemplo', { v: tipo === 'brinde' ? 'Pomada de brinde' : 'Corte grátis' }) : ''}
                       onChange={(e) => setForm({ ...form, [`${tipo}_${lang}`]: e.target.value })} />
                   </label>
                 ))}
               </div>
             ))}
-            <button type="submit" className="btn-primary" style={{ marginTop: 10 }}>{salvo ? t('salvo') : t('salvar')}</button>
+            {opcoesSelo && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ color: '#ccc', fontSize: 13, marginBottom: 6 }}>{t('carimbo')}</div>
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {[['tesoura', 'carimboTesoura'], ['logo', 'carimboLogo'], ['imagem', 'carimboImagem']].map(([v, rotulo]) => (
+                    <label key={v} style={{ color: '#e8e8e8', display: 'flex', gap: 6, alignItems: 'center', fontSize: 14,
+                      opacity: v === 'logo' && !opcoesSelo.logoUrl ? 0.5 : 1 }}>
+                      <input type="radio" name="selo_estilo" value={v} checked={(form.selo_estilo || 'tesoura') === v}
+                        disabled={v === 'logo' && !opcoesSelo.logoUrl}
+                        onChange={async () => {
+                          setForm((f) => ({ ...f, selo_estilo: v, ...(v !== 'imagem' ? { selo_imagem_url: '' } : {}) }));
+                          if (v !== 'logo') return;
+                          // cópia pequena da logo para o carimbo (se falhar, usa a logo original)
+                          setEnviandoSelo(true);
+                          try {
+                            const url = await opcoesSelo.enviarImagem(opcoesSelo.logoUrl);
+                            setForm((f) => (f.selo_estilo === 'logo' ? { ...f, selo_imagem_url: url } : f));
+                          } catch { /* fica com a logo original */ } finally {
+                            setEnviandoSelo(false);
+                          }
+                        }} />
+                      {t(rotulo)}
+                    </label>
+                  ))}
+                  <div style={estilos.previaSelo}>
+                    {(() => {
+                      const url = form.selo_estilo === 'logo' ? (form.selo_imagem_url || opcoesSelo.logoUrl)
+                        : form.selo_estilo === 'imagem' ? form.selo_imagem_url : null;
+                      return url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '✂';
+                    })()}
+                  </div>
+                </div>
+                {!opcoesSelo.logoUrl && <div style={{ color: '#888', fontSize: 12, marginTop: 4 }}>{t('semLogo')}</div>}
+                {form.selo_estilo === 'imagem' && (
+                  <div style={{ marginTop: 8 }}>
+                    <label className="btn-secondary" style={{ ...estilos.botaoPequeno, display: 'inline-block', cursor: 'pointer' }}>
+                      {enviandoSelo ? t('enviando') : t('enviarImagem')}
+                      <input type="file" accept="image/*" style={{ display: 'none' }} disabled={enviandoSelo}
+                        onChange={async (e) => {
+                          const arquivo = e.target.files?.[0];
+                          if (!arquivo) return;
+                          setEnviandoSelo(true);
+                          try {
+                            const url = await opcoesSelo.enviarImagem(arquivo);
+                            setForm((f) => ({ ...f, selo_imagem_url: url }));
+                          } catch (err) {
+                            alert(t('erro', { m: err.message }));
+                          } finally {
+                            setEnviandoSelo(false);
+                            e.target.value = '';
+                          }
+                        }} />
+                    </label>
+                    <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>{t('carimboDica')}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            <button type="submit" className="btn-primary" style={{ marginTop: 14 }} disabled={enviandoSelo}>
+              {enviandoSelo ? t('enviando') : salvo ? t('salvo') : t('salvar')}
+            </button>
           </form>
         )}
       </div>
@@ -442,14 +543,14 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
       <section style={{ ...estilos.caixa, marginTop: 30 }}>
         <h3 style={{ color: OURO, marginTop: 0 }}>{t('comoFunciona')}</h3>
         <div style={{ color: '#e8e8e8', lineHeight: 1.8 }}>
-          <p>{t('passo1', { pct: config?.desconto_primeira_visita_pct, dias: config?.validade_cupom_dias })}</p>
+          <p>{t('passo1', { pct: config?.desconto_primeira_visita_pct ?? '—', dias: config?.validade_cupom_dias ?? '—' })}</p>
           <p>{t('passo2')}</p>
           <p>{t('passo3', { b: config?.selo_brinde || '—', brinde: nomeRec('brinde'), m: meta, premio: nomeRec('premio') })}</p>
           <p>{t('passo4', {
-            pct: config?.desconto_primeira_visita_pct, dias: config?.validade_cupom_dias, min: config?.indicacao_minimo_pct ?? 10,
-            ini: config?.indicacao_pct_inicial ?? 40,
-            ini2: Math.max((config?.indicacao_pct_inicial ?? 40) - (config?.indicacao_reducao_pct ?? 10), config?.indicacao_minimo_pct ?? 10),
-            ini3: Math.max((config?.indicacao_pct_inicial ?? 40) - 2 * (config?.indicacao_reducao_pct ?? 10), config?.indicacao_minimo_pct ?? 10),
+            pct: config?.desconto_primeira_visita_pct ?? '—', dias: config?.validade_cupom_dias ?? '—', min: config?.indicacao_minimo_pct ?? 0,
+            ini: config?.indicacao_pct_inicial ?? 0,
+            ini2: Math.max((config?.indicacao_pct_inicial ?? 0) - (config?.indicacao_reducao_pct ?? 0), config?.indicacao_minimo_pct ?? 0),
+            ini3: Math.max((config?.indicacao_pct_inicial ?? 0) - 2 * (config?.indicacao_reducao_pct ?? 0), config?.indicacao_minimo_pct ?? 0),
           })}</p>
           <p>{t('passo5')}</p>
         </div>
@@ -465,6 +566,8 @@ const estilos = {
   input: { padding: 10, borderRadius: 6, border: `1px solid ${OURO}`, background: '#1f1f1f', color: '#e8e8e8', fontSize: 14 },
   botaoResgate: { display: 'block', margin: '2px 0', padding: '6px 10px', borderRadius: 6, border: 'none', background: '#4ade80', color: '#1a1a1a', fontWeight: 'bold', cursor: 'pointer', fontSize: 12 },
   botaoPequeno: { padding: '6px 10px', fontSize: 12 },
+  previaSelo: { width: 52, height: 52, borderRadius: '50%', border: `2px solid ${OURO}`, overflow: 'hidden', background: OURO,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#1a1a1a' },
 };
 
 export default FidelidadeAdminPainel;

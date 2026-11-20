@@ -3,23 +3,19 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../../config/supabaseClientTenant';
 import PaginaCartao from '../../components/fidelidade/PaginaCartao';
 
-// Cartão Fidelidade digital de cada barbearia do Kaizen Flow.
+// Cartão Fidelidade digital de cada barbearia do Kaizen Flow. O carimbo
+// (tesoura, logo ou imagem própria) vem da config: config.selo_url.
 //   /b/:slug/cartao          → QR code do balcão
 //   /b/:slug/cartao/:token   → cartão pessoal do cliente
 
 function CartaoFidelidadeTenant() {
   const { slug } = useParams();
   const [nomeLoja, setNomeLoja] = useState('');
-  const [logo, setLogo] = useState('');
 
   useEffect(() => {
     let ativo = true;
-    supabase.from('empresas').select('nome, logo_url, logo_pequeno_url').eq('slug', slug).maybeSingle()
-      .then(({ data }) => {
-        if (!ativo) return;
-        setNomeLoja(data?.nome || '');
-        setLogo(data?.logo_pequeno_url || data?.logo_url || '');
-      });
+    supabase.from('empresas').select('nome').eq('slug', slug).maybeSingle()
+      .then(({ data }) => { if (ativo) setNomeLoja(data?.nome || ''); });
     return () => { ativo = false; };
   }, [slug]);
 
@@ -53,7 +49,6 @@ function CartaoFidelidadeTenant() {
       linkAgendar={`/b/${slug}`}
       caminhoBase={`/b/${slug}/cartao`}
       chaveStorage={`kaizen_cartao_token_${slug}`}
-      logoSelo={logo || undefined}
     />
   );
 }
