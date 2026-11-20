@@ -47,6 +47,7 @@ function CartaoFidelidadeTenant() {
       api={api}
       nomeLoja={nomeLoja || ' '}
       linkAgendar={`/b/${slug}`}
+      linkInicio={`/b/${slug}`}
       caminhoBase={`/b/${slug}/cartao`}
       chaveStorage={`kaizen_cartao_token_${slug}`}
     />

@@ -14,6 +14,7 @@ const configParaJson = (c) => c && ({
   desconto_pct: c.desconto_primeira_visita_pct,
   validade_cupom_dias: c.validade_cupom_dias,
   indicacao_pct: c.indicacao_pct_inicial,
+  selos_obrigado: c.selos_obrigado_clientes,
   brinde: { pt: c.brinde_pt, en: c.brinde_en, ja: c.brinde_ja },
   premio: { pt: c.premio_pt, en: c.premio_en, ja: c.premio_ja },
 });
@@ -45,6 +46,7 @@ function CartaoFidelidade() {
       api={api}
       nomeLoja="Kaizen Barber Shop"
       linkAgendar="/?aba=agendar"
+      linkInicio="/?aba=fidelidade"
       caminhoBase="/cartao"
       chaveStorage="kaizen_cartao_token"
       logoSelo="/images/logo.jpg"

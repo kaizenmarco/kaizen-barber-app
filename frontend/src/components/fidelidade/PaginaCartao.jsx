@@ -24,7 +24,7 @@ const gravarStorage = (chave, valor) => { try { localStorage.setItem(chave, valo
 const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent || '');
 const estaInstalado = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
 
-function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, logoSelo }) {
+function PaginaCartao({ api, nomeLoja, linkAgendar, linkInicio, caminhoBase, chaveStorage, logoSelo }) {
   const { token } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -133,13 +133,16 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, l
 
   return (
     <div style={estilos.pagina}>
-      <div style={estilos.idiomas}>
+      <div style={estilos.topo}>
+        {linkInicio ? <a href={linkInicio} style={estilos.voltar}>{t('voltar')}</a> : <span />}
+        <div style={estilos.idiomas}>
         {IDIOMAS_CARTAO.map((op) => (
           <button key={op.codigo} onClick={() => setIdioma(op.codigo)}
             style={{ ...estilos.botaoIdioma, ...(idioma === op.codigo ? estilos.botaoIdiomaAtivo : {}) }}>
             {op.rotulo}
           </button>
         ))}
+        </div>
       </div>
 
       <h1 style={estilos.loja}>{nomeLoja}</h1>
@@ -161,9 +164,30 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, l
         <form onSubmit={entrar} style={estilos.bloco}>
           {ref && <p style={{ color: '#4ade80', fontWeight: 'bold', margin: '0 0 8px' }}>{t('indicado_por_amigo')}</p>}
           <h2 style={{ color: OURO, margin: '0 0 8px', fontSize: 26 }}>
-            {pctAmigo > 0 ? t('entrar_titulo', { pct: pctAmigo }) : t('entrar_titulo_sem_desconto')}
+            {ref && pctAmigo > 0 ? t('entrar_titulo', { pct: pctAmigo }) : t('entrar_titulo_sem_desconto')}
           </h2>
-          <p style={{ color: '#ccc', margin: '0 0 16px', lineHeight: 1.5 }}>{t('entrar_sub')}</p>
+
+          {/* Sem convite: deixa claro que o desconto é só para quem vem pela 1ª vez
+              e mostra o que o cliente antigo ganha (selos + indicação). */}
+          {!ref && (pctAmigo > 0 || pctIndicacao > 0) && (
+            <div style={{ display: 'grid', gap: 10, margin: '4px 0 14px' }}>
+              {pctAmigo > 0 && (
+                <div style={estilos.porta}>
+                  <div style={estilos.portaTitulo}>{t('porta_novo_titulo')}</div>
+                  <div style={estilos.portaTexto}>{t('porta_novo_texto', { pct: pctAmigo })}</div>
+                </div>
+              )}
+              <div style={estilos.porta}>
+                <div style={estilos.portaTitulo}>{t('porta_cliente_titulo')}</div>
+                <div style={estilos.portaTexto}>
+                  {config?.selos_obrigado > 0 && <strong style={{ color: OURO }}>{t('porta_cliente_presente', { n: config.selos_obrigado })} </strong>}
+                  {t(pctIndicacao > 0 ? 'porta_cliente_texto' : 'porta_cliente_texto_sem_ind', { pctInd: pctIndicacao })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <p style={{ color: '#ccc', margin: '0 0 16px', lineHeight: 1.5 }}>{t(ref ? 'entrar_sub' : 'entrar_sub_geral')}</p>
 
           {config && (
             <div style={{ ...estilos.regras }}>
@@ -172,6 +196,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, caminhoBase, chaveStorage, l
                 <p style={estilos.regra}>🎁 {t('entrar_regra_brinde', { n: config.selo_brinde, brinde })}</p>
               )}
               <p style={estilos.regra}>✂️ {t('entrar_regra_selos', { meta: config.meta_selos, premio })}</p>
+              {pctAmigo > 0 && <p style={{ ...estilos.regra, color: '#999', fontSize: 12, marginTop: 8 }}>* {t('regra_so_novos')}</p>}
             </div>
           )}
 
@@ -214,6 +239,18 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
       <p style={{ color: '#e8e8e8', fontSize: 18, margin: '0 0 12px', textAlign: 'center' }}>
         {t('ola', { nome: cartao.primeiro_nome || '' })}
       </p>
+
+      {!cupom.ativo && cartao.visitas > 0 && cuponsIndicacao.length === 0 && (
+        <div style={{ ...estilos.bloco, marginBottom: 16, textAlign: 'center', borderColor: OURO }}>
+          <div style={{ color: OURO, fontWeight: 900, fontSize: 17 }}>{t('volta_titulo')}</div>
+          {cartao.selos_obrigado > 0 && (
+            <div style={{ color: '#e8e8e8', fontWeight: 'bold', fontSize: 15, marginTop: 6 }}>{t('presente_obrigado', { n: cartao.selos_obrigado })}</div>
+          )}
+          <div style={{ color: '#ccc', fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>
+            {t(pctIndicacao > 0 ? 'volta_texto' : 'volta_texto_sem_ind', { pctInd: pctIndicacao })}
+          </div>
+        </div>
+      )}
 
       {cupom.ativo && (
         <div style={estilos.cupom}>
@@ -340,7 +377,12 @@ const estilos = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 16px 48px', boxSizing: 'border-box',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", Roboto, sans-serif',
   },
-  idiomas: { display: 'flex', gap: 6, alignSelf: 'flex-end', marginBottom: 8 },
+  topo: { width: '100%', maxWidth: 420, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  voltar: { color: OURO, textDecoration: 'none', fontWeight: 'bold', fontSize: 15, padding: '6px 4px' },
+  idiomas: { display: 'flex', gap: 6 },
+  porta: { background: '#141414', border: '1px solid #3a3320', borderRadius: 12, padding: '10px 14px' },
+  portaTitulo: { color: OURO, fontWeight: 'bold', fontSize: 15 },
+  portaTexto: { color: '#e8e8e8', fontSize: 14, marginTop: 4, lineHeight: 1.5 },
   botaoIdioma: { background: 'transparent', color: OURO, border: `1px solid ${OURO}`, borderRadius: 6, padding: '4px 8px', fontSize: 12, cursor: 'pointer' },
   botaoIdiomaAtivo: { background: OURO, color: '#1a1a1a' },
   loja: { color: OURO, fontSize: 22, letterSpacing: 3, margin: '8px 0 16px', textAlign: 'center' },
