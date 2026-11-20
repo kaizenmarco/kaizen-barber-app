@@ -30,9 +30,9 @@ create table if not exists public.config_fidelidade (
   brinde_pt text not null default 'Sobrancelha grátis',
   brinde_en text not null default 'Free eyebrow trim',
   brinde_ja text not null default '眉カット無料',
-  premio_pt text not null default 'Corte grátis',
-  premio_en text not null default 'Free haircut',
-  premio_ja text not null default 'カット無料',
+  premio_pt text not null default '50% OFF no corte',
+  premio_en text not null default '50% off your haircut',
+  premio_ja text not null default 'カット50%OFF',
   data_lancamento date not null default current_date,
   atualizado_em timestamptz not null default now()
 );

@@ -123,7 +123,7 @@ const TEXTOS = {
 
     fidelidade_titulo: 'Fidelidade',
     fidelidade_regra1: '1 selo por atendimento realizado, direto no seu celular',
-    fidelidade_regra2: 'Junte selos e ganhe brinde e corte grátis',
+    fidelidade_regra2: 'Junte selos e ganhe brinde e 50% OFF no corte',
     fidelidade_cartao_titulo: 'Cartão Fidelidade Digital',
     fidelidade_cartao_texto: 'Primeira vez aqui? Pegue seu cartão e ganhe desconto na 1ª visita.',
     fidelidade_cartao_botao: 'Abrir meu cartão',
@@ -321,7 +321,7 @@ const TEXTOS = {
 
     fidelidade_titulo: 'Loyalty card',
     fidelidade_regra1: '1 stamp per completed appointment, right on your phone',
-    fidelidade_regra2: 'Collect stamps for a gift and a free haircut',
+    fidelidade_regra2: 'Collect stamps for a gift and 50% off a haircut',
     fidelidade_cartao_titulo: 'Digital Loyalty Card',
     fidelidade_cartao_texto: 'First time here? Get your card and a discount on your first visit.',
     fidelidade_cartao_botao: 'Open my card',
@@ -519,7 +519,7 @@ const TEXTOS = {
 
     fidelidade_titulo: 'ポイントカード',
     fidelidade_regra1: 'ご来店ごとにスマホのカードにスタンプ1個',
-    fidelidade_regra2: 'スタンプを集めてプレゼントと無料カット',
+    fidelidade_regra2: 'スタンプを集めてプレゼントとカット50%OFF',
     fidelidade_cartao_titulo: 'デジタルポイントカード',
     fidelidade_cartao_texto: '初めての方はカードを受け取ると初回割引！',
     fidelidade_cartao_botao: 'カードを開く',
@@ -717,7 +717,7 @@ const TEXTOS = {
 
     fidelidade_titulo: 'Fidelidad',
     fidelidade_regra1: '1 sello por servicio realizado, directo en tu celular',
-    fidelidade_regra2: 'Junta sellos y gana un regalo y un corte gratis',
+    fidelidade_regra2: 'Junta sellos y gana un regalo y 50% OFF en el corte',
     fidelidade_cartao_titulo: 'Tarjeta de Fidelidad Digital',
     fidelidade_cartao_texto: '¿Primera vez aquí? Toma tu tarjeta y gana descuento en tu primera visita.',
     fidelidade_cartao_botao: 'Abrir mi tarjeta',
