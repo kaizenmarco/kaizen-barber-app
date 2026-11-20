@@ -196,6 +196,11 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
     ? new Date(`${cupom.expira_em}T12:00:00`).toLocaleDateString(LOCALE_CARTAO[idioma] || 'pt-BR', { day: 'numeric', month: 'long' })
     : '';
 
+  const cuponsIndicacao = cartao.cupons || [];
+  const formatarData = (d) => new Date(`${d}T12:00:00`)
+    .toLocaleDateString(LOCALE_CARTAO[idioma] || 'pt-BR', { day: 'numeric', month: 'long' });
+  const temCupomLivre = cupom.ativo || cuponsIndicacao.some((c) => !c.agendado);
+
   const proximoBrinde = seloBrinde && noCiclo < seloBrinde ? seloBrinde - noCiclo : null;
   const [mostrarSalvar, setMostrarSalvar] = useState(() => !estaInstalado());
 
@@ -214,6 +219,18 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
           )}
         </div>
       )}
+
+      {cuponsIndicacao.map((c) => (
+        <div key={c.id} style={{ ...estilos.cupom, ...(c.agendado ? { opacity: 0.75 } : {}) }}>
+          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: 0.5 }}>🤝 {t('cupom_indicacao_titulo', { pct: c.pct })}</div>
+          <div style={{ fontSize: 13, marginTop: 6, opacity: 0.85 }}>
+            {c.agendado ? t('cupom_reservado') : t('cupom_indicacao_validade', { data: formatarData(c.expira_em) })}
+          </div>
+          {!c.agendado && !cupom.ativo && linkAgendar && (
+            <a href={linkAgendar} style={estilos.botaoCupom}>{t('agendar')} →</a>
+          )}
+        </div>
+      ))}
 
       {/* O cartão */}
       <div style={estilos.cartao}>
@@ -269,7 +286,7 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
         </p>
       )}
 
-      {!cupom.ativo && linkAgendar && (
+      {!temCupomLivre && linkAgendar && (
         <a href={linkAgendar} style={{ ...estilos.botaoPrincipal, display: 'block', textAlign: 'center', textDecoration: 'none' }}>
           {t('agendar')}
         </a>
@@ -279,7 +296,7 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
       <div style={{ ...estilos.bloco, marginTop: 16 }}>
         <h3 style={{ color: OURO, margin: '0 0 6px' }}>🤝 {t('indicar_titulo')}</h3>
         <p style={{ color: '#ccc', margin: '0 0 12px', fontSize: 14, lineHeight: 1.5 }}>
-          {t('indicar_texto', { pct: config?.desconto_pct })}
+          {t('indicar_texto', { pct: config?.desconto_pct, pctInd: config?.indicacao_pct ?? config?.desconto_pct })}
         </p>
         <button onClick={indicar} style={estilos.botaoSecundario}>
           {copiado ? t('indicar_copiado') : t('indicar_botao')}

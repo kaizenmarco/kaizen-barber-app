@@ -34,6 +34,7 @@ function Fidelidade({ idioma }) {
     },
     resgatar: (clienteId, marco) => rpc('fidelidade_resgatar', { p_cliente_id: clienteId, p_marco: marco }),
     tokenCliente: (clienteId) => rpc('fidelidade_token_cliente', { p_cliente_id: clienteId }),
+    descontos: () => rpc('fidelidade_descontos_admin'),
   }), []);
 
   const origem = origemPublica();

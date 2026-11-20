@@ -28,6 +28,7 @@ function Fidelidade({ idioma, empresaId, empresa }) {
     },
     resgatar: (clienteId, marco) => rpc('fidelidade_resgatar', { p_cliente_id: clienteId, p_marco: marco }),
     tokenCliente: (clienteId) => rpc('fidelidade_token_cliente', { p_cliente_id: clienteId }),
+    descontos: () => rpc('fidelidade_descontos_admin', { p_empresa_id: empresaId }),
   }), [empresaId]);
 
   const base = `${window.location.origin}/b/${empresa?.slug || ''}`;

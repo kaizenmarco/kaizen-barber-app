@@ -13,6 +13,7 @@ const configParaJson = (c) => c && ({
   selos_boas_vindas: c.selos_boas_vindas,
   desconto_pct: c.desconto_primeira_visita_pct,
   validade_cupom_dias: c.validade_cupom_dias,
+  indicacao_pct: c.indicacao_pct_inicial,
   brinde: { pt: c.brinde_pt, en: c.brinde_en, ja: c.brinde_ja },
   premio: { pt: c.premio_pt, en: c.premio_en, ja: c.premio_ja },
 });

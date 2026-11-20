@@ -17,7 +17,7 @@ const TEXTOS = {
   'pt-BR': {
     titulo: '🎁 Cartão Fidelidade Digital',
     sub: 'Cupom de 1ª visita pelo QR code + cartão de selos no celular do cliente.',
-    cartoes: 'Cartões criados', cuponsAtivos: 'Cupons de 1ª visita ativos', convertidos: '1ª visita realizada',
+    cartoes: 'Cartões criados', cuponsAtivos: 'Descontos ativos', convertidos: '1ª visita realizada',
     pendentes: 'Recompensas a entregar', indicacoes: 'Indicações que vieram',
     qrTitulo: 'QR code do balcão', qrTexto: 'Imprima e deixe no balcão, no espelho e no cartão de visita. Também serve para a bio do Instagram:',
     imprimir: '🖨️ Imprimir', copiarLink: '📋 Copiar link', copiado: '✅ Copiado',
@@ -34,14 +34,21 @@ const TEXTOS = {
     passo1: '1. O cliente aponta a câmera para o QR code e recebe {pct}% OFF na 1ª visita (válido por {dias} dias).',
     passo2: '2. O desconto entra sozinho quando ele agenda. Não acumula com promoções nem com o desconto de recorrência; vale o maior.',
     passo3: '3. Cada atendimento realizado vira 1 selo no cartão. Selo {b}: {brinde}. Selo {m}: {premio}. Depois o cartão recomeça.',
-    passo4: '4. Indicação: o amigo entra pelo link do cliente; quando ele vem pela 1ª vez, o cliente ganha +1 selo.',
+    passo4: '4. Indicação: o amigo entra pelo link do cliente e ganha {pct}% na 1ª visita. Quando ele vem, quem indicou ganha um cupom: {ini}% na 1ª indicação, depois {ini2}%, {ini3}%… até o mínimo de {min}%. Se passar {dias} dias sem indicar, volta para {ini}%.',
+    indInicial: 'Indicação: 1º cupom (%)', indReducao: 'Indicação: reduz a cada nova (%)', indMinimo: 'Indicação: mínimo (%)',
+    descontos: '🎟️ Descontos', descontosSub: 'Quem tem desconto, quanto e até quando. O desconto entra sozinho no próximo agendamento do cliente. Cupom vencido sem uso some da lista.',
+    abaAtivos: 'Ativos ({n})', abaUsados: 'Usados ({n})',
+    colTipo: 'Tipo', colDesconto: 'Desconto', colValidade: 'Válido até', colSituacao: 'Situação', colValor: 'Valor',
+    tipo1a: '1ª visita', tipoInd: 'Indicação', trouxe: 'trouxe {n}',
+    stDisponivel: 'Disponível', stAgendado: 'Agendado {d}', stUsado: 'Usado {d}',
+    nenhumDesconto: 'Nenhum desconto aqui.',
     passo5: '5. Quando aparecer uma recompensa aqui, entregue e clique em "Entregar" para dar baixa.',
     qrCartaz: '{pct}% OFF', qrCartazSub: 'na sua 1ª visita', qrCartazRodape: 'Aponte a câmera e salve seu cartão fidelidade',
   },
   en: {
     titulo: '🎁 Digital Loyalty Card',
     sub: 'First-visit coupon via QR code + stamp card on the customer\'s phone.',
-    cartoes: 'Cards created', cuponsAtivos: 'Active first-visit coupons', convertidos: 'First visit completed',
+    cartoes: 'Cards created', cuponsAtivos: 'Active discounts', convertidos: 'First visit completed',
     pendentes: 'Rewards to hand out', indicacoes: 'Referrals who came',
     qrTitulo: 'Counter QR code', qrTexto: 'Print it for the counter, mirror and business cards. Also works in your Instagram bio:',
     imprimir: '🖨️ Print', copiarLink: '📋 Copy link', copiado: '✅ Copied',
@@ -58,14 +65,21 @@ const TEXTOS = {
     passo1: '1. The customer scans the QR code and gets {pct}% OFF their first visit (valid for {dias} days).',
     passo2: '2. The discount is applied automatically when they book. It does not stack with promotions or the recurrence discount; the best one wins.',
     passo3: '3. Each completed visit is 1 stamp. Stamp {b}: {brinde}. Stamp {m}: {premio}. Then the card starts over.',
-    passo4: '4. Referral: a friend joins through the customer\'s link; when the friend comes for the first time, the customer gets +1 stamp.',
+    passo4: '4. Referral: the friend joins through the customer\'s link and gets {pct}% off the first visit. When the friend comes, the referrer gets a coupon: {ini}% for the 1st referral, then {ini2}%, {ini3}%… down to {min}%. After {dias} days without a referral it goes back to {ini}%.',
+    indInicial: 'Referral: 1st coupon (%)', indReducao: 'Referral: decrease per new one (%)', indMinimo: 'Referral: minimum (%)',
+    descontos: '🎟️ Discounts', descontosSub: 'Who has a discount, how much and until when. It is applied automatically to the customer\'s next booking. Expired unused coupons disappear from the list.',
+    abaAtivos: 'Active ({n})', abaUsados: 'Used ({n})',
+    colTipo: 'Type', colDesconto: 'Discount', colValidade: 'Valid until', colSituacao: 'Status', colValor: 'Amount',
+    tipo1a: 'First visit', tipoInd: 'Referral', trouxe: 'brought {n}',
+    stDisponivel: 'Available', stAgendado: 'Booked {d}', stUsado: 'Used {d}',
+    nenhumDesconto: 'No discounts here.',
     passo5: '5. When a reward shows up here, hand it out and click "Hand out" to record it.',
     qrCartaz: '{pct}% OFF', qrCartazSub: 'your first visit', qrCartazRodape: 'Scan to save your loyalty card',
   },
   ja: {
     titulo: '🎁 デジタルポイントカード',
     sub: 'QRコードで初回クーポン＋お客様のスマホにスタンプカード。',
-    cartoes: '発行カード数', cuponsAtivos: '有効な初回クーポン', convertidos: '初回来店済み',
+    cartoes: '発行カード数', cuponsAtivos: '有効な割引', convertidos: '初回来店済み',
     pendentes: '未渡しの特典', indicacoes: '紹介で来店',
     qrTitulo: '受付用QRコード', qrTexto: '受付・鏡・ショップカードに印刷してください。Instagramのプロフィールにも使えます：',
     imprimir: '🖨️ 印刷', copiarLink: '📋 リンクをコピー', copiado: '✅ コピーしました',
@@ -82,7 +96,14 @@ const TEXTOS = {
     passo1: '1. お客様がQRコードを読み取ると、初回{pct}% OFF（{dias}日間有効）。',
     passo2: '2. 予約時に自動で割引。キャンペーンやリピート割引とは併用不可（お得な方を適用）。',
     passo3: '3. 来店ごとにスタンプ1個。{b}個目：{brinde}。{m}個目：{premio}。その後カードはリセット。',
-    passo4: '4. 紹介：お友達がお客様のリンクから登録し、初来店するとお客様にスタンプ+1個。',
+    passo4: '4. 紹介：お友達はお客様のリンクから登録し初回{pct}% OFF。お友達が来店すると紹介者にクーポン：1人目{ini}%、次は{ini2}%、{ini3}%…最低{min}%。{dias}日間紹介がなければ{ini}%に戻ります。',
+    indInicial: '紹介：最初のクーポン（%）', indReducao: '紹介：1人ごとの減少（%）', indMinimo: '紹介：最低（%）',
+    descontos: '🎟️ 割引一覧', descontosSub: '割引を持つお客様・割引率・有効期限。次回のご予約に自動で適用されます。期限切れの未使用クーポンは表示されません。',
+    abaAtivos: '有効（{n}）', abaUsados: '使用済み（{n}）',
+    colTipo: '種類', colDesconto: '割引', colValidade: '有効期限', colSituacao: '状況', colValor: '金額',
+    tipo1a: '初回', tipoInd: '紹介', trouxe: '{n}様をご紹介',
+    stDisponivel: '利用可能', stAgendado: '予約済み {d}', stUsado: '使用済み {d}',
+    nenhumDesconto: '割引はありません。',
     passo5: '5. 特典が表示されたらお渡しし、「渡す」をクリックして記録してください。',
     qrCartaz: '初回 {pct}% OFF', qrCartazSub: '', qrCartazRodape: 'カメラで読み取ってポイントカードを保存',
   },
@@ -92,7 +113,8 @@ const fmt = (texto, valores) => Object.entries(valores || {}).reduce(
   (acc, [k, v]) => acc.replace(new RegExp(`\\{${k}\\}`, 'g'), v), texto);
 
 const CAMPOS_CONFIG = ['ativo', 'desconto_primeira_visita_pct', 'validade_cupom_dias', 'meta_selos', 'selo_brinde',
-  'selos_boas_vindas', 'brinde_pt', 'brinde_en', 'brinde_ja', 'premio_pt', 'premio_en', 'premio_ja'];
+  'selos_boas_vindas', 'indicacao_pct_inicial', 'indicacao_reducao_pct', 'indicacao_minimo_pct',
+  'brinde_pt', 'brinde_en', 'brinde_ja', 'premio_pt', 'premio_en', 'premio_ja'];
 
 function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, linkCartao }) {
   const T = TEXTOS[idioma] || TEXTOS['pt-BR'];
@@ -100,6 +122,8 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
   const locale = idioma === 'ja' ? 'ja-JP' : idioma === 'en' ? 'en-US' : 'pt-BR';
 
   const [linhas, setLinhas] = useState([]);
+  const [descontos, setDescontos] = useState([]);
+  const [abaDescontos, setAbaDescontos] = useState('ativos');
   const [config, setConfig] = useState(null);
   const [form, setForm] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -112,8 +136,9 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const [r, c] = await Promise.all([api.resumo(), api.config()]);
+      const [r, c, d] = await Promise.all([api.resumo(), api.config(), api.descontos ? api.descontos() : []]);
       setLinhas(r || []);
+      setDescontos(d || []);
       setConfig(c);
       setForm(c ? Object.fromEntries(CAMPOS_CONFIG.map((k) => [k, c[k] ?? ''])) : null);
     } catch (e) {
@@ -129,7 +154,8 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
     e.preventDefault();
     try {
       const campos = { ...form };
-      ['desconto_primeira_visita_pct', 'validade_cupom_dias', 'meta_selos', 'selos_boas_vindas'].forEach((k) => { campos[k] = Number(campos[k]); });
+      ['desconto_primeira_visita_pct', 'validade_cupom_dias', 'meta_selos', 'selos_boas_vindas',
+        'indicacao_pct_inicial', 'indicacao_reducao_pct', 'indicacao_minimo_pct'].forEach((k) => { campos[k] = Number(campos[k]); });
       campos.selo_brinde = Number(campos.selo_brinde) > 0 ? Number(campos.selo_brinde) : null;
       await api.salvarConfig(campos);
       setSalvo(true);
@@ -188,11 +214,11 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
 
   const resumo = useMemo(() => ({
     cartoes: linhas.filter((l) => l.tem_cartao).length,
-    cuponsAtivos: linhas.filter((l) => l.estado?.cupom?.ativo).length,
+    cuponsAtivos: descontos.filter((d) => d.status !== 'usado').length,
     convertidos: linhas.filter((l) => l.estado?.cupom?.usado_em).length,
     pendentes: linhas.reduce((s, l) => s + (l.estado?.recompensas_pendentes?.length || 0), 0),
     indicacoes: linhas.reduce((s, l) => s + (l.estado?.indicacoes_creditadas || 0), 0),
-  }), [linhas]);
+  }), [linhas, descontos]);
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -203,6 +229,12 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
       return (l.nome || '').toLowerCase().includes(q) || (qDig && (l.telefone || '').replace(/\D/g, '').includes(qDig));
     });
   }, [linhas, busca, soRecompensas]);
+
+  const descontosAtivos = descontos.filter((d) => d.status !== 'usado');
+  const descontosUsados = descontos.filter((d) => d.status === 'usado');
+  const dataCurta = (v) => (v ? new Date(String(v).length === 10 ? `${v}T12:00:00` : v).toLocaleDateString(locale) : '');
+  const dataHora = (v) => (v ? new Date(v).toLocaleString(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+  const numero = (v) => Number(v).toLocaleString(locale);
 
   const meta = config?.meta_selos || 10;
   const nomeRec = (k) => config?.[`${k}_${idioma === 'pt-BR' ? 'pt' : idioma}`] || config?.[`${k}_pt`] || '';
@@ -252,7 +284,9 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
             </label>
             <div style={estilos.grade}>
               {[['desconto_primeira_visita_pct', 'pct', 0, 100], ['validade_cupom_dias', 'validade', 1, 365],
-                ['meta_selos', 'meta', 3, 30], ['selo_brinde', 'seloBrinde', 0, 29], ['selos_boas_vindas', 'boasVindas', 0, 5]]
+                ['meta_selos', 'meta', 3, 30], ['selo_brinde', 'seloBrinde', 0, 29], ['selos_boas_vindas', 'boasVindas', 0, 5],
+                ['indicacao_pct_inicial', 'indInicial', 0, 100], ['indicacao_reducao_pct', 'indReducao', 0, 100],
+                ['indicacao_minimo_pct', 'indMinimo', 0, 100]]
                 .map(([campo, rotulo, min, max]) => (
                   <label key={campo} style={estilos.label}>
                     {t(rotulo)}
@@ -276,6 +310,64 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
           </form>
         )}
       </div>
+
+      {/* Descontos */}
+      <section className="list-section" style={{ marginTop: 24 }}>
+        <h3>{t('descontos')}</h3>
+        <p style={{ color: '#999', marginTop: -6, fontSize: 13 }}>{t('descontosSub')}</p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          {[['ativos', 'abaAtivos', descontosAtivos.length], ['usados', 'abaUsados', descontosUsados.length]].map(([k, rotulo, n]) => (
+            <button key={k} onClick={() => setAbaDescontos(k)}
+              className={abaDescontos === k ? 'btn-primary' : 'btn-secondary'} style={estilos.botaoPequeno}>
+              {t(rotulo, { n })}
+            </button>
+          ))}
+        </div>
+        {(abaDescontos === 'ativos' ? descontosAtivos : descontosUsados).length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999' }}>{t('nenhumDesconto')}</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('colCliente')}</th><th>{t('colTipo')}</th><th>{t('colDesconto')}</th>
+                  <th>{t('colValidade')}</th><th>{t('colSituacao')}</th><th>{t('colValor')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(abaDescontos === 'ativos' ? descontosAtivos : descontosUsados).map((d) => (
+                  <tr key={d.id}>
+                    <td>
+                      <div style={{ fontWeight: 'bold' }}>{d.nome}</div>
+                      <div style={{ fontSize: 12, color: '#999' }}>{d.telefone}</div>
+                    </td>
+                    <td style={{ fontSize: 13 }}>
+                      {d.tipo === 'indicacao' ? `🤝 ${t('tipoInd')}` : `🎟️ ${t('tipo1a')}`}
+                      {d.indicado_nome && <div style={{ fontSize: 12, color: '#999' }}>{t('trouxe', { n: d.indicado_nome })}</div>}
+                    </td>
+                    <td style={{ color: OURO, fontWeight: 'bold', fontSize: 18 }}>{d.pct}%</td>
+                    <td style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{dataCurta(d.expira_em)}</td>
+                    <td style={{ fontSize: 13 }}>
+                      {d.status === 'disponivel' && <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{t('stDisponivel')}</span>}
+                      {d.status === 'agendado' && <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{t('stAgendado', { d: dataHora(d.agendamento_data) })}</span>}
+                      {d.status === 'usado' && <span style={{ color: '#4ade80' }}>{t('stUsado', { d: d.usado_em ? dataCurta(d.usado_em) : '' })}</span>}
+                    </td>
+                    <td style={{ fontSize: 13, whiteSpace: 'nowrap' }}>
+                      {d.preco_antes != null && d.preco_final != null ? (
+                        <>
+                          <span style={{ textDecoration: 'line-through', color: '#777' }}>{numero(d.preco_antes)}</span>
+                          {' → '}<b>{numero(d.preco_final)}</b>
+                          <div style={{ color: '#f472b6', fontSize: 12 }}>−{numero(d.preco_antes - d.preco_final)}</div>
+                        </>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Clientes */}
       <section className="list-section" style={{ marginTop: 24 }}>
@@ -353,7 +445,12 @@ function FidelidadeAdminPainel({ api, idioma = 'pt-BR', nomeLoja, linkEntrada, l
           <p>{t('passo1', { pct: config?.desconto_primeira_visita_pct, dias: config?.validade_cupom_dias })}</p>
           <p>{t('passo2')}</p>
           <p>{t('passo3', { b: config?.selo_brinde || '—', brinde: nomeRec('brinde'), m: meta, premio: nomeRec('premio') })}</p>
-          <p>{t('passo4')}</p>
+          <p>{t('passo4', {
+            pct: config?.desconto_primeira_visita_pct, dias: config?.validade_cupom_dias, min: config?.indicacao_minimo_pct ?? 10,
+            ini: config?.indicacao_pct_inicial ?? 40,
+            ini2: Math.max((config?.indicacao_pct_inicial ?? 40) - (config?.indicacao_reducao_pct ?? 10), config?.indicacao_minimo_pct ?? 10),
+            ini3: Math.max((config?.indicacao_pct_inicial ?? 40) - 2 * (config?.indicacao_reducao_pct ?? 10), config?.indicacao_minimo_pct ?? 10),
+          })}</p>
           <p>{t('passo5')}</p>
         </div>
       </section>
