@@ -3,7 +3,7 @@
 --
 -- Cliente com pelo menos 1 atendimento REALIZADO antes do lançamento do
 -- cartão (config.data_lancamento) ganha `selos_obrigado_clientes` selos extras
--- (2), somados aos selos de boas-vindas. É calculado em fidelidade_estado —
+-- (1), somados ao selo de boas-vindas (total 2 de presente). É calculado em fidelidade_estado —
 -- vale também para cartões já criados e para os gerados pelo admin.
 -- O 40% de 1ª visita continua só para quem nunca foi atendido.
 -- ============================================================================
@@ -12,7 +12,7 @@ alter table public.config_fidelidade
   add column if not exists selos_obrigado_clientes int not null default 0
     check (selos_obrigado_clientes between 0 and 10);
 
-update public.config_fidelidade set selos_obrigado_clientes = 2 where id = 1;
+update public.config_fidelidade set selos_obrigado_clientes = 1 where id = 1;
 
 create or replace function private.fidelidade_estado(p_cliente_id uuid)
 returns jsonb

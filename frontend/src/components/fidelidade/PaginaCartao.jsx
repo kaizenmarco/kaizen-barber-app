@@ -180,7 +180,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, linkInicio, caminhoBase, cha
               <div style={estilos.porta}>
                 <div style={estilos.portaTitulo}>{t('porta_cliente_titulo')}</div>
                 <div style={estilos.portaTexto}>
-                  {config?.selos_obrigado > 0 && <strong style={{ color: OURO }}>{t('porta_cliente_presente', { n: config.selos_obrigado })} </strong>}
+                  {config?.selos_obrigado > 0 && <strong style={{ color: OURO }}>{t('porta_cliente_presente', { n: config.selos_obrigado + (Number(config.selos_boas_vindas) || 0) })} </strong>}
                   {t(pctIndicacao > 0 ? 'porta_cliente_texto' : 'porta_cliente_texto_sem_ind', { pctInd: pctIndicacao })}
                 </div>
               </div>
@@ -244,7 +244,7 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
         <div style={{ ...estilos.bloco, marginBottom: 16, textAlign: 'center', borderColor: OURO }}>
           <div style={{ color: OURO, fontWeight: 900, fontSize: 17 }}>{t('volta_titulo')}</div>
           {cartao.selos_obrigado > 0 && (
-            <div style={{ color: '#e8e8e8', fontWeight: 'bold', fontSize: 15, marginTop: 6 }}>{t('presente_obrigado', { n: cartao.selos_obrigado })}</div>
+            <div style={{ color: '#e8e8e8', fontWeight: 'bold', fontSize: 15, marginTop: 6 }}>{t('presente_obrigado', { n: cartao.selos_obrigado + (Number(cartao.selos_bonus) || 0) })}</div>
           )}
           <div style={{ color: '#ccc', fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>
             {t(pctIndicacao > 0 ? 'volta_texto' : 'volta_texto_sem_ind', { pctInd: pctIndicacao })}
