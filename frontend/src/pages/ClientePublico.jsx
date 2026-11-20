@@ -238,11 +238,6 @@ function ClientePublico() {
   const [horariosOcupados, setHorariosOcupados] = useState({});
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [horariosAlmoco, setHorariosAlmoco] = useState({});
-  const [pontosCliente, setPontosCliente] = useState(0);
-  const [usarPontos, setUsarPontos] = useState(false);
-  const [carregandoPontos, setCarregandoPontos] = useState(false);
-  const [atendimentosRealizados, setAtendimentosRealizados] = useState(0);
-  const [pontosJaResgatados, setPontosJaResgatados] = useState(0);
   const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [observacoesCliente, setObservacoesCliente] = useState('');
@@ -267,8 +262,6 @@ function ClientePublico() {
   const [lembreteMinutos, setLembreteMinutos] = useState(30);
   const [presencaConfirmada, setPresencaConfirmada] = useState(false);
 
-  const [telefoneConsultaPontos, setTelefoneConsultaPontos] = useState('');
-  const [consultaPontosFeita, setConsultaPontosFeita] = useState(false);
 
   const [emailConsultaAgendamentos, setEmailConsultaAgendamentos] = useState('');
   const [telefoneConsultaAgendamentos, setTelefoneConsultaAgendamentos] = useState('');
@@ -466,13 +459,6 @@ function ClientePublico() {
     buscarHorariosAlmoco().then(setHorariosAlmoco);
   }, []);
 
-  useEffect(() => {
-    if (dadosAgendamento.email && dadosAgendamento.email.includes('@')) {
-      buscarPontosCliente();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dadosAgendamento.email]);
-
   // Sempre que o serviço muda, garante que o profissional selecionado
   // continua sendo um dos aptos para aquele serviço.
   useEffect(() => {
@@ -492,108 +478,12 @@ function ClientePublico() {
     ) ? prev : novoMes);
   }, [dataSelecionada]);
 
-  // Calcula e grava no estado o saldo de pontos de fidelidade de um cliente
-  // já identificado (por e-mail, na tela de agendamento, ou por telefone, na
-  // consulta pública de pontos) — a partir daqui a lógica é a mesma pros dois.
-  const calcularESetarPontosDoCliente = async (clienteId) => {
-    // conta_pontos_fidelidade vem preenchido automaticamente pelo banco: fica
-    // "false" quando o agendamento caiu dentro de alguma promoção configurada
-    // sem pontos (ver config/promocoes.js e o trigger aplicar_promocao_agendamento).
-    const { data: realizados, error: erroRealizados } = await supabase
-      .from('agendamentos')
-      .select('id')
-      .eq('cliente_id', clienteId)
-      .eq('status', 'REALIZADO')
-      .eq('conta_pontos_fidelidade', true);
-
-    if (erroRealizados) throw erroRealizados;
-
-    // Conta quantos agendamentos já usaram desconto de pontos, para saber quanto ja foi resgatado
-    const { data: resgates, error: erroResgates } = await supabase
-      .from('agendamentos')
-      .select('id')
-      .eq('cliente_id', clienteId)
-      .ilike('observacoes', '%Desconto de pontos%');
-
-    if (erroResgates) throw erroResgates;
-
-    const totalGanho = (realizados?.length || 0) * 2;
-    const totalResgatado = (resgates?.length || 0) * 10;
-    const saldo = Math.max(0, totalGanho - totalResgatado);
-
-    setAtendimentosRealizados(realizados?.length || 0);
-    setPontosJaResgatados(totalResgatado);
-    setPontosCliente(saldo);
-  };
-
-  const buscarPontosCliente = async (emailParam) => {
-    const email = (emailParam || dadosAgendamento.email || '').trim();
-    if (!email) return;
-    setCarregandoPontos(true);
-    try {
-      // ilike (sem coringas) em vez de eq: compara ignorando maiúsculas/
-      // minúsculas — "Fulano@Gmail.com" tem que achar o mesmo cadastro de
-      // "fulano@gmail.com", já que teclados de celular às vezes capitalizam
-      // a primeira letra do e-mail sem a pessoa perceber.
-      const { data: clientes } = await supabase
-        .from('clientes')
-        .select('id')
-        .ilike('email', email);
-
-      if (!clientes || clientes.length === 0) {
-        setPontosCliente(0);
-        setAtendimentosRealizados(0);
-        setPontosJaResgatados(0);
-        return;
-      }
-
-      await calcularESetarPontosDoCliente(clientes[0].id);
-    } catch (error) {
-      console.error('Erro ao buscar pontos:', error);
-      setPontosCliente(0);
-    } finally {
-      setCarregandoPontos(false);
-    }
-  };
-
   // Compara só os últimos 9 dígitos do telefone (ignorando espaços, traços,
   // parênteses e se a pessoa digitou com "0" na frente ou com "+81" no
   // lugar dele) — assim "080-9724-2512" e "+81 80 9724 2512" batem com o
   // mesmo cliente, sem exigir que a pessoa digite exatamente igual ao que
   // está cadastrado.
   const normalizarTelefoneParaComparar = (str) => (str || '').replace(/\D/g, '').slice(-9);
-
-  // Consulta pública de saldo de pontos, por telefone (a pedido do Marco —
-  // mais fácil do cliente lembrar o telefone do que qual e-mail usou).
-  const buscarPontosClientePorTelefone = async (telefoneParam) => {
-    const alvo = normalizarTelefoneParaComparar(telefoneParam);
-    if (!alvo) return;
-    setCarregandoPontos(true);
-    try {
-      const { data: clientes, error } = await supabase
-        .from('clientes')
-        .select('id, telefone')
-        .not('telefone', 'is', null);
-
-      if (error) throw error;
-
-      const encontrado = (clientes || []).find(c => normalizarTelefoneParaComparar(c.telefone) === alvo);
-
-      if (!encontrado) {
-        setPontosCliente(0);
-        setAtendimentosRealizados(0);
-        setPontosJaResgatados(0);
-        return;
-      }
-
-      await calcularESetarPontosDoCliente(encontrado.id);
-    } catch (error) {
-      console.error('Erro ao buscar pontos:', error);
-      setPontosCliente(0);
-    } finally {
-      setCarregandoPontos(false);
-    }
-  };
 
   // Busca o histórico de agendamentos do cliente pelo TELEFONE (sozinho já
   // basta pra ver — clientes importados do sistema antigo às vezes têm um
@@ -955,16 +845,14 @@ function ClientePublico() {
     if (!dadosAgendamento.servico) return 0;
     const servico = servicos.find(s => s.nome === dadosAgendamento.servico);
     if (!servico) return 0;
-    let preco = servico.preco;
+    const preco = servico.preco;
     const promo = promocaoDoAgendamentoAtual();
     if (promo) {
-      // Preço promocional prevalece — não combina com resgate de pontos,
-      // pra não empilhar dois descontos no mesmo agendamento.
       return calcularPrecoComPromocao(preco, promo);
     }
-    if (usarPontos && pontosCliente >= 10) {
-      preco -= 500;
-    }
+    // O desconto de 1ª visita do Cartão Fidelidade (40%) é aplicado pelo
+    // banco no insert (trigger trg_zz_desconto_primeira_visita); a tela de
+    // confirmação mostra o preço que o banco gravou.
     return Math.max(0, preco);
   };
 
@@ -1112,11 +1000,6 @@ function ClientePublico() {
       return;
     }
 
-    if (usarPontos && pontosCliente < 10) {
-      alert('⚠️ ' + t('alerta_pontos_insuficientes'));
-      return;
-    }
-
     setCarregando(true);
 
     try {
@@ -1237,7 +1120,6 @@ function ClientePublico() {
       const notas = [
         nomeAtendido.trim() ? `Atendimento para: ${nomeAtendido.trim()}` : null,
         promoAplicada ? `Promoção aplicada: ${promoAplicada.nome}` : null,
-        (!promoAplicada && usarPontos) ? 'Desconto de pontos de fidelidade aplicado (-¥500)' : null,
         observacoesCliente ? `Observação do cliente: ${observacoesCliente}` : null,
       ].filter(Boolean).join(' | ') || null;
 
@@ -1255,7 +1137,7 @@ function ClientePublico() {
             token_verificacao: tokenVerificacao
           }
         ])
-        .select('id')
+        .select('*') // '*' em vez da lista: não quebra se a migração do cartão fidelidade ainda não rodou
         .single();
 
       // Recusas da trava do banco (trigger exigir_telefone_verificado):
@@ -1303,8 +1185,9 @@ function ClientePublico() {
         horaFim: somarMinutos(dadosAgendamento.hora, duracaoSelecionada),
         duracaoMinutos: duracaoSelecionada,
         precoOriginal: servicoSelecionado.preco,
-        precoFinal: precoFinal,
-        desconto: promoAplicada ? (servicoSelecionado.preco - precoFinal) : (usarPontos ? 500 : 0),
+        precoFinal: novoAgendamento?.preco_final ?? precoFinal,
+        desconto: Math.max(0, servicoSelecionado.preco - (novoAgendamento?.preco_final ?? precoFinal)),
+        descontoPrimeiraVisita: !!novoAgendamento?.desconto_primeira_visita,
         promocaoNome: promoAplicada ? promoAplicada.nome : null
       });
 
@@ -1312,10 +1195,8 @@ function ClientePublico() {
       setModalAberto(false);
       voltarEtapaSmsParaForm();
       setDadosAgendamento({ nome: '', email: '', telefone: '', dataNascimento: '', profissional: '', hora: '', servico: '', data: '' });
-      setUsarPontos(false);
       setObservacoesCliente('');
       setNomeAtendido('');
-      setPontosCliente(0);
       setDiaHorarioSelecionado(null);
 
     } catch (error) {
@@ -1484,7 +1365,13 @@ function ClientePublico() {
                 )}
               </p>
             </div>
-            <p style={{ color: '#999', fontSize: '13px', marginTop: '15px' }}>⭐ {t('conf_pontos_fidelidade')}</p>
+            {agendamentoConfirmado.descontoPrimeiraVisita && (
+              <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '15px', fontWeight: 'bold' }}>🎟️ {t('conf_desconto_primeira_visita')}</p>
+            )}
+            <p style={{ color: '#999', fontSize: '13px', marginTop: '15px' }}>
+              ⭐ {t('conf_pontos_fidelidade')}{' '}
+              <a href="/cartao" style={{ color: '#d4af37' }}>{t('fidelidade_cartao_botao')}</a>
+            </p>
           </div>
 
           <div style={{ background: '#2d2d2d', border: '1px solid #404040', borderRadius: '12px', padding: '20px', marginBottom: '15px' }}>
@@ -2406,42 +2293,14 @@ function ClientePublico() {
         {abaAtiva === 'fidelidade' && (
           <section>
             <h2 style={{ color: '#d4af37' }}>🎁 {t('fidelidade_titulo')}</h2>
-            <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px', marginBottom: '20px' }}>
-              <p>✅ {t('fidelidade_regra1')}</p>
-              <p>✅ {t('fidelidade_regra2')}</p>
-            </div>
-
-            <div style={{ background: '#2d2d2d', border: '1px solid #d4af37', borderRadius: '8px', padding: '20px', maxWidth: '600px' }}>
-              <h3 style={{ color: '#d4af37', marginTop: 0 }}>{t('fidelidade_consultar_titulo')}</h3>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <input
-                  type="tel"
-                  placeholder={t('fidelidade_telefone_placeholder')}
-                  value={telefoneConsultaPontos}
-                  onChange={(e) => setTelefoneConsultaPontos(e.target.value)}
-                  style={{ flex: 1, minWidth: '200px', padding: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }}
-                />
-                <button
-                  onClick={async () => { await buscarPontosClientePorTelefone(telefoneConsultaPontos); setConsultaPontosFeita(true); }}
-                  disabled={telefoneConsultaPontos.replace(/\D/g, '').length < 8 || carregandoPontos}
-                  style={{ background: '#d4af37', color: '#1a1a1a', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: carregandoPontos ? 'wait' : 'pointer' }}
-                >
-                  {carregandoPontos ? '⏳' : t('fidelidade_consultar_botao')}
-                </button>
-              </div>
-
-              {consultaPontosFeita && !carregandoPontos && (
-                <div style={{ marginTop: '20px', color: '#e8e8e8', lineHeight: '1.8' }}>
-                  <p>{t('fidelidade_atendimentos')} <strong style={{ color: '#d4af37' }}>{atendimentosRealizados}</strong></p>
-                  <p>{t('fidelidade_resgatados')} <strong style={{ color: '#60a5fa' }}>{pontosJaResgatados}</strong></p>
-                  <p style={{ fontSize: '18px' }}>{t('fidelidade_saldo')} <strong style={{ color: '#4ade80' }}>{pontosCliente} {t('fidelidade_pontos')}</strong></p>
-                  {pontosCliente >= 10 ? (
-                    <p style={{ color: '#4ade80', fontWeight: 'bold' }}>🎉 {t('fidelidade_pode_resgatar')}</p>
-                  ) : (
-                    <p style={{ color: '#999' }}>{t('fidelidade_faltam', { n: 10 - pontosCliente })}</p>
-                  )}
-                </div>
-              )}
+            <div style={{ background: 'linear-gradient(160deg, #1f1f1f 0%, #0d0d0d 100%)', border: '1.5px solid #d4af37', borderRadius: '16px', padding: '24px', maxWidth: '600px' }}>
+              <h3 style={{ color: '#d4af37', marginTop: 0, fontSize: '22px' }}>{t('fidelidade_cartao_titulo')}</h3>
+              <p style={{ color: '#e8e8e8', lineHeight: '1.7' }}>✂️ {t('fidelidade_regra1')}</p>
+              <p style={{ color: '#e8e8e8', lineHeight: '1.7' }}>🎁 {t('fidelidade_regra2')}</p>
+              <p style={{ color: '#e8e8e8', lineHeight: '1.7' }}>🎟️ {t('fidelidade_cartao_texto')}</p>
+              <a href="/cartao" style={{ display: 'inline-block', marginTop: '10px', background: '#d4af37', color: '#1a1a1a', padding: '14px 22px', borderRadius: '10px', fontWeight: 'bold', textDecoration: 'none' }}>
+                {t('fidelidade_cartao_botao')} →
+              </a>
             </div>
           </section>
         )}
@@ -2634,7 +2493,7 @@ function ClientePublico() {
                 📅 {diaHorarioSelecionado.data.toLocaleDateString(localeAtual)} · 🕐 {diaHorarioSelecionado.hora} - {somarMinutos(diaHorarioSelecionado.hora, duracaoSelecionada)} ({duracaoSelecionada} min)
               </p>
               <p style={{ margin: 0 }}>
-                {(promocaoDoAgendamentoAtual() || (usarPontos && pontosCliente >= 10)) ? (
+                {promocaoDoAgendamentoAtual() ? (
                   <>
                     <span style={{ textDecoration: 'line-through', color: '#999', marginRight: '8px' }}>{formatarPreco(servicoSelecionadoInfo?.preco || 0)}</span>
                     <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
@@ -2686,26 +2545,6 @@ function ClientePublico() {
               onChange={(e) => setObservacoesCliente(e.target.value)}
               style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', minHeight: '60px' }}
             />
-
-            {dadosAgendamento.email && dadosAgendamento.email.includes('@') && !promocaoDoAgendamentoAtual() && (
-              <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '4px', padding: '12px', marginBottom: '15px', fontSize: '13px' }}>
-                {carregandoPontos ? (
-                  <p style={{ margin: 0, color: '#999' }}>⏳ {t('modal_consultando_pontos')}</p>
-                ) : (
-                  <>
-                    <p style={{ margin: '0 0 8px 0', color: '#d4af37' }}>🎁 {t('modal_pontos_disponiveis', { n: pontosCliente })}</p>
-                    {pontosCliente >= 10 ? (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#e8e8e8' }}>
-                        <input type="checkbox" checked={usarPontos} onChange={(e) => setUsarPontos(e.target.checked)} />
-                        {t('modal_usar_pontos')}
-                      </label>
-                    ) : (
-                      <p style={{ margin: 0, color: '#999' }}>{t('modal_faltam_pontos', { n: 10 - pontosCliente, a: Math.ceil((10 - pontosCliente) / 2) })}</p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
 
             {etapaSms === 'codigo' ? (
               <div style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid #d4af37', borderRadius: '8px', padding: '14px' }}>

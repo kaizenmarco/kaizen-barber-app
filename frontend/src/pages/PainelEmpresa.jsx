@@ -224,7 +224,7 @@ function PainelPrincipal({ perfil, empresa, profissionalId, aoSair, idioma, muda
       <main style={estilos.main}>
         {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
-        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
+        {abaSelecionada === 'fidelidade' && <Fidelidade t={t} idioma={idioma} empresaId={perfil.empresa_id} empresa={empresa} />}
         {abaSelecionada === 'aniversariantes' && <Aniversariantes t={t} idioma={idioma} empresaId={perfil.empresa_id} />}
         {abaSelecionada === 'profissionais' && <Profissionais empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
         {abaSelecionada === 'servicos' && <Servicos empresa={empresa} empresaId={perfil.empresa_id} idioma={idioma} t={t} />}
@@ -314,7 +314,7 @@ export default function PainelEmpresa() {
       if (perfilData?.empresa_id) {
         const { data: empresaData } = await supabaseSaaS
           .from('empresas')
-          .select('id, nome, plano, moeda, status, profissionais_extras, observacao_status')
+          .select('id, nome, slug, plano, moeda, status, profissionais_extras, observacao_status')
           .eq('id', perfilData.empresa_id)
           .maybeSingle();
         if (!cancelado) setEmpresa(empresaData);
