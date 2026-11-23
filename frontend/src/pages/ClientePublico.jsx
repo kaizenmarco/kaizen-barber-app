@@ -16,6 +16,7 @@ import { buscarHorariosAlmoco } from '../config/profissionais';
 import { buscarPromocoesAtivas, encontrarPromocaoAplicavel, calcularPrecoComPromocao } from '../config/promocoes';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 import { PAISES_TELEFONE, PAIS_TELEFONE_PADRAO, montarTelefoneInternacional, telefoneInternacionalValido } from '../config/paisesTelefone';
+import { textoVale, consultarVale, erroValeDaMensagem, formatarIenes, nomeServicoVale } from '../config/valePresente';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
@@ -327,6 +328,42 @@ function ClientePublico() {
   useEffect(() => {
     buscarServicosCompletos().then(setServicos);
   }, []);
+
+  // Vale Presente: chega pelo link /valepresente/:codigo -> /?aba=agendar&vale=CODIGO
+  // ou digitado no formulário. Quem aplica de verdade é o banco
+  // (trigger trg_zzz_vale_presente); aqui é só pra mostrar o preço certo.
+  const tv = (chave, valores) => textoVale(idioma, chave, valores);
+  const [valeAplicado, setValeAplicado] = useState(null);
+  const [campoVale, setCampoVale] = useState('');
+  const [erroVale, setErroVale] = useState('');
+  const aplicarVale = async (codigo, { selecionarServico = false } = {}) => {
+    setErroVale('');
+    if (!codigo || !codigo.trim()) return false;
+    try {
+      const v = await consultarVale(codigo.trim());
+      if (!v?.encontrado) { setErroVale(tv('erro_VALE_INVALIDO')); return false; }
+      const erroPorStatus = { pendente: 'VALE_PENDENTE', usado: 'VALE_JA_USADO', expirado: 'VALE_EXPIRADO', reservado: 'VALE_JA_RESERVADO', perdido: 'VALE_INVALIDO', cancelado: 'VALE_INVALIDO' };
+      if (v.status !== 'ativo') { setErroVale(tv('erro_' + (erroPorStatus[v.status] || 'VALE_INVALIDO'))); return false; }
+      setValeAplicado(v);
+      setCampoVale('');
+      if (selecionarServico && v.tipo === 'presente' && v.servico_id) {
+        const s = SERVICOS.find(x => x.uuid === v.servico_id);
+        if (s) setDadosAgendamento(d => ({ ...d, servico: s.nome }));
+      }
+      return true;
+    } catch {
+      setErroVale(tv('erro_VALE_INVALIDO'));
+      return false;
+    }
+  };
+  useEffect(() => {
+    const codigoUrl = new URLSearchParams(window.location.search).get('vale');
+    if (codigoUrl) aplicarVale(codigoUrl, { selecionarServico: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const descricaoValeAplicado = () => (valeAplicado?.tipo === 'bonus'
+    ? tv('reserva_banner_bonus', { valor: formatarIenes(valeAplicado.valor) })
+    : tv('reserva_banner', { servico: nomeServicoVale(valeAplicado?.servico_id, valeAplicado?.servico_nome, idioma) }));
 
   // Pacotes cadastrados pelo Admin em Cadastros > Pacotes > Meus Pacotes.
   const [pacotes, setPacotes] = useState([]);
@@ -846,6 +883,9 @@ function ClientePublico() {
     const servico = servicos.find(s => s.nome === dadosAgendamento.servico);
     if (!servico) return 0;
     const preco = servico.preco;
+    if (valeAplicado) {
+      return Math.max(0, preco - Number(valeAplicado.valor || 0));
+    }
     const promo = promocaoDoAgendamentoAtual();
     if (promo) {
       return calcularPrecoComPromocao(preco, promo);
@@ -1134,7 +1174,8 @@ function ClientePublico() {
             status: 'CONFIRMADO',
             preco_final: precoFinal,
             observacoes: notas,
-            token_verificacao: tokenVerificacao
+            token_verificacao: tokenVerificacao,
+            vale_presente_codigo: valeAplicado?.codigo || null
           }
         ])
         .select('*') // '*' em vez da lista: não quebra se a migração do cartão fidelidade ainda não rodou
@@ -1146,6 +1187,12 @@ function ClientePublico() {
       if (error?.message?.includes('TELEFONE_NAO_VERIFICADO')) {
         esquecerVerificacao();
         await enviarCodigoSms(telefoneCompleto);
+        return;
+      }
+      const erroDoVale = erroValeDaMensagem(error?.message);
+      if (erroDoVale) {
+        alert('⚠️ ' + tv('erro_' + erroDoVale));
+        if (erroDoVale !== 'VALE_EXPIRADO') setValeAplicado(null);
         return;
       }
       if (error?.message?.includes('CLIENTE_BLOQUEADO')) {
@@ -1188,6 +1235,7 @@ function ClientePublico() {
         precoFinal: novoAgendamento?.preco_final ?? precoFinal,
         desconto: Math.max(0, servicoSelecionado.preco - (novoAgendamento?.preco_final ?? precoFinal)),
         descontoPrimeiraVisita: !!novoAgendamento?.desconto_primeira_visita,
+        comVale: !!novoAgendamento?.vale_presente_id,
         promocaoNome: promoAplicada ? promoAplicada.nome : null
       });
 
@@ -1198,6 +1246,14 @@ function ClientePublico() {
       setObservacoesCliente('');
       setNomeAtendido('');
       setDiaHorarioSelecionado(null);
+      if (valeAplicado) {
+        setValeAplicado(null);
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('vale');
+          window.history.replaceState(null, '', url.toString());
+        } catch { /* ignora */ }
+      }
 
     } catch (error) {
       alert('❌ ' + t('alerta_erro_agendar') + error.message);
@@ -1365,6 +1421,9 @@ function ClientePublico() {
                 )}
               </p>
             </div>
+            {agendamentoConfirmado.comVale && (
+              <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '15px', fontWeight: 'bold' }}>{tv('conf_vale')}</p>
+            )}
             {agendamentoConfirmado.descontoPrimeiraVisita && (
               <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '15px', fontWeight: 'bold' }}>🎟️ {t('conf_desconto_primeira_visita')}</p>
             )}
@@ -1848,6 +1907,12 @@ function ClientePublico() {
           </section>
         )}
 
+        {abaAtiva === 'agendar' && valeAplicado && (
+          <div style={{ background: 'rgba(212, 175, 55, 0.12)', border: '1px solid #d4af37', borderRadius: '10px', padding: '12px 14px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '14px' }}>{descricaoValeAplicado()} · {valeAplicado.codigo}</span>
+            <button type="button" onClick={() => setValeAplicado(null)} style={{ background: 'transparent', border: 'none', color: '#999', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>{tv('reserva_remover')}</button>
+          </div>
+        )}
         {abaAtiva === 'agendar' && (
           <section style={{
             backgroundImage: 'url(/images/agendar_bg.jpg)',
@@ -2493,7 +2558,12 @@ function ClientePublico() {
                 📅 {diaHorarioSelecionado.data.toLocaleDateString(localeAtual)} · 🕐 {diaHorarioSelecionado.hora} - {somarMinutos(diaHorarioSelecionado.hora, duracaoSelecionada)} ({duracaoSelecionada} min)
               </p>
               <p style={{ margin: 0 }}>
-                {promocaoDoAgendamentoAtual() ? (
+                {valeAplicado ? (
+                  <>
+                    <span style={{ textDecoration: 'line-through', color: '#999', marginRight: '8px' }}>{formatarPreco(servicoSelecionadoInfo?.preco || 0)}</span>
+                    <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
+                  </>
+                ) : promocaoDoAgendamentoAtual() ? (
                   <>
                     <span style={{ textDecoration: 'line-through', color: '#999', marginRight: '8px' }}>{formatarPreco(servicoSelecionadoInfo?.preco || 0)}</span>
                     <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
@@ -2502,13 +2572,27 @@ function ClientePublico() {
                   <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
                 )}
               </p>
-              {promocaoDoAgendamentoAtual() && (
+              {valeAplicado && (
+                <p style={{ margin: '6px 0 0 0', color: '#4ade80', fontSize: '12px', fontWeight: 'bold' }}>
+                  {descricaoValeAplicado()} · {calcularPrecoFinal() > 0 ? tv('reserva_diferenca', { valor: formatarPreco(calcularPrecoFinal()) }) : tv('reserva_coberto')}
+                </p>
+              )}
+              {!valeAplicado && promocaoDoAgendamentoAtual() && (
                 <p style={{ margin: '6px 0 0 0', color: '#4ade80', fontSize: '12px', fontWeight: 'bold' }}>
                   🏷️ {t('modal_promocao_aplicada', { nome: promocaoDoAgendamentoAtual().nome })}
                 </p>
               )}
             </div>
 
+            {!valeAplicado && (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input type="text" placeholder={tv('reserva_campo')} value={campoVale} onChange={(e) => setCampoVale(e.target.value)} style={{ flex: 1, minWidth: 0, padding: '10px', borderRadius: '4px', border: '1px dashed #d4af37', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box', textTransform: 'uppercase' }} />
+                  <button type="button" onClick={() => aplicarVale(campoVale)} style={{ padding: '10px 14px', background: 'transparent', color: '#d4af37', border: '1px solid #d4af37', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>{tv('reserva_aplicar')}</button>
+                </div>
+                {erroVale && <p style={{ margin: '6px 0 0 0', color: '#f87171', fontSize: '12px' }}>⚠️ {erroVale}</p>}
+              </div>
+            )}
             <input type="text" placeholder={t('modal_nome_placeholder')} value={dadosAgendamento.nome} onChange={(e) => setDadosAgendamento({...dadosAgendamento, nome: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <input type="email" placeholder={t('modal_email_placeholder')} value={dadosAgendamento.email} onChange={(e) => setDadosAgendamento({...dadosAgendamento, email: e.target.value})} style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #404040', background: '#1a1a1a', color: '#e8e8e8', boxSizing: 'border-box' }} />
             <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>

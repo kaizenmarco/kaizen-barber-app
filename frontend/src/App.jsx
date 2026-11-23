@@ -11,6 +11,7 @@ import PainelEmpresa from './pages/PainelEmpresa';
 import AgendamentoPublico from './pages/public/AgendamentoPublico';
 import CartaoFidelidade from './pages/CartaoFidelidade';
 import CartaoFidelidadeTenant from './pages/public/CartaoFidelidadeTenant';
+import ValePresente from './pages/ValePresente';
 
 // O subdomínio admin.kaizenbarbershop.com é dedicado só ao painel — nele,
 // a própria raiz "/" já deve abrir o Admin (não o site do cliente).
@@ -96,6 +97,8 @@ function App() {
         <Route path="/b/:slug" element={<AgendamentoPublico />} />
         <Route path="/cartao" element={<CartaoFidelidade />} />
         <Route path="/cartao/:token" element={<CartaoFidelidade />} />
+        <Route path="/valepresente" element={<ValePresente />} />
+        <Route path="/valepresente/:codigo" element={<ValePresente />} />
         <Route path="/b/:slug/cartao" element={<CartaoFidelidadeTenant />} />
         <Route path="/b/:slug/cartao/:token" element={<CartaoFidelidadeTenant />} />
       </Routes>

@@ -15,6 +15,7 @@ import Cadastros from './Cadastros';
 import Reincidentes from './Reincidentes';
 import ClientesAusentes from './ClientesAusentes';
 import Planos from './Planos';
+import ValesPresente from './ValesPresente';
 import BottomNavigation from '../components/BottomNavigation';
 import MenuMais from '../components/MenuMais';
 import NotificacoesRealtime from '../components/NotificacoesRealtime';
@@ -43,6 +44,7 @@ const CHAVES_ABAS = [
   { key: 'reincidentes', labelChave: 'nav.reincidentes', admin: true, restrito: false },
   { key: 'clientesAusentes', labelChave: 'nav.clientesAusentes', admin: true, restrito: false },
   { key: 'planos', labelChave: 'nav.planos', admin: true, restrito: false },
+  { key: 'valesPresente', labelChave: 'nav.valesPresente', admin: true, restrito: false },
 ];
 
 const inputStyle = {
@@ -427,6 +429,7 @@ function AdminLogin() {
             {abaSelecionada === 'reincidentes' && <Reincidentes t={t} idioma={idioma} />}
             {abaSelecionada === 'clientesAusentes' && <ClientesAusentes t={t} idioma={idioma} />}
             {abaSelecionada === 'planos' && <Planos t={t} idioma={idioma} />}
+            {abaSelecionada === 'valesPresente' && <ValesPresente t={t} idioma={idioma} />}
             {abaSelecionada === 'cadastros' && <Cadastros t={t} idioma={idioma} />}
           </>
         )}
