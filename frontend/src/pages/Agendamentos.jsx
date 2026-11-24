@@ -402,6 +402,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           motivo_cancelamento,
           cancelado_por,
           cancelado_em,
+          utm_source, utm_campaign, utm_content,
           clientes(id, nome, email, telefone),
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
@@ -430,6 +431,8 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           preco: agendamento.preco_final,
           observacoesCompletas: agendamento.observacoes || '',
           encaixe: !!agendamento.observacoes?.startsWith('[ENCAIXE]'),
+          origemAnuncio: agendamento.utm_source ? [agendamento.utm_source, agendamento.utm_campaign, agendamento.utm_content].filter(Boolean).join(' · ') : null,
+          origemAnuncioCurto: agendamento.utm_content || agendamento.utm_campaign || agendamento.utm_source || null,
           criadoEm: agendamento.criado_em,
           preferenciaProfissional: !!agendamento.preferencia_profissional,
           duracaoMinutosManual: agendamento.duracao_minutos_manual || null,
@@ -1274,7 +1277,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
             <div key={a.id} style={{ fontSize: '11px', color: '#e8e8e8', marginTop: '5px', paddingTop: '5px', borderTop: '1px solid #404040' }}>
               <span style={{ color: getCorStatus(a.status), fontWeight: 'bold' }}>● </span>
               {a.hora} - {a.cliente}
-              {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold' }}> {t('agendamentos.encaixeTag')}</span>}
+              {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold' }}> {t('agendamentos.encaixeTag')}</span>}{a.origemAnuncio && <span title={a.origemAnuncio} style={{ color: '#38bdf8', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>📣 {a.origemAnuncioCurto}</span>}
               <div style={{ color: '#999', fontSize: '10px' }}>{a.servico}</div>
             </div>
           ))}
@@ -1573,7 +1576,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                           <>
                             <div className="agenda-card-servico">
                               {a.servico}
-                              {a.encaixe && <span className="agenda-card-encaixe"> {t('agendamentos.encaixeTag')}</span>}
+                              {a.encaixe && <span className="agenda-card-encaixe"> {t('agendamentos.encaixeTag')}</span>}{a.origemAnuncio && <span title={a.origemAnuncio} style={{ color: '#38bdf8', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>📣 {a.origemAnuncioCurto}</span>}
                             </div>
                             <div className="agenda-card-rodape">
                               <select
@@ -2105,7 +2108,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                       >
                         {agendamento.cliente} ✏️
                       </span>
-                      {agendamento.encaixe && <span title={t('agendamentos.criadoComoEncaixe')} style={{ color: '#f97316', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}
+                      {agendamento.encaixe && <span title={t('agendamentos.criadoComoEncaixe')} style={{ color: '#f97316', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}{agendamento.origemAnuncio && <span title={agendamento.origemAnuncio} style={{ color: '#38bdf8', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>📣 {agendamento.origemAnuncioCurto}</span>}
                     </td>
                     <td style={{ fontSize: '12px', color: '#999' }}>{agendamento.email}</td>
                     <td>{agendamento.data}</td>
@@ -2261,7 +2264,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                           >
                             {a.cliente} ✏️
                           </strong>
-                          {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}
+                          {a.encaixe && <span style={{ color: '#f97316', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px' }}>{t('agendamentos.encaixeTag')}</span>}{a.origemAnuncio && <span title={a.origemAnuncio} style={{ color: '#38bdf8', fontWeight: 'bold', marginLeft: '6px', fontSize: '11px', whiteSpace: 'nowrap' }}>📣 {a.origemAnuncioCurto}</span>}
                         </div>
                         <button
                           className="btn-delete"
