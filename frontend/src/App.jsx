@@ -11,6 +11,10 @@ import PainelEmpresa from './pages/PainelEmpresa';
 import AgendamentoPublico from './pages/public/AgendamentoPublico';
 import CartaoFidelidade from './pages/CartaoFidelidade';
 import CartaoFidelidadeTenant from './pages/public/CartaoFidelidadeTenant';
+import BannerAnuncio, { capturarOrigemAnuncio } from './components/BannerAnuncio';
+
+// Guarda a origem (UTM) de quem chegou por anúncio antes de qualquer tela abrir.
+capturarOrigemAnuncio();
 
 // O subdomínio admin.kaizenbarbershop.com é dedicado só ao painel — nele,
 // a própria raiz "/" já deve abrir o Admin (não o site do cliente).
@@ -85,6 +89,7 @@ function App() {
   return (
     <Router>
       <AtualizarManifestPWA />
+      <BannerAnuncio />
       <Routes>
         <Route path="/" element={raiz} />
         <Route path="/admin" element={<AdminLogin />} />
