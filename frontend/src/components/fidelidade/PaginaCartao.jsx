@@ -21,6 +21,14 @@ const OURO = '#d4af37';
 const lerStorage = (chave) => { try { return localStorage.getItem(chave); } catch { return null; } };
 const gravarStorage = (chave, valor) => { try { localStorage.setItem(chave, valor); } catch { /* sem storage */ } };
 
+// Aviso quando o link salvo no celular não abriu (ver carregamento abaixo).
+const TEXTO_REABRIR = {
+  'pt-BR': 'Não achamos o cartão salvo neste celular. Digite seu nome e telefone para abrir de novo — seus selos continuam guardados.',
+  en: "We couldn't find the card saved on this phone. Enter your name and phone to open it again — your stamps are kept.",
+  ja: 'この端末に保存されたカードが見つかりませんでした。お名前と電話番号を入力すると、もう一度開けます（スタンプはそのまま残っています）。',
+  es: 'No encontramos la tarjeta guardada en este celular. Escribe tu nombre y teléfono para abrirla de nuevo — tus sellos siguen guardados.',
+};
+
 const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent || '');
 const estaInstalado = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
 
@@ -29,6 +37,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, linkInicio, caminhoBase, cha
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const ref = searchParams.get('ref');
+  const reabrir = searchParams.get('reabrir') === '1';
 
   const [idioma, setIdiomaState] = useState(() => lerStorage(CHAVE_IDIOMA) || 'pt-BR');
   const t = useCallback((k, v) => traduzirCartao(idioma, k, v), [idioma]);
@@ -69,7 +78,15 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, linkInicio, caminhoBase, cha
         if (token) {
           const dados = await api.cartao(token);
           if (!ativo) return;
-          if (!dados) { setErro(t('cartao_nao_encontrado')); setCartao(null); }
+          if (!dados) {
+            // Link salvo neste celular não vale mais (cartão refeito/apagado):
+            // esquece o link velho e volta pro formulário — com o mesmo
+            // telefone o cliente reabre o cartão dele, com os selos guardados.
+            setCartao(null);
+            if (lerStorage(chaveStorage) === token) { try { localStorage.removeItem(chaveStorage); } catch { /* sem storage */ } }
+            navigate(`${caminhoBase}?reabrir=1`, { replace: true });
+            return;
+          }
           else { setCartao(dados); setConfig(dados.config); gravarStorage(chaveStorage, token); }
         } else {
           const cfg = await api.config();
@@ -163,6 +180,7 @@ function PaginaCartao({ api, nomeLoja, linkAgendar, linkInicio, caminhoBase, cha
       ) : (
         <form onSubmit={entrar} style={estilos.bloco}>
           {ref && <p style={{ color: '#4ade80', fontWeight: 'bold', margin: '0 0 8px' }}>{t('indicado_por_amigo')}</p>}
+          {reabrir && <p style={{ color: '#fbbf24', margin: '0 0 12px', fontSize: 14, lineHeight: 1.5 }}>{TEXTO_REABRIR[idioma] || TEXTO_REABRIR['pt-BR']}</p>}
           <h2 style={{ color: OURO, margin: '0 0 8px', fontSize: 26 }}>
             {ref && pctAmigo > 0 ? t('entrar_titulo', { pct: pctAmigo }) : t('entrar_titulo_sem_desconto')}
           </h2>
@@ -374,7 +392,7 @@ function Cartao({ cartao, config, t, idioma, nomeLoja, premio, brinde, linkAgend
 const estilos = {
   pagina: {
     minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #2a2210 0%, #111 55%)', color: '#e8e8e8',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 16px 48px', boxSizing: 'border-box',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'calc(16px + env(safe-area-inset-top, 0px)) 16px calc(48px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", Roboto, sans-serif',
   },
   topo: { width: '100%', maxWidth: 420, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
