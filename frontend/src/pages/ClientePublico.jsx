@@ -16,6 +16,7 @@ import { buscarHorariosAlmoco } from '../config/profissionais';
 import { buscarPromocoesAtivas, encontrarPromocaoAplicavel, calcularPrecoComPromocao } from '../config/promocoes';
 import { IDIOMAS, IDIOMA_PADRAO, DIAS_ABREV_POR_IDIOMA, DIAS_NOMES_POR_IDIOMA, LOCALE_POR_IDIOMA, traduzir } from '../config/traducoes';
 import { PAISES_TELEFONE, PAIS_TELEFONE_PADRAO, montarTelefoneInternacional, telefoneInternacionalValido } from '../config/paisesTelefone';
+import { dadosOrigemAnuncio } from '../components/BannerAnuncio';
 
 const NOME_ESTABELECIMENTO = 'Kaizen Barber Shop';
 const ENDERECO_ESTABELECIMENTO = 'Aichi-Ken Anjo-Shi, Hamatomi-Cho 4-17, San City Oomy 302';
@@ -1134,7 +1135,9 @@ function ClientePublico() {
             status: 'CONFIRMADO',
             preco_final: precoFinal,
             observacoes: notas,
-            token_verificacao: tokenVerificacao
+            token_verificacao: tokenVerificacao,
+            // De onde veio (anúncio do Meta etc.) — vazio se não veio de link marcado
+            ...dadosOrigemAnuncio()
           }
         ])
         .select('*') // '*' em vez da lista: não quebra se a migração do cartão fidelidade ainda não rodou
