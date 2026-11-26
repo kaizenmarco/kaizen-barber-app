@@ -15,6 +15,7 @@ import Cadastros from './Cadastros';
 import Reincidentes from './Reincidentes';
 import ClientesAusentes from './ClientesAusentes';
 import Planos from './Planos';
+import PrecosEspeciais from './PrecosEspeciais';
 import BottomNavigation from '../components/BottomNavigation';
 import MenuMais from '../components/MenuMais';
 import NotificacoesRealtime from '../components/NotificacoesRealtime';
@@ -43,6 +44,7 @@ const CHAVES_ABAS = [
   { key: 'reincidentes', labelChave: 'nav.reincidentes', admin: true, restrito: false },
   { key: 'clientesAusentes', labelChave: 'nav.clientesAusentes', admin: true, restrito: false },
   { key: 'planos', labelChave: 'nav.planos', admin: true, restrito: false },
+  { key: 'precosEspeciais', labelChave: 'nav.precosEspeciais', admin: true, restrito: false },
 ];
 
 const inputStyle = {
@@ -96,6 +98,39 @@ function AdminLogin() {
 
   const [abaSelecionada, setAbaSelecionada] = useState(null);
   const [mostrarMais, setMostrarMais] = useState(false);
+
+  // Agendamento pra abrir na Agenda (tocou no aviso em tempo real ou na
+  // notificação push). `n` muda a cada pedido, pra reabrir o mesmo de novo.
+  const [focoAgendamento, setFocoAgendamento] = useState(() => {
+    try {
+      const id = new URLSearchParams(window.location.search).get('agendamento');
+      return id ? { id, n: Date.now() } : null;
+    } catch {
+      return null;
+    }
+  });
+  const abrirAgendamentoNaAgenda = (id) => {
+    setMostrarMais(false);
+    setAbaSelecionada('agendamentos');
+    setFocoAgendamento({ id, n: Date.now() });
+  };
+
+  // Notificação push tocada com o app já aberto: o service worker manda o id.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined;
+    const aoReceber = (evento) => {
+      if (evento.data?.tipo === 'abrir-agendamento' && evento.data.id) abrirAgendamentoNaAgenda(evento.data.id);
+    };
+    navigator.serviceWorker.addEventListener('message', aoReceber);
+    return () => navigator.serviceWorker.removeEventListener('message', aoReceber);
+  }, []);
+
+  // Tira o ?agendamento= da barra de endereço depois de usado.
+  useEffect(() => {
+    if (focoAgendamento && window.location.search.includes('agendamento=')) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [focoAgendamento]);
 
   const [idioma, setIdioma] = useState(() => {
     try {
@@ -391,7 +426,7 @@ function AdminLogin() {
 
   return (
     <div className="admin-shell-mobile">
-      <NotificacoesRealtime t={t} />
+      <NotificacoesRealtime t={t} aoAbrirAgendamento={abrirAgendamentoNaAgenda} />
       <header className="admin-header-mobile">
         <img src="/images/logo.jpg" alt="Kaizen Barber Shop" className="admin-header-logo" />
         <span className="admin-header-titulo">Kaizen · {t('sidebar.adminPanel')}</span>
@@ -416,7 +451,7 @@ function AdminLogin() {
         ) : (
           <>
             {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={idioma} />}
-            {abaSelecionada === 'agendamentos' && <Agendamentos t={t} idioma={idioma} />}
+            {abaSelecionada === 'agendamentos' && <Agendamentos t={t} idioma={idioma} focoAgendamento={focoAgendamento} />}
             {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} />}
             {abaSelecionada === 'profissionais' && <Profissionais t={t} idioma={idioma} />}
             {abaSelecionada === 'caixa' && <Caixa t={t} idioma={idioma} />}
@@ -428,6 +463,7 @@ function AdminLogin() {
             {abaSelecionada === 'clientesAusentes' && <ClientesAusentes t={t} idioma={idioma} />}
             {abaSelecionada === 'planos' && <Planos t={t} idioma={idioma} />}
             {abaSelecionada === 'cadastros' && <Cadastros t={t} idioma={idioma} />}
+            {abaSelecionada === 'precosEspeciais' && <PrecosEspeciais t={t} idioma={idioma} />}
           </>
         )}
       </main>

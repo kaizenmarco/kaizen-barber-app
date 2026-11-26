@@ -46,7 +46,16 @@ function tocarBipe() {
   }
 }
 
-function NotificacoesRealtime({ t }) {
+// "2026-11-27T10:00:00" -> { data: "27/11", hora: "10:00" }
+const dataHoraCurta = (dataHora) => {
+  const [dataStr, horaStr] = (dataHora || '').split('T');
+  const [, mes, dia] = (dataStr || '').split('-');
+  return { data: dia && mes ? `${dia}/${mes}` : '', hora: horaStr?.substring(0, 5) || '' };
+};
+
+// aoAbrirAgendamento(id): chamado ao tocar no aviso — o AdminLogin leva pra
+// Agenda já no dia/profissional/horário do agendamento.
+function NotificacoesRealtime({ t, aoAbrirAgendamento }) {
   const [toasts, setToasts] = useState([]);
   const [mudo, setMudo] = useState(() => {
     try { return localStorage.getItem(CHAVE_SOM_MUDO) === '1'; } catch { return false; }
@@ -64,11 +73,12 @@ function NotificacoesRealtime({ t }) {
       return data;
     };
 
-    const adicionarToast = (tipo, titulo, corpo) => {
+    const adicionarToast = (tipo, titulo, corpo, agendamentoId) => {
       const id = proximoIdToast++;
-      setToasts(prev => [...prev, { id, tipo, titulo, corpo }]);
+      setToasts(prev => [...prev, { id, tipo, titulo, corpo, agendamentoId }]);
       if (!mudoRef.current) tocarBipe();
-      setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 8000);
+      // 15s (antes 8s): dá tempo de tocar pra abrir o agendamento.
+      setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 15000);
     };
 
     const canal = supabase
@@ -76,11 +86,12 @@ function NotificacoesRealtime({ t }) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agendamentos' }, async (payload) => {
         const d = await buscarDetalhes(payload.new.id);
         if (!d) return;
-        const hora = d.data_hora?.split('T')[1]?.substring(0, 5) || '';
+        const { data, hora } = dataHoraCurta(d.data_hora);
         adicionarToast(
           'novo',
           t('notificacoes.novoAgendamento'),
-          t('notificacoes.novoAgendamentoCorpo', { cliente: d.clientes?.nome || '—', servico: d.servicos?.nome || '—', profissional: d.profissionais?.nome || '—', hora })
+          t('notificacoes.novoAgendamentoCorpo', { cliente: d.clientes?.nome || '—', servico: d.servicos?.nome || '—', profissional: d.profissionais?.nome || '—', hora, data }),
+          payload.new.id
         );
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agendamentos' }, async (payload) => {
@@ -89,11 +100,12 @@ function NotificacoesRealtime({ t }) {
         if (statusAntes === 'CANCELADO' || statusDepois !== 'CANCELADO') return;
         const d = await buscarDetalhes(payload.new.id);
         if (!d) return;
-        const hora = d.data_hora?.split('T')[1]?.substring(0, 5) || '';
+        const { data, hora } = dataHoraCurta(d.data_hora);
         adicionarToast(
           'cancelado',
           t('notificacoes.agendamentoCancelado'),
-          t('notificacoes.agendamentoCanceladoCorpo', { cliente: d.clientes?.nome || '—', servico: d.servicos?.nome || '—', profissional: d.profissionais?.nome || '—', hora })
+          t('notificacoes.agendamentoCanceladoCorpo', { cliente: d.clientes?.nome || '—', servico: d.servicos?.nome || '—', profissional: d.profissionais?.nome || '—', hora, data }),
+          payload.new.id
         );
       })
       .subscribe();
@@ -131,12 +143,18 @@ function NotificacoesRealtime({ t }) {
             <div
               key={toast.id}
               className={`notif-toast notif-toast-${toast.tipo}`}
-              onClick={() => fecharToast(toast.id)}
+              onClick={() => {
+                fecharToast(toast.id);
+                if (toast.agendamentoId && aoAbrirAgendamento) aoAbrirAgendamento(toast.agendamentoId);
+              }}
               role="button"
               tabIndex={0}
             >
               <strong>{toast.tipo === 'novo' ? '📅' : '🚫'} {toast.titulo}</strong>
               <p>{toast.corpo}</p>
+              {toast.agendamentoId && aoAbrirAgendamento && (
+                <span className="notif-toast-ver">👉 {t('notificacoes.toqueParaVer')}</span>
+              )}
             </div>
           ))}
         </div>

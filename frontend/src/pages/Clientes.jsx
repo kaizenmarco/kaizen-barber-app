@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import CampoTelefone from '../components/CampoTelefone';
 import { IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import { SERVICOS } from '../config/servicos';
-import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
+import { getSlotsLivresNoDia, paraMinutos, buscarHorarioEstendido, buscarHorariosSemanais, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
 import { buscarHorariosAlmoco } from '../config/profissionais';
 
 // Importar clientes via CSV — parser simples (sem dependência externa) que
@@ -172,6 +172,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
   ];
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [horariosAlmoco, setHorariosAlmoco] = useState({});
+  const [horariosSemanais, setHorariosSemanais] = useState({});
   const [novoAgendamentoAberto, setNovoAgendamentoAberto] = useState(false);
   const [novoAgendamentoForm, setNovoAgendamentoForm] = useState({ data: '', horario: '', servico: '', profissional: '' });
   const [ocupadosNoDia, setOcupadosNoDia] = useState([]);
@@ -181,6 +182,7 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
   useEffect(() => {
     buscarHorarioEstendido().then(setHorarioEstendido);
     buscarHorariosAlmoco().then(setHorariosAlmoco);
+    buscarHorariosSemanais().then(setHorariosSemanais);
   }, []);
 
   // Busca os horários já ocupados do profissional escolhido, no dia
@@ -223,7 +225,8 @@ function Clientes({ t: tProp, idioma: idiomaProp }) {
         servicoNovoAgendamentoObj.duracaoMinutos,
         ocupadosNoDia,
         horarioEstendido,
-        horariosAlmoco[profissionaisLista.find(p => p.nome === novoAgendamentoForm.profissional)?.uuid] || HORARIO_ALMOCO
+        horariosAlmoco[profissionaisLista.find(p => p.nome === novoAgendamentoForm.profissional)?.uuid] || HORARIO_ALMOCO,
+        horariosSemanais[profissionaisLista.find(p => p.nome === novoAgendamentoForm.profissional)?.uuid]
       );
 
   const abrirNovoAgendamento = () => {

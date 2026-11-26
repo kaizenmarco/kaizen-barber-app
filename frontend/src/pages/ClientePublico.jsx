@@ -10,6 +10,8 @@ import {
   HORARIO_SALAO,
   HORARIO_ALMOCO,
   getDiaSemana,
+  getHorarioDoDia,
+  buscarHorariosSemanais,
 } from '../config/horarios';
 import { SERVICOS, getNomeServico, buscarServicosCompletos, buscarPacotesAtivos } from '../config/servicos';
 import { buscarHorariosAlmoco } from '../config/profissionais';
@@ -239,6 +241,13 @@ function ClientePublico() {
   const [horariosOcupados, setHorariosOcupados] = useState({});
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [horariosAlmoco, setHorariosAlmoco] = useState({});
+  // Horário individual de cada profissional por dia da semana (quando não
+  // segue o horário do salão) — ver buscarHorariosSemanais.
+  const [horariosSemanais, setHorariosSemanais] = useState({});
+  // Preço especial do cliente (grupo de preço criado no Admin), por uuid do
+  // serviço: { [servicoUuid]: { preco, grupo } }. Só vem com o comprovante
+  // do SMS guardado neste aparelho.
+  const [precosEspeciais, setPrecosEspeciais] = useState({});
   const [diaHorarioSelecionado, setDiaHorarioSelecionado] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [observacoesCliente, setObservacoesCliente] = useState('');
@@ -458,6 +467,20 @@ function ClientePublico() {
 
   useEffect(() => {
     buscarHorariosAlmoco().then(setHorariosAlmoco);
+    buscarHorariosSemanais().then(setHorariosSemanais);
+  }, []);
+
+  const carregarPrecosEspeciais = async (token) => {
+    if (!token) { setPrecosEspeciais({}); return; }
+    const { data, error } = await supabase.rpc('precos_especiais_cliente', { p_token: token });
+    if (error) { console.error('Erro ao buscar preço especial:', error); return; }
+    setPrecosEspeciais(Object.fromEntries((data || []).map(r => [r.servico_id, { preco: Number(r.preco), grupo: r.grupo }])));
+  };
+
+  useEffect(() => {
+    const v = lerVerificacaoLocal();
+    if (v?.token && new Date(v.expira_em).getTime() > Date.now()) carregarPrecosEspeciais(v.token);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sempre que o serviço muda, garante que o profissional selecionado
@@ -816,7 +839,7 @@ function ClientePublico() {
     const dataStr = paraDataStr(data);
     const intervalosOcupados = (horariosOcupados[prof.uuid] || []).filter(o => o.data === dataStr);
     const horarioAlmocoProf = horariosAlmoco[prof.uuid] || HORARIO_ALMOCO;
-    const slots = getSlotsLivresNoDia(data, duracao, intervalosOcupados, horarioEstendido, horarioAlmocoProf);
+    const slots = getSlotsLivresNoDia(data, duracao, intervalosOcupados, horarioEstendido, horarioAlmocoProf, horariosSemanais[prof.uuid]);
 
     // Se o dia selecionado é "hoje" no horário do Japão, esconde os horários
     // que já passaram lá no salão (evita agendar às 9h sendo já 20h, por
@@ -847,10 +870,15 @@ function ClientePublico() {
     const servico = servicos.find(s => s.nome === dadosAgendamento.servico);
     if (!servico) return 0;
     const preco = servico.preco;
+    const especial = precosEspeciais[servico.uuid]?.preco;
     const promo = promocaoDoAgendamentoAtual();
     if (promo) {
-      return calcularPrecoComPromocao(preco, promo);
+      const comPromo = calcularPrecoComPromocao(preco, promo);
+      return especial != null ? Math.min(comPromo, especial) : comPromo;
     }
+    // Preço especial do grupo do cliente (o banco grava o mesmo valor no
+    // insert, trigger trg_preco_grupo).
+    if (especial != null) return Math.max(0, Math.min(preco, especial));
     // O desconto de 1ª visita do Cartão Fidelidade (40%) é aplicado pelo
     // banco no insert (trigger trg_zz_desconto_primeira_visita); a tela de
     // confirmação mostra o preço que o banco gravou.
@@ -970,6 +998,7 @@ function ClientePublico() {
       const verificacao = { telefone: telefoneSms, token: data.token, cliente_id: data.cliente_id, expira_em: data.expira_em };
       verificacaoSessaoRef.current = verificacao;
       salvarVerificacaoLocal(verificacao);
+      carregarPrecosEspeciais(data.token);
       setEtapaSms('form');
       setCodigoSms('');
     } finally {
@@ -1151,6 +1180,10 @@ function ClientePublico() {
         await enviarCodigoSms(telefoneCompleto);
         return;
       }
+      if (error?.message?.includes('FORA_HORARIO_PROFISSIONAL')) {
+        alert('⚠️ ' + t('alerta_fora_horario_profissional'));
+        return;
+      }
       if (error?.message?.includes('CLIENTE_BLOQUEADO')) {
         alert('⚠️ ' + t('alerta_cliente_bloqueado'));
         return;
@@ -1191,6 +1224,7 @@ function ClientePublico() {
         precoFinal: novoAgendamento?.preco_final ?? precoFinal,
         desconto: Math.max(0, servicoSelecionado.preco - (novoAgendamento?.preco_final ?? precoFinal)),
         descontoPrimeiraVisita: !!novoAgendamento?.desconto_primeira_visita,
+        precoEspecialGrupo: novoAgendamento?.grupo_preco_id ? (precosEspeciais[servicoUUID]?.grupo || true) : null,
         promocaoNome: promoAplicada ? promoAplicada.nome : null
       });
 
@@ -1368,6 +1402,9 @@ function ClientePublico() {
                 )}
               </p>
             </div>
+            {agendamentoConfirmado.precoEspecialGrupo && !agendamentoConfirmado.descontoPrimeiraVisita && (
+              <p style={{ color: '#d4af37', fontSize: '13px', marginTop: '15px', fontWeight: 'bold' }}>💎 {t('preco_especial_tag')}</p>
+            )}
             {agendamentoConfirmado.descontoPrimeiraVisita && (
               <p style={{ color: '#4ade80', fontSize: '13px', marginTop: '15px', fontWeight: 'bold' }}>🎟️ {t('conf_desconto_primeira_visita')}</p>
             )}
@@ -1751,7 +1788,14 @@ function ClientePublico() {
                         {idx + 1}. {nomeServico.toUpperCase()}
                       </h3>
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>{formatarPreco(servico.preco)}</span>
+                        {precosEspeciais[servico.uuid] && precosEspeciais[servico.uuid].preco < servico.preco ? (
+                          <span>
+                            <span style={{ textDecoration: 'line-through', color: '#999', marginRight: '6px', fontSize: '13px' }}>{formatarPreco(servico.preco)}</span>
+                            <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>💎 {formatarPreco(precosEspeciais[servico.uuid].preco)}</span>
+                          </span>
+                        ) : (
+                          <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>{formatarPreco(servico.preco)}</span>
+                        )}
                         <span style={{ color: '#999', fontSize: '13px' }}>⏱️ {servico.duracao}</span>
                       </div>
                     </div>
@@ -1939,8 +1983,11 @@ function ClientePublico() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', marginBottom: '20px' }}>
                     {gerarGradeMes(mesCalendario).map((data, idx) => {
                       if (!data) return <div key={`vazio-${idx}`} />;
-                      const diaSemana = getDiaSemana(data);
-                      const fechado = !HORARIO_SALAO[diaSemana]?.aberto;
+                      // Fechado = nenhum profissional que faz o serviço atende
+                      // nesse dia (horário individual de cada um, ou o do salão).
+                      const fechado = profissionaisAptos.length > 0
+                        ? !profissionaisAptos.some(p => getHorarioDoDia(data, horarioEstendido, horariosSemanais[p.uuid]).aberto)
+                        : !HORARIO_SALAO[getDiaSemana(data)]?.aberto;
                       const foraDoIntervalo = data < hoje || data > limiteDataMax;
                       const desabilitado = fechado || foraDoIntervalo;
                       const selecionado = data.toDateString() === dataSelecionada.toDateString();
@@ -2243,6 +2290,26 @@ function ClientePublico() {
                     })}
                   </tbody>
                 </table>
+                {(() => {
+                  // Profissionais com horário próprio em algum dia da semana.
+                  const abrev = DIAS_ABREV_POR_IDIOMA[idioma] || DIAS_ABREV_POR_IDIOMA[IDIOMA_PADRAO];
+                  const linhas = profissionais
+                    .map(p => {
+                      const dias = horariosSemanais[p.uuid] || {};
+                      const partes = [1, 2, 3, 4, 5, 6, 0]
+                        .filter(d => dias[d])
+                        .map(d => `${abrev[d]} ${dias[d].aberto ? `${dias[d].abertura}-${dias[d].fechamento}` : t('endereco_fechado')}`);
+                      return partes.length ? `${p.nome.split(' ')[0]}: ${partes.join(', ')}` : null;
+                    })
+                    .filter(Boolean);
+                  if (!linhas.length) return null;
+                  return (
+                    <p style={{ fontSize: '13px', color: '#e8e8e8', marginTop: '14px', marginBottom: 0 }}>
+                      💈 {t('endereco_horario_individual')}<br />
+                      {linhas.map(l => <span key={l} style={{ display: 'block', color: '#d4af37' }}>{l}</span>)}
+                    </p>
+                  );
+                })()}
                 <p style={{ fontSize: '13px', color: '#999', marginTop: '14px', marginBottom: 0 }}>
                   ☕ {(() => {
                     // Almoço é por profissional: se todos almoçam no mesmo
@@ -2496,7 +2563,7 @@ function ClientePublico() {
                 📅 {diaHorarioSelecionado.data.toLocaleDateString(localeAtual)} · 🕐 {diaHorarioSelecionado.hora} - {somarMinutos(diaHorarioSelecionado.hora, duracaoSelecionada)} ({duracaoSelecionada} min)
               </p>
               <p style={{ margin: 0 }}>
-                {promocaoDoAgendamentoAtual() ? (
+                {(promocaoDoAgendamentoAtual() || calcularPrecoFinal() < (servicoSelecionadoInfo?.preco || 0)) ? (
                   <>
                     <span style={{ textDecoration: 'line-through', color: '#999', marginRight: '8px' }}>{formatarPreco(servicoSelecionadoInfo?.preco || 0)}</span>
                     <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
@@ -2505,6 +2572,11 @@ function ClientePublico() {
                   <span style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '18px' }}>{formatarPreco(calcularPrecoFinal())}</span>
                 )}
               </p>
+              {servicoSelecionadoInfo && precosEspeciais[servicoSelecionadoInfo.uuid] && (
+                <p style={{ margin: '6px 0 0 0', color: '#d4af37', fontSize: '12px', fontWeight: 'bold' }}>
+                  💎 {t('preco_especial_tag')}
+                </p>
+              )}
               {promocaoDoAgendamentoAtual() && (
                 <p style={{ margin: '6px 0 0 0', color: '#4ade80', fontSize: '12px', fontWeight: 'bold' }}>
                   🏷️ {t('modal_promocao_aplicada', { nome: promocaoDoAgendamentoAtual().nome })}

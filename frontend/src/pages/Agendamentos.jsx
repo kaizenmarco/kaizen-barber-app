@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import CampoTelefone from '../components/CampoTelefone';
-import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
+import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, buscarHorariosSemanais, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
 import { buscarHorariosAlmoco } from '../config/profissionais';
 import { SERVICOS, buscarServicosCompletos } from '../config/servicos';
 import { LOCALE_POR_IDIOMA_ADMIN, DIAS_SEMANA_ABREV_ADMIN, DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import { contarCancelamentosUltimaHora, LIMITE_ULTIMA_HORA_MIN } from '../config/reincidencias';
 
-function Agendamentos({ t: tProp, idioma: idiomaProp }) {
+function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
   const locale = LOCALE_POR_IDIOMA_ADMIN[idioma] || 'pt-BR';
@@ -21,6 +21,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [horarioEstendido, setHorarioEstendido] = useState(HORARIO_ESTENDIDO_PADRAO);
   const [horariosAlmoco, setHorariosAlmoco] = useState({});
+  const [horariosSemanais, setHorariosSemanais] = useState({}); // horário individual de cada profissional por dia da semana
   const [diaModal, setDiaModal] = useState(null); // data (YYYY-MM-DD) do dia clicado no calendário, ou null se fechado
   const [bloqueios, setBloqueios] = useState([]);
   const [agendamentoEditando, setAgendamentoEditando] = useState(null); // agendamento sendo editado (data/hora), ou null se fechado
@@ -254,6 +255,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   useEffect(() => {
     buscarHorarioEstendido().then(setHorarioEstendido);
     buscarHorariosAlmoco().then(setHorariosAlmoco);
+    buscarHorariosSemanais().then(setHorariosSemanais);
   }, []);
 
   // Lista de clientes já cadastrados (nome/email/telefone/nascimento) — usada
@@ -300,6 +302,56 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Tocou no aviso de "novo agendamento"/"cancelado" (ou na notificação
+  // push): vai direto pro profissional, dia e horário dele, rola até o
+  // cartão e deixa ele piscando em dourado. Cancelado não aparece na grade,
+  // então abre os detalhes.
+  const [idEmFoco, setIdEmFoco] = useState(null);
+  const [focoPendente, setFocoPendente] = useState(null);
+  useEffect(() => {
+    if (!focoAgendamento?.id) return;
+    let cancelado = false;
+    (async () => {
+      const { data } = await supabase
+        .from('agendamentos')
+        .select('id, data_hora, profissional_id')
+        .eq('id', focoAgendamento.id)
+        .maybeSingle();
+      if (cancelado || !data) return;
+      const dataStr = data.data_hora.split('T')[0];
+      setAbaProfissional(data.profissional_id);
+      setDiaSelecionado(dataStr);
+      setSemanaAncora(new Date(`${dataStr}T00:00:00`));
+      setSubView('dia');
+      setFiltroStatus('todos');
+      setDetalhesAgendamento(null);
+      setFocoPendente(data.id);
+      await buscarAgendamentos();
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focoAgendamento?.n]);
+
+  useEffect(() => {
+    if (!focoPendente) return undefined;
+    const ag = agendamentos.find(a => a.id === focoPendente);
+    if (!ag) return undefined;
+    setFocoPendente(null);
+    if (ag.status === 'CANCELADO') {
+      abrirDetalhesAgendamento(ag);
+      return undefined;
+    }
+    setIdEmFoco(ag.id);
+    // Sem cleanup de propósito: o setFocoPendente(null) acima re-roda este
+    // efeito e um cleanup cancelaria a rolagem.
+    setTimeout(() => {
+      document.getElementById(`agenda-card-${ag.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    setTimeout(() => setIdEmFoco(atual => (atual === ag.id ? null : atual)), 6000);
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendamentos, focoPendente]);
+
   // ---- Cálculo de horários disponíveis para o formulário "Novo Agendamento" ----
   // Usa a mesma lógica de duração por serviço do site público (config/horarios.js
   // + config/servicos.js), e os agendamentos já carregados nesta tela para saber
@@ -330,7 +382,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const slotsDisponiveisNovoAgendamento = (!profissionalNovoObj || !servicoNovoObj || !novoAgendamento.data) ? [] : (() => {
     const dataObj = new Date(`${novoAgendamento.data}T00:00:00`);
-    return getSlotsLivresNoDia(dataObj, duracaoNovoAgendamento, intervalosOcupadosNoDia, horarioEstendido, horariosAlmoco[profissionalNovoObj.uuid] || HORARIO_ALMOCO);
+    return getSlotsLivresNoDia(dataObj, duracaoNovoAgendamento, intervalosOcupadosNoDia, horarioEstendido, horariosAlmoco[profissionalNovoObj.uuid] || HORARIO_ALMOCO, horariosSemanais[profissionalNovoObj.uuid]);
   })();
 
   const conflitosEncaixe = (!modoEncaixe || !novoAgendamento.horario) ? [] : (() => {
@@ -373,7 +425,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   const slotsDisponiveisEdicao = (!agendamentoEditando || !edicaoForm.data) ? [] : (() => {
     const dataObj = new Date(`${edicaoForm.data}T00:00:00`);
-    return getSlotsLivresNoDia(dataObj, duracaoEdicao, intervalosOcupadosEdicao, horarioEstendido, horariosAlmoco[profissionalEdicaoId] || HORARIO_ALMOCO);
+    return getSlotsLivresNoDia(dataObj, duracaoEdicao, intervalosOcupadosEdicao, horarioEstendido, horariosAlmoco[profissionalEdicaoId] || HORARIO_ALMOCO, horariosSemanais[profissionalEdicaoId]);
   })();
 
   const conflitosEncaixeEdicao = (!edicaoForm.encaixe || !edicaoForm.horario) ? [] : (() => {
@@ -403,6 +455,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           cancelado_por,
           cancelado_em,
           utm_source, utm_campaign, utm_content,
+          grupo_preco_id, grupos_preco:grupo_preco_id(nome),
           clientes(id, nome, email, telefone),
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
@@ -429,6 +482,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
           profissionalId: agendamento.profissional_id,
           status: agendamento.status,
           preco: agendamento.preco_final,
+          grupoPreco: agendamento.grupo_preco_id ? (agendamento.grupos_preco?.nome || t('agendamentos.precoEspecial')) : null,
           observacoesCompletas: agendamento.observacoes || '',
           encaixe: !!agendamento.observacoes?.startsWith('[ENCAIXE]'),
           origemAnuncio: agendamento.utm_source ? [agendamento.utm_source, agendamento.utm_campaign, agendamento.utm_content].filter(Boolean).join(' · ') : null,
@@ -1288,7 +1342,24 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
 
   // ---- Visão "Dia" (padrão ao abrir a tela) ----
   const dataDiaSelecionadoObj = new Date(`${diaSelecionado}T00:00:00`);
-  const horarioDoDiaSelecionado = getHorarioDoDia(dataDiaSelecionadoObj, horarioEstendido);
+  // A régua do dia cobre o horário do salão E o do profissional (ele pode
+  // ter horário próprio, até num dia em que o salão fecha). O que fica fora
+  // do horário do profissional aparece como faixa cinza "fora do horário".
+  const horarioSemanalProfSelecionado = horariosSemanais[abaProfissional];
+  const nomeProfSelecionado = (profissionaisLista.find(p => p.uuid === abaProfissional)?.nome || '').split(' ')[0];
+  const uniaoHorarios = (a, b) => {
+    const abertos = [a, b].filter(h => h.aberto);
+    if (abertos.length === 0) return { aberto: false, abertura: null, fechamento: null };
+    return {
+      aberto: true,
+      abertura: paraHHMM(Math.min(...abertos.map(h => paraMinutos(h.abertura)))),
+      fechamento: paraHHMM(Math.max(...abertos.map(h => paraMinutos(h.fechamento)))),
+    };
+  };
+  const horarioProfDoDia = (d) => getHorarioDoDia(d, horarioEstendido, horarioSemanalProfSelecionado);
+  const horarioReguaDoDia = (d) => uniaoHorarios(getHorarioDoDia(d, horarioEstendido), horarioProfDoDia(d));
+  const horarioDoDiaSelecionado = horarioReguaDoDia(dataDiaSelecionadoObj);
+  const horarioProfDiaSelecionado = horarioProfDoDia(dataDiaSelecionadoObj);
   const agendamentosDoDiaSelecionado = agendamentosFiltrados
     .filter(a => a.data === diaSelecionado && (filtroStatus !== 'todos' || a.status !== 'CANCELADO'))
     .sort((a, b) => a.hora.localeCompare(b.hora));
@@ -1370,6 +1441,28 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   // ocupa coluna nem impede encaixe/bloqueio — quem tira o almoço dos
   // horários livres é getSlotsLivresNoDia.
   const almocoProfSelecionado = horariosAlmoco[abaProfissional] || HORARIO_ALMOCO;
+
+  // Faixas cinzas "fora do horário do profissional" dentro da régua
+  // [abertura, fechamento] — ex.: Marco fecha domingo às 12:45, então de
+  // 12:45 até 17:00 fica cinza. Profissional sem expediente no dia = régua
+  // inteira cinza.
+  const faixasForaDoHorario = (horarioProf, abertura, fechamento, alturaSlotPx) => {
+    const trechos = !horarioProf.aberto
+      ? [[abertura, fechamento]]
+      : [[abertura, paraMinutos(horarioProf.abertura)], [paraMinutos(horarioProf.fechamento), fechamento]];
+    return trechos
+      .map(([ini, fim]) => [Math.max(abertura, ini), Math.min(fechamento, fim)])
+      .filter(([ini, fim]) => fim > ini)
+      .map(([ini, fim]) => ({
+        chave: `${ini}-${fim}`,
+        inteiro: !horarioProf.aberto,
+        estilo: {
+          top: `${((ini - abertura) / SLOT_MINUTOS) * alturaSlotPx}px`,
+          height: `${((fim - ini) / SLOT_MINUTOS) * alturaSlotPx}px`,
+        },
+      }));
+  };
+
   const faixaAlmoco = (abertura, fechamento, alturaSlotPx) => {
     const inicio = Math.max(abertura, paraMinutos(almocoProfSelecionado.inicio));
     const fim = Math.min(fechamento, paraMinutos(almocoProfSelecionado.fim));
@@ -1387,7 +1480,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
   // (o mais cedo que abre até o mais tarde que fecha na semana) pra todas
   // as colunas ficarem alinhadas na mesma régua de horas. ----
   const SLOT_ALTURA_PX_SEMANA = 18;
-  const horariosPorDiaSemana = diasDaSemanaAtual.map(d => getHorarioDoDia(d, horarioEstendido));
+  const horariosPorDiaSemana = diasDaSemanaAtual.map(d => horarioReguaDoDia(d));
   const diasAbertosSemana = horariosPorDiaSemana.filter(h => h.aberto);
   const aberturaMinSemana = diasAbertosSemana.length ? Math.min(...diasAbertosSemana.map(h => paraMinutos(h.abertura))) : 0;
   const fechamentoMinSemana = diasAbertosSemana.length ? Math.max(...diasAbertosSemana.map(h => paraMinutos(h.fechamento))) : 0;
@@ -1425,7 +1518,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
       }),
     ].filter(item => item.fimMin > item.inicioMin && item.inicioMin < fechamentoMinSemana));
 
-    return { data: d, dataStr, horarioDoDia, itens };
+    return { data: d, dataStr, horarioDoDia, horarioProf: horarioProfDoDia(d), itens };
   });
 
   return (
@@ -1526,7 +1619,12 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                     abrirBloqueioRapido(minutosClicados);
                   }}
                 >
-                  {horarioDoDiaSelecionado.aberto && faixaAlmoco(aberturaMinDia, fechamentoMinDia, SLOT_ALTURA_PX) && (
+                  {faixasForaDoHorario(horarioProfDiaSelecionado, aberturaMinDia, fechamentoMinDia, SLOT_ALTURA_PX).map(f => (
+                    <div key={f.chave} className="agenda-timeline-fora" style={f.estilo}>
+                      {f.inteiro ? t('agendamentos.profNaoAtendeNesseDia', { nome: nomeProfSelecionado }) : t('agendamentos.foraDoHorarioProf', { nome: nomeProfSelecionado })}
+                    </div>
+                  ))}
+                  {horarioProfDiaSelecionado.aberto && faixaAlmoco(aberturaMinDia, fechamentoMinDia, SLOT_ALTURA_PX) && (
                     <div className="agenda-timeline-almoco" style={faixaAlmoco(aberturaMinDia, fechamentoMinDia, SLOT_ALTURA_PX)}>
                       🍽️ {t('agendamentos.almoco')} {almocoProfSelecionado.inicio}–{almocoProfSelecionado.fim}
                     </div>
@@ -1562,7 +1660,8 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                     return (
                       <div
                         key={item.id}
-                        className="agenda-timeline-evento agenda-card"
+                        id={`agenda-card-${a.id}`}
+                        className={`agenda-timeline-evento agenda-card${idEmFoco === a.id ? ' agenda-card-em-foco' : ''}`}
                         style={{ ...estiloPosicao, borderLeftColor: getCorStatus(a.status), cursor: 'pointer' }}
                         onClick={() => abrirDetalhesAgendamento(a)}
                       >
@@ -1587,7 +1686,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                               >
                                 {statusOpcoes.map(s => <option key={s} value={s}>{t(`statusAg.${s}`)}</option>)}
                               </select>
-                              <span className="agenda-card-preco">{a.preco ? `¥${a.preco.toLocaleString('ja-JP')}` : '-'}</span>
+                              <span className="agenda-card-preco" title={a.grupoPreco || undefined}>{a.grupoPreco ? '💎 ' : ''}{a.preco ? `¥${a.preco.toLocaleString('ja-JP')}` : '-'}</span>
                             </div>
                           </>
                         )}
@@ -1644,7 +1743,10 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
                       }}
                     >
                       {!col.horarioDoDia.aberto && <span className="agenda-semana-fechado-label">{t('agendamentos.fechado')}</span>}
-                      {col.horarioDoDia.aberto && faixaAlmoco(aberturaMinSemana, fechamentoMinSemana, SLOT_ALTURA_PX_SEMANA) && (
+                      {col.horarioDoDia.aberto && faixasForaDoHorario(col.horarioProf, aberturaMinSemana, fechamentoMinSemana, SLOT_ALTURA_PX_SEMANA).map(f => (
+                        <div key={f.chave} className="agenda-timeline-fora" style={f.estilo} title={t('agendamentos.foraDoHorarioProf', { nome: nomeProfSelecionado })} />
+                      ))}
+                      {col.horarioDoDia.aberto && col.horarioProf.aberto && faixaAlmoco(aberturaMinSemana, fechamentoMinSemana, SLOT_ALTURA_PX_SEMANA) && (
                         <div
                           className="agenda-timeline-almoco agenda-semana-almoco"
                           style={faixaAlmoco(aberturaMinSemana, fechamentoMinSemana, SLOT_ALTURA_PX_SEMANA)}
@@ -2490,7 +2592,10 @@ function Agendamentos({ t: tProp, idioma: idiomaProp }) {
             <div className="detalhe-campo-linha">
               <div className="detalhe-campo-texto">
                 <span className="detalhe-campo-label">{t('agendamentos.valor')}</span>
-                <span className="detalhe-campo-valor">{detalhesAgendamento.preco ? `¥${detalhesAgendamento.preco.toLocaleString('ja-JP')}` : '-'}</span>
+                <span className="detalhe-campo-valor">
+                  {detalhesAgendamento.preco ? `¥${detalhesAgendamento.preco.toLocaleString('ja-JP')}` : '-'}
+                  {detalhesAgendamento.grupoPreco && <span style={{ color: '#d4af37', marginLeft: '6px', fontSize: '12px' }}>💎 {detalhesAgendamento.grupoPreco}</span>}
+                </span>
               </div>
             </div>
 

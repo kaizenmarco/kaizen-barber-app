@@ -86,6 +86,56 @@ export const salvarHorarioEstendido = async (config) => {
   if (error) throw error;
 };
 
+// ----------------------------------------------------------------------------
+// Horário semanal individual de cada profissional (tabela
+// horario_semanal_profissional). Só existe linha pros dias em que o
+// profissional NÃO segue o horário do salão — ex.: Marco fecha domingo à
+// tarde (domingo 09:00–12:45) ou não atende num dia (aberto = false).
+// Formato devolvido: { [uuid]: { [0-6 (0 = domingo)]: { aberto, abertura, fechamento } } }
+// ----------------------------------------------------------------------------
+export const buscarHorariosSemanais = async () => {
+  const { data, error } = await supabase
+    .from('horario_semanal_profissional')
+    .select('profissional_id, dia_semana, aberto, abertura, fechamento');
+  if (error) {
+    console.error('Erro ao buscar horários individuais:', error);
+    return {};
+  }
+  const mapa = {};
+  (data || []).forEach(r => {
+    if (!mapa[r.profissional_id]) mapa[r.profissional_id] = {};
+    mapa[r.profissional_id][r.dia_semana] = { aberto: r.aberto, abertura: r.abertura, fechamento: r.fechamento };
+  });
+  return mapa;
+};
+
+// horario = { aberto, abertura, fechamento } pra gravar, ou null pra voltar
+// ao horário padrão do salão naquele dia.
+export const salvarHorarioSemanal = async (uuidProfissional, diaSemana, horario) => {
+  if (!horario) {
+    const { error } = await supabase
+      .from('horario_semanal_profissional')
+      .delete()
+      .eq('profissional_id', uuidProfissional)
+      .eq('dia_semana', diaSemana);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase
+    .from('horario_semanal_profissional')
+    .upsert({
+      profissional_id: uuidProfissional,
+      dia_semana: diaSemana,
+      aberto: horario.aberto,
+      abertura: horario.aberto ? horario.abertura : null,
+      fechamento: horario.aberto ? horario.fechamento : null,
+      atualizado_em: new Date().toISOString(),
+    });
+  if (error) throw error;
+};
+
+export const ORDEM_DIAS_SEMANA_CHAVES = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+
 const ORDEM_DIAS = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
 
 export const getDiaSemana = (data) => ORDEM_DIAS[data.getDay()];
@@ -110,7 +160,18 @@ const dataDentroDoIntervalo = (dataStr, inicio, fim) => {
 // aplicando o horário estendido quando ativo e a data estiver no período.
 // `horarioEstendido` deve vir de buscarHorarioEstendido() (ou usar o padrão
 // desativado, se ainda não foi carregado).
-export const getHorarioDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRAO) => {
+export const getHorarioDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRAO, horarioSemanalProf = null) => {
+  // Horário individual do profissional pra esse dia da semana (tabela
+  // horario_semanal_profissional, editada em Profissionais no Admin) vale
+  // no lugar do horário do salão — inclusive pra abrir num dia que o salão
+  // fecha. Sem horário individual, segue o padrão abaixo.
+  const individual = horarioSemanalProf?.[data.getDay()];
+  if (individual) {
+    return individual.aberto
+      ? { aberto: true, abertura: individual.abertura, fechamento: individual.fechamento, individual: true }
+      : { aberto: false, abertura: null, fechamento: null, individual: true };
+  }
+
   const diaSemana = getDiaSemana(data);
   const padrao = HORARIO_SALAO[diaSemana];
   if (!padrao || !padrao.aberto) {
@@ -133,8 +194,8 @@ export const getHorarioDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRA
 // Divide um dia nos blocos de trabalho (manhã e tarde, separados pelo
 // almoço), em minutos desde 00:00. Não considera agendamentos já feitos —
 // só a grade fixa de funcionamento do salão.
-const getBlocosDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRAO, horarioAlmoco = HORARIO_ALMOCO) => {
-  const { aberto, abertura, fechamento } = getHorarioDoDia(data, horarioEstendido);
+const getBlocosDoDia = (data, horarioEstendido = HORARIO_ESTENDIDO_PADRAO, horarioAlmoco = HORARIO_ALMOCO, horarioSemanalProf = null) => {
+  const { aberto, abertura, fechamento } = getHorarioDoDia(data, horarioEstendido, horarioSemanalProf);
   if (!aberto) return [];
 
   const aberturaMin = paraMinutos(abertura);
@@ -167,8 +228,10 @@ export const getSlotsDisponiveisNoDia = (data, duracaoMinutos = 60, horarioEsten
 // de cada agendamento existente e continua a grade a partir dali. Assim
 // buracos "torcidos" (tipo 30min sobrando) aparecem como opção real de
 // horário, sem precisar do modo Encaixe.
-export const getSlotsLivresNoDia = (data, duracaoMinutos = 60, intervalosOcupados = [], horarioEstendido = HORARIO_ESTENDIDO_PADRAO, horarioAlmoco = HORARIO_ALMOCO) => {
-  const blocos = getBlocosDoDia(data, horarioEstendido, horarioAlmoco);
+// `horarioSemanalProf` = horário individual do profissional (de
+// buscarHorariosSemanais()[uuid]); sem ele, usa o horário do salão.
+export const getSlotsLivresNoDia = (data, duracaoMinutos = 60, intervalosOcupados = [], horarioEstendido = HORARIO_ESTENDIDO_PADRAO, horarioAlmoco = HORARIO_ALMOCO, horarioSemanalProf = null) => {
+  const blocos = getBlocosDoDia(data, horarioEstendido, horarioAlmoco, horarioSemanalProf);
   if (blocos.length === 0) return [];
 
   const ocupadosOrdenados = [...intervalosOcupados].sort((a, b) => a.inicioMin - b.inicioMin);

@@ -18,7 +18,7 @@ self.addEventListener('push', (event) => {
     icon: '/admin-icon-192.png',
     badge: '/admin-icon-192.png',
     tag: dados.tag || undefined,
-    data: dados.url || '/admin',
+    data: { url: dados.url || '/admin', agendamentoId: dados.agendamento_id || null },
   };
 
   event.waitUntil(self.registration.showNotification(titulo, opcoes));
@@ -26,12 +26,21 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data || '/admin';
+  // data antigo era só a url (string); o novo traz também o id do
+  // agendamento, pra abrir a Agenda direto nele.
+  const dados = typeof event.notification.data === 'string'
+    ? { url: event.notification.data, agendamentoId: null }
+    : (event.notification.data || {});
+  const url = dados.url || '/admin';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((listaClientes) => {
       for (const cliente of listaClientes) {
-        if ('focus' in cliente) return cliente.focus();
+        if ('focus' in cliente) {
+          // App já aberto: avisa a página qual agendamento mostrar.
+          if (dados.agendamentoId) cliente.postMessage({ tipo: 'abrir-agendamento', id: dados.agendamentoId });
+          return cliente.focus();
+        }
       }
       if (clients.openWindow) return clients.openWindow(url);
       return undefined;

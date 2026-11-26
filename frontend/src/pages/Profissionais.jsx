@@ -5,6 +5,8 @@ import {
   HORARIO_ESTENDIDO_PADRAO,
   buscarHorarioEstendido,
   salvarHorarioEstendido,
+  buscarHorariosSemanais,
+  salvarHorarioSemanal,
 } from '../config/horarios';
 import { PROFISSIONAIS, COMISSAO_PADRAO, buscarComissoes, salvarComissao, buscarHorariosAlmoco, salvarHorarioAlmoco } from '../config/profissionais';
 import { DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
@@ -12,6 +14,9 @@ import { DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config
 const INDICE_DIA = {
   domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6,
 };
+
+// índice 0-6 (0 = domingo) -> chave de HORARIO_SALAO
+const ORDEM_DIAS_CHAVE = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
 
 const ORDEM_DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
 
@@ -40,7 +45,15 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
   const [salvandoComissao, setSalvandoComissao] = useState(null);
   const [mensagemComissao, setMensagemComissao] = useState({});
 
+  // Horário semanal individual: { [uuid]: { [0-6]: { aberto, abertura, fechamento } } }
+  const [horariosSemanais, setHorariosSemanais] = useState({});
+  const [semanalEditado, setSemanalEditado] = useState({});
+  const [semanalAberto, setSemanalAberto] = useState(null); // uuid com o editor aberto
+  const [salvandoSemanal, setSalvandoSemanal] = useState(null);
+  const [mensagemSemanal, setMensagemSemanal] = useState({});
+
   useEffect(() => {
+    buscarHorariosSemanais().then(mapa => { setHorariosSemanais(mapa); setSemanalEditado(mapa); });
     (async () => {
       const config = await buscarHorarioEstendido();
       setHorarioEstendido(config);
@@ -114,6 +127,66 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
     } finally {
       setSalvandoAlmoco(null);
     }
+  };
+
+  // Linha de um dia no editor: modo 'padrao' (sem linha no banco), 'proprio'
+  // (horário diferente do salão) ou 'fechado' (não atende).
+  const diaSemanalDe = (uuid, dow, mapa) => {
+    const h = mapa[uuid]?.[dow];
+    const salao = HORARIO_SALAO[ORDEM_DIAS_CHAVE[dow]];
+    if (!h) return { modo: 'padrao', abertura: salao.abertura || '09:00', fechamento: salao.fechamento || '17:00' };
+    if (!h.aberto) return { modo: 'fechado', abertura: salao.abertura || '09:00', fechamento: salao.fechamento || '17:00' };
+    return { modo: 'proprio', abertura: h.abertura, fechamento: h.fechamento };
+  };
+
+  const alterarDiaSemanal = (uuid, dow, campo, valor) => {
+    setMensagemSemanal({ ...mensagemSemanal, [uuid]: '' });
+    const atual = diaSemanalDe(uuid, dow, semanalEditado);
+    const novo = { ...atual, [campo]: valor };
+    const doProf = { ...(semanalEditado[uuid] || {}) };
+    if (novo.modo === 'padrao') delete doProf[dow];
+    else doProf[dow] = { aberto: novo.modo === 'proprio', abertura: novo.abertura, fechamento: novo.fechamento };
+    setSemanalEditado({ ...semanalEditado, [uuid]: doProf });
+  };
+
+  const semanalMudou = (uuid) => [0, 1, 2, 3, 4, 5, 6].some(dow =>
+    JSON.stringify(diaSemanalDe(uuid, dow, semanalEditado)) !== JSON.stringify(diaSemanalDe(uuid, dow, horariosSemanais)));
+
+  const handleSalvarSemanal = async (uuid) => {
+    const dias = [0, 1, 2, 3, 4, 5, 6];
+    const invalido = dias.some(dow => {
+      const d = diaSemanalDe(uuid, dow, semanalEditado);
+      return d.modo === 'proprio' && (!d.abertura || !d.fechamento || d.fechamento <= d.abertura);
+    });
+    if (invalido) {
+      setMensagemSemanal({ ...mensagemSemanal, [uuid]: t('profissionais.horarioSemanalInvalido') });
+      return;
+    }
+    setSalvandoSemanal(uuid);
+    try {
+      for (const dow of dias) {
+        const novo = diaSemanalDe(uuid, dow, semanalEditado);
+        if (JSON.stringify(novo) === JSON.stringify(diaSemanalDe(uuid, dow, horariosSemanais))) continue;
+        await salvarHorarioSemanal(uuid, dow, novo.modo === 'padrao' ? null : {
+          aberto: novo.modo === 'proprio', abertura: novo.abertura, fechamento: novo.fechamento,
+        });
+      }
+      const mapa = await buscarHorariosSemanais();
+      setHorariosSemanais(mapa);
+      setSemanalEditado(mapa);
+      setMensagemSemanal({ ...mensagemSemanal, [uuid]: t('profissionais.comissaoSalva') });
+    } catch (erro) {
+      console.error('Erro ao salvar horário semanal:', erro);
+      setMensagemSemanal({ ...mensagemSemanal, [uuid]: t('profissionais.erroSalvarHorario') });
+    } finally {
+      setSalvandoSemanal(null);
+    }
+  };
+
+  const resumoSemanal = (uuid) => {
+    const dias = Object.keys(horariosSemanais[uuid] || {});
+    if (dias.length === 0) return t('profissionais.segueHorarioSalao');
+    return t('profissionais.horarioPersonalizado', { n: dias.length });
   };
 
   const handleInputChange = (e) => {
@@ -293,7 +366,61 @@ function Profissionais({ t: tProp, idioma: idiomaProp }) {
               <h3>{profissional.nome}</h3>
               <p className="especialidades">{profissional.especialidades}</p>
               <div className="detalhes">
-                <p><strong>{t('profissionais.horarioLabel')}</strong> {t('profissionais.segueHorarioSalao')}</p>
+                <p><strong>{t('profissionais.horarioLabel')}</strong> {resumoSemanal(profissional.uuid)}</p>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ marginTop: '4px', marginBottom: '8px', background: 'transparent', color: '#d4af37', border: '1px solid #d4af37' }}
+                  onClick={() => setSemanalAberto(semanalAberto === profissional.uuid ? null : profissional.uuid)}
+                >
+                  🗓️ {t('profissionais.editarHorarioSemanal')} {semanalAberto === profissional.uuid ? '▲' : '▼'}
+                </button>
+                {semanalAberto === profissional.uuid && (
+                  <div style={{ border: '1px solid #333', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}>
+                    <p style={{ fontSize: '12px', color: '#999', margin: '0 0 8px 0' }}>{t('profissionais.horarioSemanalDesc')}</p>
+                    {[1, 2, 3, 4, 5, 6, 0].map(dow => {
+                      const d = diaSemanalDe(profissional.uuid, dow, semanalEditado);
+                      const salao = HORARIO_SALAO[ORDEM_DIAS_CHAVE[dow]];
+                      return (
+                        <div key={dow} style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', padding: '6px 0', borderBottom: '1px solid #2a2a2a' }}>
+                          <strong style={{ width: '82px', fontSize: '13px' }}>{diasNomes[dow]}</strong>
+                          <select
+                            value={d.modo}
+                            onChange={(e) => alterarDiaSemanal(profissional.uuid, dow, 'modo', e.target.value)}
+                            style={{ width: 'auto', marginBottom: 0 }}
+                          >
+                            <option value="padrao">
+                              {t('profissionais.modoPadrao')} ({salao.aberto ? `${salao.abertura}-${salao.fechamento}` : t('comum.fechado')})
+                            </option>
+                            <option value="proprio">{t('profissionais.modoProprio')}</option>
+                            <option value="fechado">{t('profissionais.modoFechado')}</option>
+                          </select>
+                          {d.modo === 'proprio' && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <input type="time" value={d.abertura} onChange={(e) => alterarDiaSemanal(profissional.uuid, dow, 'abertura', e.target.value)} style={{ width: 'auto', marginBottom: 0 }} />
+                              <span>-</span>
+                              <input type="time" value={d.fechamento} onChange={(e) => alterarDiaSemanal(profissional.uuid, dow, 'fechamento', e.target.value)} style={{ width: 'auto', marginBottom: 0 }} />
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ marginTop: '10px' }}
+                      onClick={() => handleSalvarSemanal(profissional.uuid)}
+                      disabled={salvandoSemanal === profissional.uuid || !semanalMudou(profissional.uuid)}
+                    >
+                      {salvandoSemanal === profissional.uuid ? t('comum.salvando') : t('profissionais.salvarHorarioSemanal')}
+                    </button>
+                    {mensagemSemanal[profissional.uuid] && (
+                      <p style={{ fontSize: '12px', marginTop: '6px', color: mensagemSemanal[profissional.uuid] === t('profissionais.comissaoSalva') ? '#4ade80' : '#f87171' }}>
+                        {mensagemSemanal[profissional.uuid]}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                   <strong>{t('profissionais.comissao')}</strong>
                   <input
