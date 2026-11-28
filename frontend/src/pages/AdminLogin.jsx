@@ -451,7 +451,7 @@ function AdminLogin() {
         ) : (
           <>
             {abaSelecionada === 'dashboard' && <Dashboard t={t} idioma={idioma} />}
-            {abaSelecionada === 'agendamentos' && <Agendamentos t={t} idioma={idioma} focoAgendamento={focoAgendamento} />}
+            {abaSelecionada === 'agendamentos' && <Agendamentos t={t} idioma={idioma} focoAgendamento={focoAgendamento} aoUsarFoco={() => setFocoAgendamento(null)} />}
             {abaSelecionada === 'clientes' && <Clientes t={t} idioma={idioma} />}
             {abaSelecionada === 'profissionais' && <Profissionais t={t} idioma={idioma} />}
             {abaSelecionada === 'caixa' && <Caixa t={t} idioma={idioma} />}

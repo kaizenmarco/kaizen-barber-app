@@ -147,10 +147,13 @@ function Comandas({ t: tProp, idioma: idiomaProp }) {
     const servicoInfo = SERVICOS.find(s => s.uuid === item.servicoId);
     const sugestaoCheia = item.valor > 0 ? item.valor : (servicoInfo?.preco ?? 0);
     const coberturaAssinatura = item.origemPagamento === 'assinatura';
+    // O banco já grava o agendamento com os 15% (preço normal × 0,85); aqui
+    // só garante que não desconta duas vezes.
+    const precoComRecorrencia = Math.round((servicoInfo?.preco || sugestaoCheia) * 0.85);
     const sugestao = coberturaAssinatura
       ? 0
       : item.elegivelDescontoRecorrencia
-        ? Math.round(sugestaoCheia * 0.85 * 100) / 100
+        ? (item.valor > 0 ? Math.min(item.valor, precoComRecorrencia) : precoComRecorrencia)
         : sugestaoCheia;
     const chavePrompt = coberturaAssinatura
       ? 'comandas.fecharPromptAssinatura'

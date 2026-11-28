@@ -2933,3 +2933,9 @@ body {
   background: var(--accent-gold);
   border-radius: 3px;
 }
+/* Marcou o próximo no mesmo dia do atendimento: 15% já aplicado no preço */
+.agenda-card-recorrencia {
+  color: #4ade80;
+  font-weight: bold;
+  white-space: nowrap;
+}

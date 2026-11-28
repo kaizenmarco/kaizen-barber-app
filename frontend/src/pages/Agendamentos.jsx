@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import CampoTelefone from '../components/CampoTelefone';
 import { getSlotsLivresNoDia, paraMinutos, paraHHMM, getHorarioDoDia, buscarHorarioEstendido, buscarHorariosSemanais, HORARIO_ESTENDIDO_PADRAO, HORARIO_ALMOCO } from '../config/horarios';
@@ -7,7 +7,7 @@ import { SERVICOS, buscarServicosCompletos } from '../config/servicos';
 import { LOCALE_POR_IDIOMA_ADMIN, DIAS_SEMANA_ABREV_ADMIN, DIAS_SEMANA_ADMIN, IDIOMA_ADMIN_PADRAO, traduzirAdmin } from '../config/traducoesAdmin';
 import { contarCancelamentosUltimaHora, LIMITE_ULTIMA_HORA_MIN } from '../config/reincidencias';
 
-function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
+function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento, aoUsarFoco }) {
   const idioma = idiomaProp || IDIOMA_ADMIN_PADRAO;
   const t = tProp || ((chave, valores) => traduzirAdmin(idioma, chave, valores));
   const locale = LOCALE_POR_IDIOMA_ADMIN[idioma] || 'pt-BR';
@@ -306,6 +306,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
   // push): vai direto pro profissional, dia e horário dele, rola até o
   // cartão e deixa ele piscando em dourado. Cancelado não aparece na grade,
   // então abre os detalhes.
+  const abertoPeloAviso = useRef(false); // a Agenda está no dia de um aviso tocado
   const [idEmFoco, setIdEmFoco] = useState(null);
   const [focoPendente, setFocoPendente] = useState(null);
   useEffect(() => {
@@ -317,7 +318,12 @@ function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
         .select('id, data_hora, profissional_id')
         .eq('id', focoAgendamento.id)
         .maybeSingle();
-      if (cancelado || !data) return;
+      if (cancelado) return;
+      // Usado uma vez só: sem isso, ao voltar pra Agenda (ou reabrir o app)
+      // ela pulava de novo pro dia do aviso em vez de abrir hoje.
+      aoUsarFoco?.();
+      if (!data) return;
+      abertoPeloAviso.current = true;
       const dataStr = data.data_hora.split('T')[0];
       setAbaProfissional(data.profissional_id);
       setDiaSelecionado(dataStr);
@@ -331,6 +337,34 @@ function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
     return () => { cancelado = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focoAgendamento?.n]);
+
+  // Voltou pro app (iPhone: saiu pra tela de início e abriu de novo) depois
+  // de ter aberto um agendamento pelo aviso, ou depois de 10+ min fora, ou
+  // virou o dia: a Agenda volta pra hoje.
+  useEffect(() => {
+    let saiuEm = null;
+    const aoMudarVisibilidade = () => {
+      if (document.visibilityState === 'hidden') {
+        saiuEm = Date.now();
+        return;
+      }
+      if (saiuEm === null) return;
+      const ficouFora = Date.now() - saiuEm;
+      const diaSaida = formatarDataLocalISO(new Date(saiuEm));
+      saiuEm = null;
+      const hoje = formatarDataLocalISO(new Date());
+      if (!abertoPeloAviso.current && ficouFora < 10 * 60 * 1000 && diaSaida === hoje) return;
+      abertoPeloAviso.current = false;
+      setDiaSelecionado(hoje);
+      setSemanaAncora(new Date());
+      setMesAtual(new Date());
+      setIdEmFoco(null);
+      buscarAgendamentos();
+    };
+    document.addEventListener('visibilitychange', aoMudarVisibilidade);
+    return () => document.removeEventListener('visibilitychange', aoMudarVisibilidade);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!focoPendente) return undefined;
@@ -455,7 +489,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
           cancelado_por,
           cancelado_em,
           utm_source, utm_campaign, utm_content,
-          grupo_preco_id, grupos_preco:grupo_preco_id(nome),
+          grupo_preco_id, grupos_preco:grupo_preco_id(nome), elegivel_desconto_recorrencia, preco_antes_desconto,
           clientes(id, nome, email, telefone),
           profissionais:profissional_id(id, nome),
           servicos:servico_id(id, nome)
@@ -483,6 +517,8 @@ function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
           status: agendamento.status,
           preco: agendamento.preco_final,
           grupoPreco: agendamento.grupo_preco_id ? (agendamento.grupos_preco?.nome || t('agendamentos.precoEspecial')) : null,
+          descontoRecorrencia: !!agendamento.elegivel_desconto_recorrencia,
+          precoAntesDesconto: agendamento.preco_antes_desconto ? Number(agendamento.preco_antes_desconto) : null,
           observacoesCompletas: agendamento.observacoes || '',
           encaixe: !!agendamento.observacoes?.startsWith('[ENCAIXE]'),
           origemAnuncio: agendamento.utm_source ? [agendamento.utm_source, agendamento.utm_campaign, agendamento.utm_content].filter(Boolean).join(' · ') : null,
@@ -1686,7 +1722,7 @@ function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
                               >
                                 {statusOpcoes.map(s => <option key={s} value={s}>{t(`statusAg.${s}`)}</option>)}
                               </select>
-                              <span className="agenda-card-preco" title={a.grupoPreco || undefined}>{a.grupoPreco ? '💎 ' : ''}{a.preco ? `¥${a.preco.toLocaleString('ja-JP')}` : '-'}</span>
+                              <span className="agenda-card-preco" title={a.descontoRecorrencia ? t('agendamentos.descontoRecorrencia') : (a.grupoPreco || undefined)}>{a.grupoPreco ? '💎 ' : ''}{a.preco ? `¥${a.preco.toLocaleString('ja-JP')}` : '-'}{a.descontoRecorrencia && <span className="agenda-card-recorrencia"> 🔁 -15%</span>}</span>
                             </div>
                           </>
                         )}
@@ -2595,6 +2631,12 @@ function Agendamentos({ t: tProp, idioma: idiomaProp, focoAgendamento }) {
                 <span className="detalhe-campo-valor">
                   {detalhesAgendamento.preco ? `¥${detalhesAgendamento.preco.toLocaleString('ja-JP')}` : '-'}
                   {detalhesAgendamento.grupoPreco && <span style={{ color: '#d4af37', marginLeft: '6px', fontSize: '12px' }}>💎 {detalhesAgendamento.grupoPreco}</span>}
+                  {detalhesAgendamento.descontoRecorrencia && (
+                    <div style={{ color: '#4ade80', fontSize: '12px', marginTop: '4px', fontWeight: 'bold' }}>
+                      🔁 {t('agendamentos.descontoRecorrencia')}
+                      {detalhesAgendamento.precoAntesDesconto ? ` (¥${detalhesAgendamento.precoAntesDesconto.toLocaleString('ja-JP')} → ¥${Number(detalhesAgendamento.preco || 0).toLocaleString('ja-JP')})` : ''}
+                    </div>
+                  )}
                 </span>
               </div>
             </div>
